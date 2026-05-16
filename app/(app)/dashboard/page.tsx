@@ -77,8 +77,8 @@ export default async function DashboardPage() {
 
   // Agrupar top deudores por persona
   const deudoresMapa = new Map<string, { nombre: string; apellido: string | null; telefono: string | null; total: number }>()
-  topDeudores?.forEach((c) => {
-    const p = c.persona as any
+  (topDeudores as any)?.forEach((c: any) => {
+    const p = c.persona
     if (!p) return
     const prev = deudoresMapa.get(c.persona_id)
     deudoresMapa.set(c.persona_id, {
