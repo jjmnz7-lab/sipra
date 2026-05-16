@@ -35,5 +35,12 @@
     "tailwindcss": "^4",
     "typescript": "^5"
   },
-  "packageManager": "pnpm@11.1.2"
+  "packageManager": "pnpm@11.1.2",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "msw",
+      "sharp",
+      "unrs-resolver"
+    ]
+  }
 }
