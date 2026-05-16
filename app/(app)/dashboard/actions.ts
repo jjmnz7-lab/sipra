@@ -13,7 +13,7 @@ export type FormState = {
 
 const generarSchema = z.object({
   concepto: z.string().min(3, { message: 'El concepto necesita al menos 3 caracteres' }),
-  monto: z.coerce.number({ invalid_type_error: 'El monto debe ser un número' }).positive({ message: 'El monto debe ser mayor a 0' }),
+  monto: z.coerce.number().positive({ message: 'El monto debe ser mayor a 0' }),
   fecha_vencimiento: z.string().min(1, { message: 'La fecha de vencimiento es requerida' }),
 })
 
