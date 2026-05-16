@@ -28,9 +28,9 @@ export default async function DashboardPage() {
     { data: academia },
     { data: ingresosMes },
     { data: deudaVencida },
-    { data: alumnosActivos },
+    { count: alumnosActivos },
     { data: topDeudores },
-    { data: avisosPendientes },
+    { count: avisosPendientes },
   ] = await Promise.all([
     // Academia name
     supabase.from('academia').select('nombre').eq('id', academiaId).single(),
