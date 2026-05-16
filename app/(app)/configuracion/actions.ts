@@ -57,7 +57,7 @@ export async function ejecutarMotorRecargosAction(prevState: FormState, formData
 
   if (!academiaId) return { message: 'Academia no encontrada', success: false }
 
-  const { data, error } = await supabase.rpc('procesar_recargos_v1', {
+  const { data, error } = await (supabase as any).rpc('procesar_recargos_v1', {
     p_academia_id: academiaId
   })
 
