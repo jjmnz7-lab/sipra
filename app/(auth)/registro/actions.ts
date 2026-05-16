@@ -66,7 +66,7 @@ export async function registroAction(prevState: RegistroState, formData: FormDat
   }
 
   // 2. Llamar a la RPC transaccional para crear academia y ligar usuario
-  const { error: rpcError } = await supabase.rpc('registrar_owner_v1', {
+  const { error: rpcError } = await (supabase as any).rpc('registrar_owner_v1', {
     p_nombre_academia: validatedFields.data.nombreAcademia,
     p_nombre_owner: validatedFields.data.nombreOwner,
     p_apellido_owner: validatedFields.data.apellidoOwner || null,
