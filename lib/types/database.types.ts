@@ -1,7 +1,27 @@
 export type Database = {
   public: {
     Tables: {
-      [key: string]: {
+      academia: {
+        Row: any;
+        Insert: any;
+        Update: any;
+      };
+      cargo: {
+        Row: any;
+        Insert: any;
+        Update: any;
+      };
+      movimiento: {
+        Row: any;
+        Insert: any;
+        Update: any;
+      };
+      persona: {
+        Row: any;
+        Insert: any;
+        Update: any;
+      };
+      envio_sugerido: {
         Row: any;
         Insert: any;
         Update: any;
