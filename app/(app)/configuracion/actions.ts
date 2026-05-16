@@ -37,8 +37,8 @@ export async function guardarConfiguracionRecargosAction(prevState: FormState, f
     escalones
   }
 
-  const { error } = await supabase
-    .from('academia')
+  const { error } = await (supabase
+    .from('academia') as any)
     .update({ config_recargos: newConfig })
     .eq('id', academiaId)
 
