@@ -70,8 +70,8 @@ export default async function DashboardPage() {
       .eq('estado', 'pendiente_revision'),
   ])
 
-  const totalIngresos = ingresosMes?.reduce((acc, m) => acc + Number(m.monto_total), 0) || 0
-  const totalDeudaVencida = deudaVencida?.reduce((acc, c) => acc + Number(c.saldo_pendiente), 0) || 0
+  const totalIngresos = (ingresosMes as any)?.reduce((acc: number, m: any) => acc + Number(m.monto_total), 0) || 0
+  const totalDeudaVencida = (deudaVencida as any)?.reduce((acc: number, c: any) => acc + Number(c.saldo_pendiente), 0) || 0
   const cantAlumnos = alumnosActivos ?? 0
   const cantAvisos = avisosPendientes ?? 0
 

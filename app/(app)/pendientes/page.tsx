@@ -29,12 +29,12 @@ export default async function PendientesPage() {
 
   // 3. Calcular KPIs
   const totalVencido = cargos
-    ?.filter(c => c.estado_financiero === 'vencido')
-    .reduce((acc, c) => acc + Number(c.saldo_pendiente), 0) || 0
+    ?.filter((c: any) => c.estado_financiero === 'vencido')
+    .reduce((acc: number, c: any) => acc + Number(c.saldo_pendiente), 0) || 0
 
   const totalPendiente = cargos
-    ?.filter(c => c.estado_financiero === 'pendiente' || c.estado_financiero === 'parcial')
-    .reduce((acc, c) => acc + Number(c.saldo_pendiente), 0) || 0
+    ?.filter((c: any) => c.estado_financiero === 'pendiente' || c.estado_financiero === 'parcial')
+    .reduce((acc: number, c: any) => acc + Number(c.saldo_pendiente), 0) || 0
 
   // Fetch lo cobrado hoy
   const hoy = new Date().toISOString().split('T')[0]
@@ -44,7 +44,7 @@ export default async function PendientesPage() {
     .eq('estado', 'registrado')
     .gte('fecha_pago', `${hoy}T00:00:00Z`)
   
-  const totalCobrado = cobradoHoy?.reduce((acc, m) => acc + Number(m.monto_total), 0) || 0
+  const totalCobrado = (cobradoHoy as any)?.reduce((acc: number, m: any) => acc + Number(m.monto_total), 0) || 0
 
   return (
     <div className="flex flex-col h-full min-h-screen bg-slate-50 pb-24">
