@@ -15,7 +15,7 @@ export default async function ConfiguracionPage() {
     .eq('id', academiaId)
     .single()
 
-  const config = academia?.config_recargos || { activo: false, escalones: [] }
+  const config = (academia as any)?.config_recargos || { activo: false, escalones: [] }
 
   return (
     <div className="flex flex-col h-full min-h-screen bg-slate-50 pb-20">
@@ -23,7 +23,7 @@ export default async function ConfiguracionPage() {
         <h1 className="text-xl font-bold tracking-tight text-slate-900 flex items-center">
           <Settings className="mr-2 h-5 w-5" /> Ajustes
         </h1>
-        <p className="text-sm text-slate-500">{academia?.nombre}</p>
+        <p className="text-sm text-slate-500">{(academia as any)?.nombre}</p>
       </div>
 
       <div className="p-4 space-y-6">
