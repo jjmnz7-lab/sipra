@@ -19,6 +19,8 @@ import {
   DrawerTrigger,
 } from '@/components/ui/drawer'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import type { CargoConPersona } from '@/lib/types/domain'
+import { METODOS_PAGO } from '@/lib/types/domain'
 
 const initialState: FormState = {}
 
@@ -32,7 +34,7 @@ function SubmitButton() {
   )
 }
 
-export function RegistrarPagoDrawer({ cargo, children }: { cargo: any, children: React.ReactNode }) {
+export function RegistrarPagoDrawer({ cargo, children }: { cargo: CargoConPersona, children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
   const [state, formAction] = useActionState(registrarPagoAction, initialState)
   const [idempotencyKey, setIdempotencyKey] = useState('')
@@ -62,7 +64,7 @@ export function RegistrarPagoDrawer({ cargo, children }: { cargo: any, children:
               <Banknote className="mr-2 h-5 w-5" /> Registrar Pago
             </DrawerTitle>
             <DrawerDescription>
-              Cobro a <strong>{cargo.persona.nombre} {cargo.persona.apellido}</strong> por {cargo.concepto}.
+              Cobro a <strong>{cargo.persona?.nombre ?? '—'} {cargo.persona?.apellido ?? ''}</strong> por {cargo.concepto}.
             </DrawerDescription>
           </DrawerHeader>
           
@@ -98,11 +100,11 @@ export function RegistrarPagoDrawer({ cargo, children }: { cargo: any, children:
                     <SelectValue placeholder="Selecciona el método" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="efectivo">Efectivo</SelectItem>
-                    <SelectItem value="transferencia">Transferencia</SelectItem>
-                    <SelectItem value="tarjeta">Tarjeta</SelectItem>
-                    <SelectItem value="deposito">Depósito</SelectItem>
-                    <SelectItem value="otro">Otro</SelectItem>
+                    {METODOS_PAGO.map(m => (
+                      <SelectItem key={m} value={m}>
+                        {m.charAt(0).toUpperCase() + m.slice(1)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 {state?.errors?.metodo_pago && <p className="text-sm text-red-600">{state.errors.metodo_pago[0]}</p>}

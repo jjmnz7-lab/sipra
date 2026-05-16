@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { EnvioCard } from '@/components/domain/envio/envio-card'
 import { MotorRecordatoriosBoton } from '@/components/domain/envio/motor-recordatorios-boton'
 import { MessageSquare, CheckCircle2 } from 'lucide-react'
+import type { EnvioSugerido } from '@/lib/types/domain'
 
 export default async function RecordatoriosPage() {
   const supabase = await createClient()
@@ -10,7 +11,7 @@ export default async function RecordatoriosPage() {
     .from('envio_sugerido')
     .select('*')
     .eq('estado', 'pendiente_revision')
-    .order('fecha_sugerida', { ascending: false })
+    .order('fecha_sugerida', { ascending: false }) as { data: EnvioSugerido[] | null; error: unknown }
 
   return (
     <div className="flex flex-col h-full min-h-screen bg-slate-50 pb-20">

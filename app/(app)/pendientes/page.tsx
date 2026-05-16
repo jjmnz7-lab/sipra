@@ -5,6 +5,7 @@ import { formatCurrency } from '@/lib/utils/currency'
 import { RegistrarPagoDrawer } from '@/components/domain/cargo/registrar-pago-drawer'
 import { CrearCargoDrawer } from '@/components/domain/cargo/crear-cargo-drawer'
 import { Calendar, Banknote } from 'lucide-react'
+import type { CargoConPersona } from '@/lib/types/domain'
 
 export default async function PendientesPage() {
   const supabase = await createClient()
@@ -15,7 +16,7 @@ export default async function PendientesPage() {
     .select('id, nombre, apellido')
     .eq('etiqueta', 'alumno')
     .eq('estado_global', 'al_corriente') // O traer todos activos
-    .order('nombre')
+    .order('nombre') as any
 
   // 2. Fetch cargos operativos
   const { data: cargos } = await supabase
@@ -25,7 +26,7 @@ export default async function PendientesPage() {
       persona (nombre, apellido)
     `)
     .in('estado_financiero', ['vencido', 'pendiente', 'parcial'])
-    .order('fecha_vencimiento', { ascending: true })
+    .order('fecha_vencimiento', { ascending: true }) as { data: CargoConPersona[] | null; error: unknown }
 
   // 3. Calcular KPIs
   const totalVencido = cargos
@@ -89,7 +90,7 @@ export default async function PendientesPage() {
                   <div className="flex-1">
                     <div className="flex justify-between items-start mb-1">
                       <h3 className="font-bold text-slate-900 leading-tight">
-                        {cargo.persona.nombre} {cargo.persona.apellido}
+                        {cargo.persona?.nombre ?? '—'} {cargo.persona?.apellido ?? ''}
                       </h3>
                       <Badge 
                         variant={isVencido ? 'destructive' : 'outline'}

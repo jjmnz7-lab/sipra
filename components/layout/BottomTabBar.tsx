@@ -20,7 +20,7 @@ export function BottomTabBar() {
     <nav className="fixed bottom-0 w-full bg-white border-t border-slate-200 pb-safe lg:hidden z-50">
       <div className="flex justify-around items-center h-16">
         {navItems.map((item) => {
-          const isActive = pathname.startsWith(item.href)
+          const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
           const Icon = item.icon
           return (
             <Link

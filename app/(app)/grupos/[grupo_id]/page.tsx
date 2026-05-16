@@ -14,7 +14,7 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ g
     .from('grupo')
     .select('*')
     .eq('id', grupo_id)
-    .single()
+    .single() as any
 
   if (!grupo) {
     notFound()
@@ -29,7 +29,7 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ g
     `)
     .eq('grupo_id', grupo_id)
     .eq('estado', 'activo')
-    .order('fecha_inscripcion', { ascending: false })
+    .order('fecha_inscripcion', { ascending: false }) as any
 
   return (
     <div className="flex flex-col h-full min-h-screen pb-20">

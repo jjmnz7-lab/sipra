@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
+import { translateRpcError } from '@/lib/utils/rpc-errors'
 
 const grupoSchema = z.object({
   nombre: z.string().min(2, { message: 'El nombre debe tener al menos 2 caracteres' }),
@@ -51,10 +52,10 @@ export async function crearGrupoAction(prevState: FormState, formData: FormData)
     academia_id: academiaId,
     nombre: validatedFields.data.nombre,
     descripcion: validatedFields.data.descripcion || null,
-  })
+  } as any)
 
   if (error) {
-    return { message: error.message, success: false }
+    return { message: translateRpcError(error), success: false }
   }
 
   revalidatePath('/grupos')
@@ -94,10 +95,10 @@ export async function crearPersonaAction(prevState: FormState, formData: FormDat
     apellido: validatedFields.data.apellido || null,
     telefono_whatsapp: validatedFields.data.telefono_whatsapp || null,
     email: validatedFields.data.email || null,
-  }).select('id').single()
+  } as any).select('id').single() as any
 
   if (personaError || !personaData) {
-    return { message: personaError?.message || 'Error al crear persona', success: false }
+    return { message: personaError ? translateRpcError(personaError) : 'Error al crear persona', success: false }
   }
 
   // 2. Si hay un grupo, inscribirlo atómicamente
@@ -106,7 +107,7 @@ export async function crearPersonaAction(prevState: FormState, formData: FormDat
       academia_id: academiaId,
       persona_id: personaData.id,
       grupo_id: validatedFields.data.grupo_id,
-    })
+    } as any)
 
     if (pgError) {
        return { message: 'Alumno creado, pero hubo error al inscribirlo al grupo: ' + pgError.message, success: false }

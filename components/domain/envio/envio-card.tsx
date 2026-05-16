@@ -4,23 +4,24 @@ import * as React from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils/currency'
+import { buildWhatsAppUrl, buildRecordatorioMensaje } from '@/lib/utils/whatsapp'
 import { MessageCircle, XCircle } from 'lucide-react'
 import { procesarEnvioAction } from '@/app/(app)/recordatorios/actions'
 import { useTransition } from 'react'
+import type { EnvioSugerido } from '@/lib/types/domain'
 
-export function EnvioCard({ envio }: { envio: any }) {
+export function EnvioCard({ envio }: { envio: EnvioSugerido }) {
   const [isPending, startTransition] = useTransition()
-  const meta = envio.metadata as Record<string, any>
+  const meta = (envio as any).metadata as Record<string, unknown>
 
-  const telefono = meta.telefono
-  const nombre = meta.persona_nombre || 'Alumno'
-  const academia = meta.academia_nombre || 'la academia'
-  const deuda = formatCurrency(meta.monto_adeudado || 0)
-  const concepto = meta.concepto || 'mensualidad'
+  const nombre = String(meta?.persona_nombre ?? 'Alumno')
+  const academia = String(meta?.academia_nombre ?? 'la academia')
+  const monto = Number(meta?.monto_adeudado ?? 0)
+  const concepto = String(meta?.concepto ?? 'mensualidad')
+  const telefono = String(meta?.telefono ?? '')
 
-  // Mensaje pre-llenado
-  const mensaje = `Hola ${nombre}, te escribimos de ${academia} para recordarte amablemente tu pago pendiente de ${deuda} por concepto de: ${concepto}. ¡Gracias!`
-  const waUrl = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`
+  const mensaje = buildRecordatorioMensaje({ nombre, academia, monto, concepto })
+  const waUrl = buildWhatsAppUrl(telefono, mensaje)
 
   const handleAction = (accion: 'enviar' | 'ignorar') => {
     startTransition(() => {
@@ -31,14 +32,13 @@ export function EnvioCard({ envio }: { envio: any }) {
     })
   }
 
-  // Si está en pending, se aplica una opacidad para hacer optimista la transición
   return (
     <Card className={`overflow-hidden shadow-sm transition-all duration-200 ${isPending ? 'opacity-30 scale-[0.98] pointer-events-none' : ''}`}>
       <CardContent className="p-4">
         <div className="flex justify-between items-start mb-2">
           <div>
             <h3 className="font-bold text-slate-900 leading-tight">{nombre}</h3>
-            <p className="text-sm text-red-600 font-semibold">{deuda}</p>
+            <p className="text-sm text-red-600 font-semibold">{formatCurrency(monto)}</p>
           </div>
           <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-md">
             Recordatorio
@@ -46,16 +46,14 @@ export function EnvioCard({ envio }: { envio: any }) {
         </div>
         
         <p className="text-xs text-slate-600 mb-4 line-clamp-2">
-          "{mensaje}"
+          &quot;{mensaje}&quot;
         </p>
 
         <div className="flex gap-2">
           <Button 
             className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white" 
             onClick={() => {
-              // Abrimos WA en pestaña nueva
               window.open(waUrl, '_blank', 'noopener,noreferrer')
-              // Y marcamos como enviado
               handleAction('enviar')
             }}
           >

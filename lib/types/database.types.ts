@@ -1,7 +1,9 @@
-// Tipos fallback generados manualmente (sin Docker local).
+// Tipos generados manualmente (sin Docker local).
 // Reemplazar con: npx supabase gen types typescript --project-id <id> > lib/types/database.types.ts
+// NOTA: Los index signatures [key: string]: unknown han sido eliminados intencionalmente
+// porque rompen la inferencia de tipos relacionales en el cliente Supabase (produce 'never').
 
-type Json = string | number | boolean | null | { [key: string]: Json } | Json[]
+export type Json = string | number | boolean | null | { [key: string]: Json } | Json[]
 
 export type Database = {
   public: {
@@ -14,21 +16,21 @@ export type Database = {
           config_recargos: Json | null
           next_run_utc: string | null
           created_at: string
-          [key: string]: unknown
         }
         Insert: {
           id?: string
           nombre: string
           estado_tenant?: string
           config_recargos?: Json | null
-          [key: string]: unknown
+          next_run_utc?: string | null
+          created_at?: string
         }
         Update: {
           id?: string
           nombre?: string
           estado_tenant?: string
           config_recargos?: Json | null
-          [key: string]: unknown
+          next_run_utc?: string | null
         }
       }
       usuario: {
@@ -41,7 +43,6 @@ export type Database = {
           rol: string
           estado: string
           created_at: string
-          [key: string]: unknown
         }
         Insert: {
           id?: string
@@ -51,14 +52,13 @@ export type Database = {
           email_snapshot: string
           rol?: string
           estado?: string
-          [key: string]: unknown
+          created_at?: string
         }
         Update: {
           nombre?: string
           apellido?: string | null
           rol?: string
           estado?: string
-          [key: string]: unknown
         }
       }
       persona: {
@@ -68,10 +68,11 @@ export type Database = {
           nombre: string
           apellido: string | null
           telefono_whatsapp: string | null
+          email: string | null
           etiqueta: string | null
           estado_registro: string
+          estado_global: string | null
           created_at: string
-          [key: string]: unknown
         }
         Insert: {
           id?: string
@@ -79,17 +80,20 @@ export type Database = {
           nombre: string
           apellido?: string | null
           telefono_whatsapp?: string | null
+          email?: string | null
           etiqueta?: string | null
           estado_registro?: string
-          [key: string]: unknown
+          estado_global?: string | null
+          created_at?: string
         }
         Update: {
           nombre?: string
           apellido?: string | null
           telefono_whatsapp?: string | null
+          email?: string | null
           etiqueta?: string | null
           estado_registro?: string
-          [key: string]: unknown
+          estado_global?: string | null
         }
       }
       cargo: {
@@ -99,12 +103,11 @@ export type Database = {
           persona_id: string
           concepto: string
           monto_original: number
+          monto_disponible: number
           saldo_pendiente: number
           estado_financiero: string
           fecha_vencimiento: string
           created_at: string
-          persona?: { nombre: string; apellido: string | null; telefono_whatsapp: string | null } | null
-          [key: string]: unknown
         }
         Insert: {
           id?: string
@@ -112,18 +115,19 @@ export type Database = {
           persona_id: string
           concepto: string
           monto_original: number
+          monto_disponible?: number
           saldo_pendiente?: number
           estado_financiero?: string
           fecha_vencimiento: string
-          [key: string]: unknown
+          created_at?: string
         }
         Update: {
           concepto?: string
           monto_original?: number
+          monto_disponible?: number
           saldo_pendiente?: number
           estado_financiero?: string
           fecha_vencimiento?: string
-          [key: string]: unknown
         }
       }
       movimiento: {
@@ -132,24 +136,54 @@ export type Database = {
           academia_id: string
           persona_id: string
           monto_total: number
+          monto_disponible: number
           estado: string
+          metodo_pago: string | null
+          referencia: string | null
+          idempotency_key: string | null
           fecha_pago: string
           created_at: string
-          [key: string]: unknown
         }
         Insert: {
           id?: string
           academia_id: string
           persona_id: string
           monto_total: number
+          monto_disponible?: number
           estado?: string
+          metodo_pago?: string | null
+          referencia?: string | null
+          idempotency_key?: string | null
           fecha_pago?: string
-          [key: string]: unknown
+          created_at?: string
         }
         Update: {
           monto_total?: number
+          monto_disponible?: number
           estado?: string
-          [key: string]: unknown
+          metodo_pago?: string | null
+          referencia?: string | null
+        }
+      }
+      aplicacion_movimiento: {
+        Row: {
+          id: string
+          academia_id: string
+          movimiento_id: string
+          cargo_id: string
+          monto_aplicado: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          academia_id: string
+          movimiento_id: string
+          cargo_id: string
+          monto_aplicado: number
+          created_at?: string
+        }
+        Update: {
+          monto_aplicado?: number
         }
       }
       grupo: {
@@ -159,8 +193,8 @@ export type Database = {
           nombre: string
           descripcion: string | null
           estado: string
+          orden_visual: number | null
           created_at: string
-          [key: string]: unknown
         }
         Insert: {
           id?: string
@@ -168,13 +202,14 @@ export type Database = {
           nombre: string
           descripcion?: string | null
           estado?: string
-          [key: string]: unknown
+          orden_visual?: number | null
+          created_at?: string
         }
         Update: {
           nombre?: string
           descripcion?: string | null
           estado?: string
-          [key: string]: unknown
+          orden_visual?: number | null
         }
       }
       persona_grupo: {
@@ -183,19 +218,22 @@ export type Database = {
           academia_id: string
           persona_id: string
           grupo_id: string
+          estado: string
+          fecha_inscripcion: string | null
           created_at: string
-          persona?: { nombre: string; apellido: string | null; telefono_whatsapp: string | null } | null
-          [key: string]: unknown
         }
         Insert: {
           id?: string
           academia_id: string
           persona_id: string
           grupo_id: string
-          [key: string]: unknown
+          estado?: string
+          fecha_inscripcion?: string | null
+          created_at?: string
         }
         Update: {
-          [key: string]: unknown
+          estado?: string
+          fecha_inscripcion?: string | null
         }
       }
       envio_sugerido: {
@@ -204,25 +242,35 @@ export type Database = {
           academia_id: string
           persona_id: string
           cargo_id: string | null
+          tipo_mensaje: string
           estado: string
+          invalid_reason: string | null
+          fecha_sugerida: string
+          fecha_procesado: string | null
           mensaje_sugerido: string | null
+          metadata: Json
           created_at: string
-          persona?: { nombre: string; apellido: string | null; telefono_whatsapp: string | null } | null
-          [key: string]: unknown
         }
         Insert: {
           id?: string
           academia_id: string
           persona_id: string
           cargo_id?: string | null
+          tipo_mensaje: string
           estado?: string
+          invalid_reason?: string | null
+          fecha_sugerida?: string
+          fecha_procesado?: string | null
           mensaje_sugerido?: string | null
-          [key: string]: unknown
+          metadata?: Json
+          created_at?: string
         }
         Update: {
           estado?: string
+          invalid_reason?: string | null
+          fecha_procesado?: string | null
           mensaje_sugerido?: string | null
-          [key: string]: unknown
+          metadata?: Json
         }
       }
       evento_timeline: {
@@ -233,9 +281,12 @@ export type Database = {
           categoria: string
           tipo: string
           titulo: string
-          metadata: Json | null
+          descripcion: string | null
+          fecha_evento: string
+          actor_id: string | null
+          actor_nombre: string | null
+          metadata: Json
           created_at: string
-          [key: string]: unknown
         }
         Insert: {
           id?: string
@@ -244,11 +295,17 @@ export type Database = {
           categoria: string
           tipo: string
           titulo: string
-          metadata?: Json | null
-          [key: string]: unknown
+          descripcion?: string | null
+          fecha_evento?: string
+          actor_id?: string | null
+          actor_nombre?: string | null
+          metadata?: Json
+          created_at?: string
         }
         Update: {
-          [key: string]: unknown
+          titulo?: string
+          descripcion?: string | null
+          metadata?: Json
         }
       }
       suscripcion_academia: {
@@ -262,7 +319,7 @@ export type Database = {
           fecha_inicio: string
           fecha_fin: string | null
           trial_ends_at: string | null
-          [key: string]: unknown
+          created_at: string
         }
         Insert: {
           id?: string
@@ -274,10 +331,46 @@ export type Database = {
           fecha_inicio?: string
           fecha_fin?: string | null
           trial_ends_at?: string | null
-          [key: string]: unknown
+          created_at?: string
         }
         Update: {
-          [key: string]: unknown
+          estado?: string
+          is_current?: boolean
+          precio_mensual?: number
+          fecha_inicio?: string
+          fecha_fin?: string | null
+          trial_ends_at?: string | null
+        }
+      }
+      job_execution: {
+        Row: {
+          id: string
+          job_name: string
+          academia_id: string | null
+          status: string
+          started_at: string
+          completed_at: string | null
+          records_procesed: number | null
+          error_message: string | null
+          metadata: Json
+        }
+        Insert: {
+          id?: string
+          job_name: string
+          academia_id?: string | null
+          status: string
+          started_at?: string
+          completed_at?: string | null
+          records_procesed?: number | null
+          error_message?: string | null
+          metadata?: Json
+        }
+        Update: {
+          status?: string
+          completed_at?: string | null
+          records_procesed?: number | null
+          error_message?: string | null
+          metadata?: Json
         }
       }
     }

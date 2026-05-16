@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { translateRpcError } from '@/lib/utils/rpc-errors'
 
 export type FormState = {
   message?: string | null
@@ -20,7 +21,7 @@ export async function ejecutarMotorRecordatoriosAction(prevState: FormState, for
   })
 
   if (error) {
-    return { message: error.message, success: false }
+    return { message: translateRpcError(error), success: false }
   }
 
   revalidatePath('/recordatorios')
@@ -45,13 +46,11 @@ export async function procesarEnvioAction(formData: FormData) {
   
   const nuevoEstado = accion === 'enviar' ? 'enviado' : 'ignorado'
 
-  await supabase
-    .from('envio_sugerido')
-    .update({ 
-      estado: nuevoEstado,
-      fecha_procesado: new Date().toISOString()
-    })
-    .eq('id', envioId)
+  const sb = supabase as unknown as { from: (t: string) => { update: (v: unknown) => { eq: (col: string, val: string) => Promise<unknown> } } }
+  await sb.from('envio_sugerido').update({ 
+    estado: nuevoEstado,
+    fecha_procesado: new Date().toISOString()
+  }).eq('id', envioId)
 
   // Opcional: registrar en el timeline que se envió un recordatorio
   // (Para simplificar, asumimos que solo marcar como enviado en el outbox es suficiente).

@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils/currency'
+import { buildWhatsAppUrl, buildRecordatorioMensaje } from '@/lib/utils/whatsapp'
 import { GenerarMensualidadesDrawer } from '@/components/domain/cargo/generar-mensualidades-drawer'
 import {
   TrendingUp,
@@ -19,78 +20,24 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   const academiaId = user?.app_metadata?.academia_id
 
-  // Fetch in parallel for performance
-  const mesInicio = new Date()
-  mesInicio.setDate(1)
-  mesInicio.setHours(0, 0, 0, 0)
+  const { data: academia } = await supabase.from('academia').select('nombre').eq('id', academiaId).single() as { data: { nombre: string } | null; error: unknown }
 
-  const [
-    { data: academia },
-    { data: ingresosMes },
-    { data: deudaVencida },
-    { count: alumnosActivos },
-    { data: topDeudores },
-    { count: avisosPendientes },
-  ] = await Promise.all([
-    // Academia name
-    supabase.from('academia').select('nombre').eq('id', academiaId).single(),
+  const { data: kpis } = await (supabase as any).rpc('get_dashboard_kpis_v1', { p_academia_id: academiaId })
 
-    // Ingresos del mes: SUM de movimientos registrados este mes
-    supabase
-      .from('movimiento')
-      .select('monto_total')
-      .eq('estado', 'registrado')
-      .gte('fecha_pago', mesInicio.toISOString()),
-
-    // Deuda vencida total
-    supabase
-      .from('cargo')
-      .select('saldo_pendiente')
-      .eq('estado_financiero', 'vencido'),
-
-    // Alumnos activos
-    supabase
-      .from('persona')
-      .select('id', { count: 'exact', head: true })
-      .eq('etiqueta', 'alumno')
-      .eq('estado_registro', 'activo'),
-
-    // Top 5 deudores (personas con mayor saldo vencido)
-    supabase
-      .from('cargo')
-      .select('persona_id, saldo_pendiente, persona(nombre, apellido, telefono_whatsapp)')
-      .eq('estado_financiero', 'vencido')
-      .order('saldo_pendiente', { ascending: false })
-      .limit(20),
-
-    // Avisos pendientes count
-    supabase
-      .from('envio_sugerido')
-      .select('id', { count: 'exact', head: true })
-      .eq('estado', 'pendiente_revision'),
-  ])
-
-  const totalIngresos = (ingresosMes as any)?.reduce((acc: number, m: any) => acc + Number(m.monto_total), 0) || 0
-  const totalDeudaVencida = (deudaVencida as any)?.reduce((acc: number, c: any) => acc + Number(c.saldo_pendiente), 0) || 0
-  const cantAlumnos = alumnosActivos ?? 0
-  const cantAvisos = avisosPendientes ?? 0
-
-  // Agrupar top deudores por persona
-  const deudoresMapa = new Map<string, { nombre: string; apellido: string | null; telefono: string | null; total: number }>()
-  ;(topDeudores as any)?.forEach((c: any) => {
-    const p = c.persona
-    if (!p) return
-    const prev = deudoresMapa.get(c.persona_id)
-    deudoresMapa.set(c.persona_id, {
-      nombre: p.nombre,
-      apellido: p.apellido,
-      telefono: p.telefono_whatsapp,
-      total: (prev?.total || 0) + Number(c.saldo_pendiente),
-    })
-  })
-  const topDeudoresList = Array.from(deudoresMapa.entries())
-    .sort(([, a], [, b]) => b.total - a.total)
-    .slice(0, 5)
+  const totalIngresos = kpis?.total_ingresos || 0
+  const totalDeudaVencida = kpis?.total_deuda_vencida || 0
+  const cantAlumnos = kpis?.cant_alumnos || 0
+  const cantAvisos = kpis?.cant_avisos || 0
+  
+  const topDeudoresList = kpis?.top_deudores?.map((d: any) => [
+    d.persona_id, 
+    { 
+      nombre: d.persona.nombre, 
+      apellido: d.persona.apellido, 
+      telefono: d.persona.telefono_whatsapp, 
+      total: d.total 
+    }
+  ]) || []
 
   const mesActual = new Date().toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })
 
@@ -180,11 +127,14 @@ export default async function DashboardPage() {
               </Link>
             </div>
             <div className="space-y-2">
-              {topDeudoresList.map(([personaId, deudor]) => {
-                const mensaje = `Hola ${deudor.nombre}, te escribimos de ${academia?.nombre || 'la academia'} para recordarte tu saldo pendiente de ${formatCurrency(deudor.total)}. ¡Gracias!`
-                const waUrl = deudor.telefono
-                  ? `https://wa.me/${deudor.telefono}?text=${encodeURIComponent(mensaje)}`
-                  : null
+              {(topDeudoresList as [string, { nombre: string; apellido: string | null; telefono: string | null; total: number }][]).map(([personaId, deudor]) => {
+                const mensaje = buildRecordatorioMensaje({
+                  nombre: deudor.nombre,
+                  academia: (academia as any)?.nombre ?? 'la academia',
+                  monto: deudor.total,
+                  concepto: 'saldo vencido',
+                })
+                const waUrl = buildWhatsAppUrl(deudor.telefono, mensaje)
 
                 return (
                   <Card key={personaId} className="overflow-hidden">

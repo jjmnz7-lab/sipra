@@ -7,6 +7,12 @@ import { AnularPagoDrawer } from '@/components/domain/timeline/anular-pago-drawe
 import { ArrowLeft, Phone, Clock, CheckCircle2, AlertCircle, RefreshCcw } from 'lucide-react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import type { Database } from '@/lib/types/database.types'
+
+type PersonaConCargo = Database['public']['Tables']['persona']['Row'] & {
+  cargo: Pick<Database['public']['Tables']['cargo']['Row'], 'saldo_pendiente' | 'estado_financiero'>[] | null
+}
+type EventoRow = Database['public']['Tables']['evento_timeline']['Row']
 
 export default async function SeguimientoPersonaPage({ params }: { params: Promise<{ persona_id: string }> }) {
   const { persona_id } = await params
@@ -17,7 +23,7 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
     .from('persona')
     .select('*, cargo (saldo_pendiente, estado_financiero)')
     .eq('id', persona_id)
-    .single()
+    .single() as { data: PersonaConCargo | null; error: unknown }
 
   if (!persona) notFound()
 
@@ -28,7 +34,7 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
     .from('evento_timeline')
     .select('*')
     .eq('persona_id', persona_id)
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: false }) as { data: EventoRow[] | null; error: unknown }
 
   return (
     <div className="flex flex-col h-full min-h-screen bg-slate-50 pb-20">

@@ -6,6 +6,14 @@ import { CrearGrupoDrawer } from '@/components/domain/grupo/crear-grupo-drawer'
 import { CrearPersonaDrawer } from '@/components/domain/persona/crear-persona-drawer'
 import { Users, Phone, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
+import type { Database } from '@/lib/types/database.types'
+
+type PersonaRow = Database['public']['Tables']['persona']['Row'] & {
+  persona_grupo: { grupo: { id: string; nombre: string } | null }[] | null
+}
+type GrupoRow = Database['public']['Tables']['grupo']['Row'] & {
+  persona_grupo: { count: number }[] | null
+}
 
 export default async function GruposPage() {
   const supabase = await createClient()
@@ -18,7 +26,7 @@ export default async function GruposPage() {
       persona_grupo (grupo (id, nombre))
     `)
     .eq('etiqueta', 'alumno')
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: false }) as { data: PersonaRow[] | null; error: unknown }
 
   const { data: grupos } = await supabase
     .from('grupo')
@@ -26,7 +34,7 @@ export default async function GruposPage() {
       id, nombre, descripcion, estado,
       persona_grupo (count)
     `)
-    .order('orden_visual', { ascending: true })
+    .order('orden_visual', { ascending: true }) as { data: GrupoRow[] | null; error: unknown }
 
   return (
     <div className="flex flex-col h-full min-h-screen">
@@ -104,7 +112,7 @@ export default async function GruposPage() {
         </Tabs>
       </div>
 
-      <CrearPersonaDrawer grupos={grupos || []} />
+      <CrearPersonaDrawer grupos={(grupos || []) as GrupoRow[]} />
     </div>
   )
 }

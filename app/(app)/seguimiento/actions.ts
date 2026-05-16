@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
+import { translateRpcError } from '@/lib/utils/rpc-errors'
 
 const anularSchema = z.object({
   movimiento_id: z.string().uuid({ message: 'Movimiento inválido' }),
@@ -44,7 +45,7 @@ export async function anularPagoAction(prevState: FormState, formData: FormData)
   })
 
   if (error) {
-    return { message: error.message, success: false }
+    return { message: translateRpcError(error), success: false }
   }
 
   // Refrescar vistas
