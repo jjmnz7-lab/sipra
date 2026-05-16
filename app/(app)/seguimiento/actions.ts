@@ -37,7 +37,7 @@ export async function anularPagoAction(prevState: FormState, formData: FormData)
 
   if (!academiaId) return { message: 'Academia no encontrada', success: false }
 
-  const { error } = await supabase.rpc('revertir_pago_atomico_v1', {
+  const { error } = await (supabase as any).rpc('revertir_pago_atomico_v1', {
     p_academia_id: academiaId,
     p_movimiento_id: validatedFields.data.movimiento_id,
     p_motivo: validatedFields.data.motivo

@@ -95,7 +95,7 @@ export async function registrarPagoAction(prevState: FormState, formData: FormDa
 
   if (!academiaId) return { message: 'Academia no encontrada', success: false }
 
-  const { error, data } = await supabase.rpc('registrar_pago_atomico_v1', {
+  const { error, data } = await (supabase as any).rpc('registrar_pago_atomico_v1', {
     p_academia_id: academiaId,
     p_persona_id: validatedFields.data.persona_id,
     p_cargo_ids: [validatedFields.data.cargo_id],

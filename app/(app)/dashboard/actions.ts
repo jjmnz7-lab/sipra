@@ -40,7 +40,7 @@ export async function generarMensualidadesAction(prevState: FormState, formData:
 
   if (!academiaId) return { message: 'Academia no encontrada.', success: false }
 
-  const { data, error } = await supabase.rpc('generar_cargos_masivos_v1', {
+  const { data, error } = await (supabase as any).rpc('generar_cargos_masivos_v1', {
     p_academia_id: academiaId,
     p_concepto: validated.data.concepto,
     p_monto: validated.data.monto,
