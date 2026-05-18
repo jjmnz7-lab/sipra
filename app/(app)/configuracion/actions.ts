@@ -91,3 +91,53 @@ export async function guardarAjustesAction(prevState: FormState, formData: FormD
   revalidatePath('/configuracion')
   return { success: true, message: 'Ajustes guardados con éxito.' }
 }
+
+export async function guardarConfiguracionRecargosAction(prevState: FormState, formData: FormData): Promise<FormState> {
+  const supabase = await createClient()
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  const academiaId = user?.app_metadata?.academia_id
+
+  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
+
+  const activo = formData.get('activo') === 'on'
+  
+  const escalones = []
+  for (let i = 1; i <= 5; i++) {
+    const dias = formData.get(`dias_${i}`)
+    const monto = formData.get(`monto_${i}`)
+    if (dias && monto) {
+      escalones.push({ nivel: i, dias_retraso: Number(dias), monto: Number(monto) })
+    }
+  }
+
+  const { error } = await supabase
+    .from('academia')
+    .update({ config_recargos: { activo, escalones } } as any)
+    .eq('id', academiaId)
+
+  if (error) {
+    return { message: translateRpcError(error), success: false }
+  }
+
+  revalidatePath('/configuracion')
+  return { success: true, message: 'Reglas de recargos guardadas con éxito.' }
+}
+
+export async function ejecutarMotorRecargosAction(prevState: FormState, formData: FormData): Promise<FormState> {
+  const supabase = await createClient()
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  const academiaId = user?.app_metadata?.academia_id
+
+  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
+
+  const { data, error } = await supabase.rpc('procesar_recargos_v1', { p_academia_id: academiaId })
+
+  if (error) {
+    return { message: translateRpcError(error), success: false }
+  }
+
+  revalidatePath('/configuracion')
+  return { success: true, message: 'Motor ejecutado con éxito. Se procesaron las deudas.' }
+}
