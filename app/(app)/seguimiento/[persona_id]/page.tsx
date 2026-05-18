@@ -4,13 +4,17 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils/currency'
 import { AnularPagoDrawer } from '@/components/domain/timeline/anular-pago-drawer'
-import { ArrowLeft, Phone, Clock, CheckCircle2, AlertCircle, RefreshCcw } from 'lucide-react'
+import { RegistrarPagoDrawer } from '@/components/domain/cargo/registrar-pago-drawer'
+import { CrearNotaDrawer } from '@/components/domain/timeline/crear-nota-drawer'
+import { CrearPromesaDrawer } from '@/components/domain/timeline/crear-promesa-drawer'
+import { ArrowLeft, Phone, Clock, CheckCircle2, AlertCircle, RefreshCcw, Banknote, Bell, Calendar, FileText } from 'lucide-react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Database } from '@/lib/types/database.types'
 
 type PersonaConCargo = Database['public']['Tables']['persona']['Row'] & {
-  cargo: Pick<Database['public']['Tables']['cargo']['Row'], 'saldo_pendiente' | 'estado_financiero'>[] | null
+  cargo: Pick<Database['public']['Tables']['cargo']['Row'],
+    'id' | 'saldo_pendiente' | 'estado_financiero' | 'concepto' | 'monto_original' | 'fecha_vencimiento'>[] | null
 }
 type EventoRow = Database['public']['Tables']['evento_timeline']['Row']
 
@@ -21,13 +25,23 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
   // 1. Fetch persona
   const { data: persona } = await supabase
     .from('persona')
-    .select('*, cargo (saldo_pendiente, estado_financiero)')
+    .select('*, cargo (id, concepto, monto_original, saldo_pendiente, estado_financiero, fecha_vencimiento)')
     .eq('id', persona_id)
     .single() as { data: PersonaConCargo | null; error: unknown }
 
   if (!persona) notFound()
 
-  const deudaTotal = persona.cargo?.reduce((acc: number, c: any) => acc + Number(c.saldo_pendiente), 0) || 0
+  // Cargos activos (para desglose en snapshot)
+  const cargosActivos = persona.cargo?.filter((c: any) =>
+    ['pendiente', 'parcial', 'vencido'].includes(c.estado_financiero)
+  ) || []
+  const deudaTotal = cargosActivos.reduce((acc: number, c: any) => acc + Number(c.saldo_pendiente), 0)
+
+  // Preparar el primer cargo para el RegistrarPagoDrawer (inyectando la persona)
+  const primerCargo = cargosActivos[0] ? {
+    ...cargosActivos[0],
+    persona: { nombre: persona.nombre, apellido: persona.apellido }
+  } : null as any
 
   // 2. Fetch timeline
   const { data: timeline } = await supabase
@@ -40,7 +54,7 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
     <div className="flex flex-col h-full min-h-screen bg-slate-50 pb-20">
       <div className="bg-white border-b border-slate-200 p-4 sticky top-0 z-10">
         <div className="flex items-center space-x-3 mb-4">
-          <Link href="/grupos" className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+          <Link href="/pendientes" className="p-2 hover:bg-slate-100 rounded-full transition-colors">
             <ArrowLeft className="h-5 w-5 text-slate-600" />
           </Link>
           <div className="flex-1">
@@ -53,19 +67,81 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
           </Badge>
         </div>
 
-        <div className="flex justify-between items-center bg-slate-100 rounded-xl p-4">
-          <div>
-            <p className="text-xs text-slate-500 font-medium">Deuda actual</p>
-            <p className={`text-xl font-bold ${deudaTotal > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-              {formatCurrency(deudaTotal)}
-            </p>
+        {/* Snapshot: total + desglose de conceptos */}
+        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+          {/* Total y WA en la misma fila */}
+          <div className="flex justify-between items-center mb-3">
+            <div>
+              <p className="text-xs text-slate-500 font-medium">Pendiente total</p>
+              <p className={`text-2xl font-black leading-none mt-0.5 ${deudaTotal > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                {formatCurrency(deudaTotal)}
+              </p>
+            </div>
+            {persona.telefono_whatsapp && (
+              <a href={`https://wa.me/${persona.telefono_whatsapp}`} target="_blank" rel="noreferrer" 
+                 className="flex items-center text-sm font-medium text-emerald-600 bg-emerald-100 px-3 py-2 rounded-lg hover:bg-emerald-200 transition-colors flex-shrink-0">
+                <Phone className="h-4 w-4 mr-2" /> WhatsApp
+              </a>
+            )}
           </div>
-          {persona.telefono_whatsapp && (
-            <a href={`https://wa.me/${persona.telefono_whatsapp}`} target="_blank" rel="noreferrer" 
-               className="flex items-center text-sm font-medium text-emerald-600 bg-emerald-100 px-3 py-2 rounded-lg hover:bg-emerald-200 transition-colors">
-              <Phone className="h-4 w-4 mr-2" /> WhatsApp
-            </a>
+
+          {/* Desglose de conceptos activos */}
+          {cargosActivos.length > 0 && (
+            <div className="space-y-1 border-t border-slate-200 pt-3">
+              {cargosActivos.map((c: any) => (
+                <div key={c.id} className="flex justify-between items-center">
+                  <p className="text-xs text-slate-600 truncate flex-1 mr-3">{c.concepto}</p>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className={`text-xs font-semibold ${
+                      c.estado_financiero === 'vencido' ? 'text-red-600' : 'text-amber-600'
+                    }`}>
+                      {formatCurrency(c.saldo_pendiente)}
+                    </span>
+                    {c.estado_financiero === 'vencido' && (
+                      <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-medium">Vencido</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
+
+          {deudaTotal === 0 && (
+            <p className="text-xs text-emerald-600 font-medium">✅ Al corriente</p>
+          )}
+        </div>
+
+        {/* Acciones Rápidas (spec §10) */}
+        <div className="flex gap-2 mt-4 overflow-x-auto pb-1 hide-scrollbar">
+          {primerCargo ? (
+            <RegistrarPagoDrawer cargo={primerCargo}>
+              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold h-9 rounded-lg flex-1 min-w-[100px]">
+                <Banknote className="h-4 w-4 mr-1.5" /> Cobrar
+              </Button>
+            </RegistrarPagoDrawer>
+          ) : (
+            <Button size="sm" disabled className="bg-slate-100 text-slate-400 text-xs font-semibold h-9 rounded-lg flex-1 min-w-[100px]">
+              <Banknote className="h-4 w-4 mr-1.5" /> Cobrar
+            </Button>
+          )}
+
+          <Button size="sm" variant="outline" className="text-indigo-600 border-indigo-200 hover:bg-indigo-50 text-xs font-semibold h-9 rounded-lg flex-1 min-w-[100px]" asChild>
+            <a href={persona.telefono_whatsapp ? `https://wa.me/${persona.telefono_whatsapp}` : '#'} target="_blank" rel="noreferrer">
+              <Bell className="h-4 w-4 mr-1.5" /> Recordar
+            </a>
+          </Button>
+
+          <CrearPromesaDrawer personaId={persona.id}>
+            <Button size="sm" variant="outline" className="text-slate-600 border-slate-200 hover:bg-slate-50 text-xs font-semibold h-9 rounded-lg flex-1 min-w-[100px]">
+              <Calendar className="h-4 w-4 mr-1.5" /> Promesa
+            </Button>
+          </CrearPromesaDrawer>
+
+          <CrearNotaDrawer personaId={persona.id}>
+            <Button size="sm" variant="outline" className="text-slate-600 border-slate-200 hover:bg-slate-50 text-xs font-semibold h-9 rounded-lg flex-1 min-w-[100px]">
+              <FileText className="h-4 w-4 mr-1.5" /> Nota
+            </Button>
+          </CrearNotaDrawer>
         </div>
       </div>
 
