@@ -159,7 +159,7 @@ export default async function PendientesPage({ searchParams }: { searchParams: P
           <div className="w-px h-6 bg-slate-200 self-center mx-1" />
 
           {/* Chips de Grupos */}
-          {grupos?.map(grupo => (
+          {grupos?.map((grupo: any) => (
             <Link
               key={grupo.id}
               href={`/pendientes?${activeStatus ? `status=${activeStatus}&` : ''}group=${grupo.id}`}
