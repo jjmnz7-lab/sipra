@@ -26,7 +26,7 @@ export default async function PendientesPage({ searchParams }: { searchParams: P
     .from('grupo')
     .select('id, nombre')
     .eq('estado', 'activo')
-    .order('nombre')
+    .order('nombre') as any
 
   // Fetch personas del grupo seleccionado si aplica
   let personasEnGrupo: string[] = []
@@ -35,7 +35,7 @@ export default async function PendientesPage({ searchParams }: { searchParams: P
       .from('persona_grupo')
       .select('persona_id')
       .eq('grupo_id', activeGroup)
-      .eq('estado', 'activo')
+      .eq('estado', 'activo') as any
     
     personasEnGrupo = rels?.map((r: any) => r.persona_id) || []
   }
