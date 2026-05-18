@@ -9,8 +9,8 @@ import { Calendar, Banknote, Bell, ChevronRight, Search, Settings, MessageCircle
 import type { CargoConPersona } from '@/lib/types/domain'
 import Link from 'next/link'
 
-export default async function PendientesPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
-  const { filter: activeFilter } = await searchParams
+export default async function PendientesPage({ searchParams }: { searchParams: Promise<{ status?: string, group?: string }> }) {
+  const { status: activeStatus, group: activeGroup } = await searchParams
   const supabase = await createClient()
 
   // 1. Fetch alumnos para el drawer de nuevo cargo
@@ -20,6 +20,25 @@ export default async function PendientesPage({ searchParams }: { searchParams: P
     .eq('etiqueta', 'alumno')
     .eq('estado_global', 'al_corriente') // O traer todos activos
     .order('nombre') as any
+
+  // Fetch grupos activos
+  const { data: grupos } = await supabase
+    .from('grupo')
+    .select('id, nombre')
+    .eq('estado', 'activo')
+    .order('nombre')
+
+  // Fetch personas del grupo seleccionado si aplica
+  let personasEnGrupo: string[] = []
+  if (activeGroup) {
+    const { data: rels } = await supabase
+      .from('persona_grupo')
+      .select('persona_id')
+      .eq('grupo_id', activeGroup)
+      .eq('estado', 'activo')
+    
+    personasEnGrupo = rels?.map((r: any) => r.persona_id) || []
+  }
 
   // 2. Fetch cargos operativos
   const { data: cargos } = await supabase
@@ -104,37 +123,53 @@ export default async function PendientesPage({ searchParams }: { searchParams: P
         {/* Filtros Rápidos (Chips) (spec §10) */}
         <div className="flex gap-2 text-sm overflow-x-auto hide-scrollbar">
           <Link 
-            href="/pendientes" 
+            href={`/pendientes${activeGroup ? `?group=${activeGroup}` : ''}`} 
             className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
-              !activeFilter ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              !activeStatus ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
             Todos
           </Link>
           <Link 
-            href="/pendientes?filter=vencidos" 
+            href={`/pendientes?status=vencidos${activeGroup ? `&group=${activeGroup}` : ''}`} 
             className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
-              activeFilter === 'vencidos' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              activeStatus === 'vencidos' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
             Vencidos
           </Link>
           <Link 
-            href="/pendientes?filter=pendientes" 
+            href={`/pendientes?status=pendientes${activeGroup ? `&group=${activeGroup}` : ''}`} 
             className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
-              activeFilter === 'pendientes' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              activeStatus === 'pendientes' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
             Pendientes
           </Link>
           <Link 
-            href="/pendientes?filter=parciales" 
+            href={`/pendientes?status=parciales${activeGroup ? `&group=${activeGroup}` : ''}`} 
             className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
-              activeFilter === 'parciales' ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              activeStatus === 'parciales' ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
             Parciales
           </Link>
+
+          {/* Separador visual */}
+          <div className="w-px h-6 bg-slate-200 self-center mx-1" />
+
+          {/* Chips de Grupos */}
+          {grupos?.map(grupo => (
+            <Link
+              key={grupo.id}
+              href={`/pendientes?${activeStatus ? `status=${activeStatus}&` : ''}group=${grupo.id}`}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
+                activeGroup === grupo.id ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {grupo.nombre}
+            </Link>
+          ))}
         </div>
       </div>
 
@@ -168,11 +203,17 @@ export default async function PendientesPage({ searchParams }: { searchParams: P
         </h2>
 
         {cargos?.filter(cargo => {
-          if (!activeFilter) return true
-          if (activeFilter === 'vencidos') return cargo.estado_financiero === 'vencido'
-          if (activeFilter === 'pendientes') return cargo.estado_financiero === 'pendiente'
-          if (activeFilter === 'parciales') return cargo.estado_financiero === 'parcial'
-          return true
+          // Filtrar por status
+          let matchStatus = true
+          if (activeStatus === 'vencidos') matchStatus = cargo.estado_financiero === 'vencido'
+          if (activeStatus === 'pendientes') matchStatus = cargo.estado_financiero === 'pendiente'
+          if (activeStatus === 'parciales') matchStatus = cargo.estado_financiero === 'parcial'
+
+          // Filtrar por grupo
+          let matchGroup = true
+          if (activeGroup) matchGroup = personasEnGrupo.includes(cargo.persona_id)
+
+          return matchStatus && matchGroup
         }).map(cargo => {
           const isVencido = cargo.estado_financiero === 'vencido'
           return (
