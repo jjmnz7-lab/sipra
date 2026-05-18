@@ -5,7 +5,11 @@ import { Phone, Banknote } from 'lucide-react'
 import { RegistrarPagoDrawer } from './registrar-pago-drawer'
 
 interface SwipeableCargoCardProps {
-  cargo: any
+  cargo: {
+    persona?: {
+      telefono_whatsapp?: string | null
+    }
+  }
   children: React.ReactNode
 }
 

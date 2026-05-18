@@ -97,7 +97,7 @@ export async function crearNotaAction(prevState: FormState, formData: FormData):
 
   const actorNombre = userData ? `${(userData as { nombre: string; apellido: string | null }).nombre} ${(userData as { nombre: string; apellido: string | null }).apellido ?? ''}` : 'Operador'
 
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('evento_timeline')
     .insert({
       academia_id: academiaId,
@@ -149,7 +149,7 @@ export async function crearPromesaAction(prevState: FormState, formData: FormDat
 
   const actorNombre = userData ? `${(userData as { nombre: string; apellido: string | null }).nombre} ${(userData as { nombre: string; apellido: string | null }).apellido ?? ''}` : 'Operador'
 
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('evento_timeline')
     .insert({
       academia_id: academiaId,
