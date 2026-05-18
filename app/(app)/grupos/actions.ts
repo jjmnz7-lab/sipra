@@ -65,10 +65,10 @@ export async function crearGrupoAction(prevState: FormState, formData: FormData)
 export async function crearPersonaAction(prevState: FormState, formData: FormData): Promise<FormState> {
   const payload = {
     nombre: formData.get('nombre') as string,
-    apellido: formData.get('apellido') as string,
-    telefono_whatsapp: formData.get('telefono_whatsapp') as string,
-    email: formData.get('email') as string,
-    grupo_id: formData.get('grupo_id') as string,
+    apellido: (formData.get('apellido') as string) || '',
+    telefono_whatsapp: (formData.get('telefono_whatsapp') as string) || '',
+    email: (formData.get('email') as string) || '',
+    grupo_id: (formData.get('grupo_id') as string) || '',
   }
 
   const validatedFields = personaSchema.safeParse(payload)
