@@ -8,7 +8,7 @@ interface SwipeableCargoCardProps {
   cargo: {
     persona?: {
       telefono_whatsapp?: string | null
-    }
+    } | null
   }
   children: React.ReactNode
 }
