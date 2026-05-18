@@ -8,11 +8,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
 const navItems = [
-  { name: 'Resumen', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Cobranza', href: '/pendientes', icon: ListTodo },
-  { name: 'Alumnos', href: '/grupos', icon: Users },
-  { name: 'Avisos', href: '/recordatorios', icon: MessageSquareText },
-  { name: 'Ajustes', href: '/configuracion', icon: Settings },
+  { name: 'Pendientes', href: '/pendientes', icon: ListTodo },
+  { name: 'Grupos', href: '/grupos', icon: Users },
 ]
 
 export function DesktopSidebar() {
