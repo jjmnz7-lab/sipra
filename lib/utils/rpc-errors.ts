@@ -12,5 +12,5 @@ export function translateRpcError(error: { message: string; code?: string }): st
   for (const [key, msg] of Object.entries(RPC_ERROR_MAP)) {
     if (error.message.includes(key)) return msg
   }
-  return 'Ocurrió un error inesperado. Intenta de nuevo.'
+  return `Ocurrió un error inesperado: ${error.message}. Intenta de nuevo.`
 }
