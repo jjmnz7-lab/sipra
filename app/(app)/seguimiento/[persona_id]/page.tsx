@@ -125,11 +125,14 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
             </Button>
           )}
 
-          <Button size="sm" variant="outline" className="text-indigo-600 border-indigo-200 hover:bg-indigo-50 text-xs font-semibold h-9 rounded-lg flex-1 min-w-[100px]" asChild>
-            <a href={persona.telefono_whatsapp ? `https://wa.me/${persona.telefono_whatsapp}` : '#'} target="_blank" rel="noreferrer">
-              <Bell className="h-4 w-4 mr-1.5" /> Recordar
-            </a>
-          </Button>
+          <a 
+            href={persona.telefono_whatsapp ? `https://wa.me/${persona.telefono_whatsapp}` : '#'} 
+            target="_blank" 
+            rel="noreferrer"
+            className="text-indigo-600 border border-indigo-200 hover:bg-indigo-50 text-xs font-semibold h-9 rounded-lg flex-1 min-w-[100px] inline-flex items-center justify-center transition-colors"
+          >
+            <Bell className="h-4 w-4 mr-1.5" /> Recordar
+          </a>
 
           <CrearPromesaDrawer personaId={persona.id}>
             <Button size="sm" variant="outline" className="text-slate-600 border-slate-200 hover:bg-slate-50 text-xs font-semibold h-9 rounded-lg flex-1 min-w-[100px]">
