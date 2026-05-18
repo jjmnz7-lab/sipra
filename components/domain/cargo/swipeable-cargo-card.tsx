@@ -3,13 +3,10 @@
 import React, { useState, useRef } from 'react'
 import { Phone, Banknote } from 'lucide-react'
 import { RegistrarPagoDrawer } from './registrar-pago-drawer'
+import type { CargoConPersona } from '@/lib/types/domain'
 
 interface SwipeableCargoCardProps {
-  cargo: {
-    persona?: {
-      telefono_whatsapp?: string | null
-    } | null
-  }
+  cargo: CargoConPersona
   children: React.ReactNode
 }
 
