@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { CrearGrupoDrawer } from '@/components/domain/grupo/crear-grupo-drawer'
 import { CrearPersonaDrawer } from '@/components/domain/persona/crear-persona-drawer'
-import { Users, Phone, ChevronRight } from 'lucide-react'
+import { Users, Phone, ChevronRight, Search } from 'lucide-react'
 import Link from 'next/link'
 import type { Database } from '@/lib/types/database.types'
 
