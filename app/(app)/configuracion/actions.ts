@@ -42,7 +42,7 @@ export async function guardarAjustesAction(prevState: FormState, formData: FormD
     }
   }
 
-  const supabase = await createClient()
+  const supabase = (await createClient()) as any
   
   const { data: { user } } = await supabase.auth.getUser()
   const academiaId = user?.app_metadata?.academia_id
