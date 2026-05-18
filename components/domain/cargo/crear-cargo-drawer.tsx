@@ -32,9 +32,12 @@ function SubmitButton() {
   )
 }
 
-export function CrearCargoDrawer({ alumnos = [] }: { alumnos: any[] }) {
-  const [open, setOpen] = useState(false)
+export function CrearCargoDrawer({ alumnos = [], open: controlledOpen, onOpenChange }: { alumnos: any[], open?: boolean, onOpenChange?: (open: boolean) => void }) {
+  const [localOpen, setLocalOpen] = useState(false)
   const [state, formAction] = useActionState(crearCargoAction, initialState)
+
+  const open = controlledOpen ?? localOpen
+  const setOpen = onOpenChange ?? setLocalOpen
 
   useEffect(() => {
     if (state.success) {
@@ -44,12 +47,14 @@ export function CrearCargoDrawer({ alumnos = [] }: { alumnos: any[] }) {
 
   return (
     <Drawer open={open} onOpenChange={setOpen}>
-      <DrawerTrigger asChild>
-        <Button className="h-14 w-14 rounded-full shadow-lg bg-indigo-600 hover:bg-indigo-700 fixed bottom-20 right-4 lg:static lg:h-10 lg:w-auto lg:rounded-lg lg:shadow-none z-40">
-          <PlusCircle className="h-6 w-6 lg:mr-2 lg:h-4 lg:w-4" />
-          <span className="hidden lg:inline">Nuevo Cargo</span>
-        </Button>
-      </DrawerTrigger>
+      {controlledOpen === undefined && (
+        <DrawerTrigger asChild>
+          <Button className="h-14 w-14 rounded-full shadow-lg bg-indigo-600 hover:bg-indigo-700 fixed bottom-20 right-4 lg:static lg:h-10 lg:w-auto lg:rounded-lg lg:shadow-none z-40">
+            <PlusCircle className="h-6 w-6 lg:mr-2 lg:h-4 lg:w-4" />
+            <span className="hidden lg:inline">Nuevo Cargo</span>
+          </Button>
+        </DrawerTrigger>
+      )}
       <DrawerContent>
         <div className="mx-auto w-full max-w-sm">
           <DrawerHeader>

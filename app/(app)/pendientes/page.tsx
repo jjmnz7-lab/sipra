@@ -3,9 +3,9 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrency } from '@/lib/utils/currency'
 import { RegistrarPagoDrawer } from '@/components/domain/cargo/registrar-pago-drawer'
-import { CrearCargoDrawer } from '@/components/domain/cargo/crear-cargo-drawer'
+import { FabOperativo } from '@/components/layout/fab-operativo'
 import { SwipeableCargoCard } from '@/components/domain/cargo/swipeable-cargo-card'
-import { Calendar, Banknote, Bell, ChevronRight } from 'lucide-react'
+import { Calendar, Banknote, Bell, ChevronRight, Search, Settings, MessageCircle } from 'lucide-react'
 import type { CargoConPersona } from '@/lib/types/domain'
 import Link from 'next/link'
 
@@ -64,7 +64,17 @@ export default async function PendientesPage({ searchParams }: { searchParams: P
     <div className="flex flex-col h-full min-h-screen bg-slate-50 pb-24">
       {/* Header & KPIs */}
       <div className="bg-white border-b border-slate-200 p-4 sticky top-0 z-10 space-y-4">
-        <h1 className="text-xl font-bold tracking-tight text-slate-900">Pendientes</h1>
+        <div className="flex justify-between items-center">
+          <h1 className="text-xl font-bold tracking-tight text-slate-900">Pendientes</h1>
+          <div className="flex gap-1">
+            <button className="p-2 text-slate-600 hover:text-slate-900 transition-colors">
+              <Search className="h-5 w-5" />
+            </button>
+            <button className="p-2 text-slate-600 hover:text-slate-900 transition-colors">
+              <Settings className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
         
         {/* Termómetro: conteo primero, monto secundario */}
         <div className="flex gap-3 overflow-x-auto pb-2 snap-x hide-scrollbar">
@@ -117,6 +127,14 @@ export default async function PendientesPage({ searchParams }: { searchParams: P
           >
             Pendientes
           </Link>
+          <Link 
+            href="/pendientes?filter=parciales" 
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
+              activeFilter === 'parciales' ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            Parciales
+          </Link>
         </div>
       </div>
 
@@ -152,51 +170,55 @@ export default async function PendientesPage({ searchParams }: { searchParams: P
         {cargos?.filter(cargo => {
           if (!activeFilter) return true
           if (activeFilter === 'vencidos') return cargo.estado_financiero === 'vencido'
-          if (activeFilter === 'pendientes') return cargo.estado_financiero === 'pendiente' || cargo.estado_financiero === 'parcial'
+          if (activeFilter === 'pendientes') return cargo.estado_financiero === 'pendiente'
+          if (activeFilter === 'parciales') return cargo.estado_financiero === 'parcial'
           return true
         }).map(cargo => {
           const isVencido = cargo.estado_financiero === 'vencido'
           return (
             <SwipeableCargoCard key={cargo.id} cargo={cargo}>
-              <Link href={`/seguimiento/${cargo.persona_id}`}>
-                <Card className="overflow-hidden cursor-pointer active:scale-[0.98] transition-transform hover:border-indigo-200">
-                  <CardContent className="p-4 flex gap-4 items-center">
-                    <div className="flex-1">
-                      <div className="flex justify-between items-start mb-1">
-                        <h3 className="font-bold text-slate-900 leading-tight">
-                          {cargo.persona?.nombre ?? '—'} {cargo.persona?.apellido ?? ''}
-                        </h3>
-                        <Badge 
-                          variant={isVencido ? 'destructive' : 'outline'}
-                          className={!isVencido ? 'text-amber-600 border-amber-200 bg-amber-50' : ''}
-                        >
-                          {isVencido ? 'Vencido' : cargo.estado_financiero === 'parcial' ? 'Parcial' : 'Pendiente'}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-slate-600">{cargo.concepto}</p>
-                      <div className="flex items-center text-xs text-slate-500 mt-2">
-                        <Calendar className="h-3 w-3 mr-1" />
-                        Vence: {new Date(cargo.fecha_vencimiento).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
-                      </div>
+              <Card className="overflow-hidden hover:border-indigo-200 transition-colors">
+                <CardContent className="p-4 flex gap-3 items-center">
+                  {/* Contenido principal (clicable para ir a Seguimiento) */}
+                  <Link href={`/seguimiento/${cargo.persona_id}`} className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${isVencido ? 'bg-red-500' : cargo.estado_financiero === 'parcial' ? 'bg-amber-500' : 'bg-slate-300'}`} />
+                      <h3 className="font-bold text-slate-900 truncate">
+                        {cargo.persona?.nombre ?? '—'} {cargo.persona?.apellido ?? ''}
+                      </h3>
                     </div>
                     
-                    <div className="text-right flex flex-col items-end justify-center border-l border-slate-100 pl-4 min-w-[80px] pr-10">
-                      <span className="text-xs text-slate-400 mb-1">Saldo</span>
-                      <span className={`text-lg font-bold ${isVencido ? 'text-red-600' : 'text-amber-600'}`}>
-                        {formatCurrency(cargo.saldo_pendiente)}
-                      </span>
+                    <p className="text-sm text-slate-600 truncate">
+                      {cargo.concepto} · <span className="font-semibold text-slate-800">{formatCurrency(cargo.saldo_pendiente)}</span>
+                    </p>
+                    
+                    <div className="flex items-center text-xs text-slate-500 mt-1">
+                      <Calendar className="h-3.5 w-3.5 mr-1" />
+                      Vence: {new Date(cargo.fecha_vencimiento).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
                     </div>
-                  </CardContent>
-                </Card>
-              </Link>
-              
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 z-20">
-                <RegistrarPagoDrawer cargo={cargo}>
-                  <button className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-full w-9 h-9 flex items-center justify-center shadow-md transition-colors">
-                    <Banknote className="h-4 w-4" />
-                  </button>
-                </RegistrarPagoDrawer>
-              </div>
+                  </Link>
+
+                  {/* Acciones Rápidas (Derecha) */}
+                  <div className="flex items-center gap-1 border-l border-slate-100 pl-2">
+                    {cargo.persona?.telefono_whatsapp && (
+                      <a 
+                        href={`https://wa.me/${cargo.persona.telefono_whatsapp}`} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors"
+                      >
+                        <MessageCircle className="h-5 w-5" />
+                      </a>
+                    )}
+                    
+                    <RegistrarPagoDrawer cargo={cargo}>
+                      <button className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors">
+                        <Banknote className="h-5 w-5" />
+                      </button>
+                    </RegistrarPagoDrawer>
+                  </div>
+                </CardContent>
+              </Card>
             </SwipeableCargoCard>
           )
         })}
@@ -212,7 +234,7 @@ export default async function PendientesPage({ searchParams }: { searchParams: P
         )}
       </div>
 
-      <CrearCargoDrawer alumnos={alumnos || []} />
+      <FabOperativo alumnos={alumnos || []} />
     </div>
   )
 }
