@@ -95,7 +95,7 @@ export async function crearNotaAction(prevState: FormState, formData: FormData):
     .eq('id', user.id)
     .single()
 
-  const actorNombre = userData ? `${userData.nombre} ${userData.apellido}` : 'Operador'
+  const actorNombre = userData ? `${(userData as { nombre: string; apellido: string | null }).nombre} ${(userData as { nombre: string; apellido: string | null }).apellido ?? ''}` : 'Operador'
 
   const { error } = await supabase
     .from('evento_timeline')
@@ -147,7 +147,7 @@ export async function crearPromesaAction(prevState: FormState, formData: FormDat
     .eq('id', user.id)
     .single()
 
-  const actorNombre = userData ? `${userData.nombre} ${userData.apellido}` : 'Operador'
+  const actorNombre = userData ? `${(userData as { nombre: string; apellido: string | null }).nombre} ${(userData as { nombre: string; apellido: string | null }).apellido ?? ''}` : 'Operador'
 
   const { error } = await supabase
     .from('evento_timeline')
