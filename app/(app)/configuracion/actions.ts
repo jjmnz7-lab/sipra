@@ -93,7 +93,7 @@ export async function guardarAjustesAction(prevState: FormState, formData: FormD
 }
 
 export async function guardarConfiguracionRecargosAction(prevState: FormState, formData: FormData): Promise<FormState> {
-  const supabase = await createClient()
+  const supabase = (await createClient()) as any
   
   const { data: { user } } = await supabase.auth.getUser()
   const academiaId = user?.app_metadata?.academia_id
@@ -125,7 +125,7 @@ export async function guardarConfiguracionRecargosAction(prevState: FormState, f
 }
 
 export async function ejecutarMotorRecargosAction(prevState: FormState, formData: FormData): Promise<FormState> {
-  const supabase = await createClient()
+  const supabase = (await createClient()) as any
   
   const { data: { user } } = await supabase.auth.getUser()
   const academiaId = user?.app_metadata?.academia_id
