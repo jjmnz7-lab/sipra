@@ -68,7 +68,7 @@ export function MotorRecargosForm({ initialConfig }: { initialConfig: any }) {
         <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-lg">
           <div>
             <h3 className="font-medium text-slate-900">Activar Recargos</h3>
-            <p className="text-sm text-slate-500">Genera deudas aditivas a morosos.</p>
+            <p className="text-sm text-slate-600">Genera deudas aditivas a morosos.</p>
           </div>
           <label className="relative inline-flex items-center cursor-pointer">
             <input 
@@ -96,7 +96,7 @@ export function MotorRecargosForm({ initialConfig }: { initialConfig: any }) {
             {escalones.map((escalon, i) => (
               <div key={i} className="flex items-end gap-3 bg-white p-3 border border-slate-100 rounded-lg shadow-sm">
                 <div className="flex-1 space-y-1">
-                  <Label className="text-xs text-slate-500">Días de atraso</Label>
+                  <Label className="text-xs text-slate-700 font-semibold">Días de atraso</Label>
                   <Input 
                     type="number" 
                     name={`dias_${i+1}`} 
@@ -104,11 +104,11 @@ export function MotorRecargosForm({ initialConfig }: { initialConfig: any }) {
                     onChange={(e) => updateEscalon(i, 'dias_retraso', e.target.value)}
                     min="1" 
                     required 
-                    className="h-10"
+                    className="h-10 border-slate-300 text-slate-800"
                   />
                 </div>
                 <div className="flex-1 space-y-1">
-                  <Label className="text-xs text-slate-500">Monto ($)</Label>
+                  <Label className="text-xs text-slate-700 font-semibold">Monto ($)</Label>
                   <Input 
                     type="number" 
                     name={`monto_${i+1}`} 
@@ -116,7 +116,7 @@ export function MotorRecargosForm({ initialConfig }: { initialConfig: any }) {
                     onChange={(e) => updateEscalon(i, 'monto', e.target.value)}
                     min="1" 
                     required 
-                    className="h-10"
+                    className="h-10 border-slate-300 text-slate-800"
                   />
                 </div>
                 {escalones.length > 1 && (
@@ -127,7 +127,7 @@ export function MotorRecargosForm({ initialConfig }: { initialConfig: any }) {
               </div>
             ))}
             
-            <p className="text-xs text-slate-500 leading-relaxed mt-2">
+            <p className="text-xs text-slate-600 leading-relaxed mt-2">
               Ejemplo: Si pones 1 día de atraso y $50, al día siguiente del vencimiento se generará una deuda adicional de $50 al alumno. Si luego configuras 5 días de atraso y $100, se le sumarán otros $100 al quinto día.
             </p>
           </div>

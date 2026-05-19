@@ -2,7 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { MotorRecargosForm } from '@/components/domain/configuracion/motor-recargos-form'
 import { AjustesGeneralesForm } from '@/components/domain/configuracion/ajustes-generales-form'
-import { Settings, Zap } from 'lucide-react'
+import { logoutAction } from '@/app/(app)/configuracion/actions'
+import { Settings, Zap, LogOut } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 export default async function ConfiguracionPage() {
   const supabase = await createClient()
@@ -47,6 +49,29 @@ export default async function ConfiguracionPage() {
           </CardHeader>
           <CardContent>
             <MotorRecargosForm initialConfig={configRecargos} />
+          </CardContent>
+        </Card>
+
+        {/* Gestión y Soporte */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center text-slate-900">
+              <LogOut className="mr-2 h-5 w-5" /> Gestión de Cuenta
+            </CardTitle>
+            <CardDescription>Opciones de salida segura.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex justify-between items-center p-4 bg-slate-50 border border-slate-200 rounded-lg">
+              <div>
+                <h4 className="text-sm font-semibold text-slate-700">Cerrar Sesión</h4>
+                <p className="text-xs text-slate-600">Salir de tu cuenta de forma segura.</p>
+              </div>
+              <form action={logoutAction}>
+                <Button type="submit" variant="destructive" size="sm">
+                  Cerrar Sesión
+                </Button>
+              </form>
+            </div>
           </CardContent>
         </Card>
       </div>

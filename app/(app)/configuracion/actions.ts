@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { translateRpcError } from '@/lib/utils/rpc-errors'
 
 const ajustesSchema = z.object({
@@ -60,7 +61,6 @@ export async function guardarAjustesAction(prevState: FormState, formData: FormD
   }
 
   // 2. Actualizar config_cobro (en la tabla academia)
-  // Primero leemos la config actual para no borrar otros campos (como dias_generacion)
   const { data: academiaData } = await supabase
     .from('academia')
     .select('config_cobro')
@@ -140,4 +140,10 @@ export async function ejecutarMotorRecargosAction(prevState: FormState, formData
 
   revalidatePath('/configuracion')
   return { success: true, message: 'Motor ejecutado con éxito. Se procesaron las deudas.' }
+}
+
+export async function logoutAction() {
+  const supabase = await createClient()
+  await supabase.auth.signOut()
+  redirect('/login')
 }
