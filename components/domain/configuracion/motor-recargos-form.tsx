@@ -2,15 +2,14 @@
 
 import * as React from 'react'
 import { useActionState, useEffect, useState } from 'react'
-import { guardarConfiguracionRecargosAction, ejecutarMotorRecargosAction, type FormState } from '@/app/(app)/configuracion/actions'
+import { guardarConfiguracionRecargosAction, type FormState } from '@/app/(app)/configuracion/actions'
 import { useFormStatus } from 'react-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Loader2, Plus, Trash2, Play } from 'lucide-react'
+import { Loader2, Plus, Trash2 } from 'lucide-react'
 
 const initialGuardarState: FormState = {}
-const initialEjecutarState: FormState = {}
 
 function GuardarButton() {
   const { pending } = useFormStatus()
@@ -22,19 +21,8 @@ function GuardarButton() {
   )
 }
 
-function EjecutarButton() {
-  const { pending } = useFormStatus()
-  return (
-    <Button type="submit" variant="outline" className="w-full h-11 text-emerald-700 border-emerald-200 hover:bg-emerald-50" disabled={pending}>
-      {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
-      {pending ? 'Procesando deudas...' : 'Ejecutar Motor Ahora'}
-    </Button>
-  )
-}
-
 export function MotorRecargosForm({ initialConfig }: { initialConfig: any }) {
   const [guardarState, guardarAction] = useActionState(guardarConfiguracionRecargosAction, initialGuardarState)
-  const [ejecutarState, ejecutarAction] = useActionState(ejecutarMotorRecargosAction, initialEjecutarState)
   
   const [activo, setActivo] = useState(initialConfig?.activo || false)
   const [escalones, setEscalones] = useState<any[]>(
@@ -141,23 +129,6 @@ export function MotorRecargosForm({ initialConfig }: { initialConfig: any }) {
 
         <GuardarButton />
       </form>
-
-      <div className="border-t border-slate-200 pt-6">
-        <form action={ejecutarAction}>
-          <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-3">
-            <h4 className="text-sm font-semibold text-slate-800">Prueba Manual (Emulador de Cron)</h4>
-            <p className="text-xs text-slate-600">
-              Usa este botón para evaluar todas las deudas vencidas y generar los recargos ahora mismo. En producción esto ocurre automáticamente a la media noche.
-            </p>
-            <EjecutarButton />
-            {ejecutarState?.message && (
-              <div className={`p-3 text-sm rounded-md border ${ejecutarState.success ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
-                {ejecutarState.message}
-              </div>
-            )}
-          </div>
-        </form>
-      </div>
     </div>
   )
 }
