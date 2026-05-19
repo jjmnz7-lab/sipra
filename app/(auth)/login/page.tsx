@@ -29,21 +29,21 @@ export default function LoginPage() {
     <Card className="w-full">
       <CardHeader className="space-y-1 text-center">
         <CardTitle className="text-2xl font-bold tracking-tight text-slate-900">Bienvenido de vuelta</CardTitle>
-        <CardDescription className="text-slate-600">
+        <CardDescription className="text-slate-700">
           Ingresa tus credenciales para acceder a SIPRA
         </CardDescription>
       </CardHeader>
       <form action={formAction}>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">Correo Electrónico</Label>
+            <Label htmlFor="email" className="text-slate-700 font-semibold">Correo Electrónico</Label>
             <Input
               id="email"
               name="email"
               type="email"
               placeholder="tu@correo.com"
               required
-              className="h-11"
+              className="h-11 border-slate-300 focus:border-indigo-500 focus:ring-indigo-500"
             />
             {state?.errors?.email && (
               <p className="text-sm text-red-600">{state.errors.email[0]}</p>
@@ -51,14 +51,14 @@ export default function LoginPage() {
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="password">Contraseña</Label>
+              <Label htmlFor="password" className="text-slate-700 font-semibold">Contraseña</Label>
             </div>
             <Input
               id="password"
               name="password"
               type="password"
               required
-              className="h-11"
+              className="h-11 border-slate-300 focus:border-indigo-500 focus:ring-indigo-500"
             />
             {state?.errors?.password && (
               <p className="text-sm text-red-600">{state.errors.password[0]}</p>
@@ -72,7 +72,7 @@ export default function LoginPage() {
         </CardContent>
         <CardFooter className="flex flex-col gap-4">
           <SubmitButton />
-          <div className="text-center text-sm text-slate-600">
+          <div className="text-center text-sm text-slate-700">
             ¿No tienes academia aún?{' '}
             <Link href="/registro" className="font-semibold text-indigo-600 hover:text-indigo-500">
               Crea tu cuenta aquí

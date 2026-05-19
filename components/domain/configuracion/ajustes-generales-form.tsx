@@ -63,17 +63,17 @@ export function AjustesGeneralesForm({ initialConfig, academiaNombre }: { initia
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="nombre_academia">Nombre de la academia</Label>
-            <Input id="nombre_academia" name="nombre_academia" defaultValue={academiaNombre} required />
+            <Label htmlFor="nombre_academia" className="text-slate-700 font-semibold">Nombre de la academia</Label>
+            <Input id="nombre_academia" name="nombre_academia" defaultValue={academiaNombre} required className="border-slate-300" />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="nombre_responsable">Nombre del responsable</Label>
-            <Input id="nombre_responsable" name="nombre_responsable" defaultValue={initialConfig.nombre_responsable || ''} placeholder="Ej. Profe Juan" required />
+            <Label htmlFor="nombre_responsable" className="text-slate-700 font-semibold">Nombre del responsable</Label>
+            <Input id="nombre_responsable" name="nombre_responsable" defaultValue={initialConfig.nombre_responsable || ''} placeholder="Ej. Profe Juan" required className="border-slate-300" />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="telefono_recordatorios">Número para recordatorios (WhatsApp)</Label>
-            <Input id="telefono_recordatorios" name="telefono_recordatorios" defaultValue={initialConfig.telefono_recordatorios || ''} placeholder="Ej. 52155..." required />
-            <p className="text-xs text-slate-500">SIPRA usará este número para abrir la app de WhatsApp nativa.</p>
+            <Label htmlFor="telefono_recordatorios" className="text-slate-700 font-semibold">Número para recordatorios (WhatsApp)</Label>
+            <Input id="telefono_recordatorios" name="telefono_recordatorios" defaultValue={initialConfig.telefono_recordatorios || ''} placeholder="Ej. 52155..." required className="border-slate-300" />
+            <p className="text-xs text-slate-600">SIPRA usará este número para abrir la app de WhatsApp nativa.</p>
           </div>
         </CardContent>
       </Card>
@@ -86,12 +86,12 @@ export function AjustesGeneralesForm({ initialConfig, academiaNombre }: { initia
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="nivel_automatizacion">Nivel de Automatización</Label>
+            <Label htmlFor="nivel_automatizacion" className="text-slate-700 font-semibold">Nivel de Automatización</Label>
             <select 
               id="nivel_automatizacion" 
               name="nivel_automatizacion" 
               defaultValue={initialConfig.nivel_automatizacion || 'asistido'}
-              className="w-full h-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full h-10 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800"
             >
               <option value="asistido">Asistido (Recomendado)</option>
               <option value="semi-automatico">Semi-automático</option>
@@ -100,14 +100,14 @@ export function AjustesGeneralesForm({ initialConfig, academiaNombre }: { initia
           </div>
           
           <div className="space-y-2">
-            <Label>Ventana de Cobro</Label>
-            <div className="flex items-center space-x-2">
+            <Label className="text-slate-700 font-semibold">Ventana de Cobro</Label>
+            <div className="flex items-center space-x-2 text-slate-700">
               <span>Del día</span>
-              <Input type="number" name="ventana_cobro_inicio" defaultValue={initialConfig.ventana_cobro_inicio || 1} className="w-20" min="1" max="31" required />
+              <Input type="number" name="ventana_cobro_inicio" defaultValue={initialConfig.ventana_cobro_inicio || 1} className="w-20 border-slate-300" min="1" max="31" required />
               <span>al día</span>
-              <Input type="number" name="ventana_cobro_fin" defaultValue={initialConfig.ventana_cobro_fin || 10} className="w-20" min="1" max="31" required />
+              <Input type="number" name="ventana_cobro_fin" defaultValue={initialConfig.ventana_cobro_fin || 10} className="w-20 border-slate-300" min="1" max="31" required />
             </div>
-            <p className="text-xs text-slate-500">Los días fuera de este rango se considerarán Vencidos.</p>
+            <p className="text-xs text-slate-600">Los días fuera de este rango se considerarán Vencidos.</p>
           </div>
         </CardContent>
       </Card>
@@ -120,7 +120,7 @@ export function AjustesGeneralesForm({ initialConfig, academiaNombre }: { initia
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="template_recordatorio">Plantilla de recordatorio</Label>
+            <Label htmlFor="template_recordatorio" className="text-slate-700 font-semibold">Plantilla de recordatorio</Label>
             <Textarea 
               id="template_recordatorio" 
               name="template_recordatorio" 
@@ -128,6 +128,7 @@ export function AjustesGeneralesForm({ initialConfig, academiaNombre }: { initia
               onChange={(e) => setTemplate(e.target.value)}
               rows={4}
               required
+              className="border-slate-300 text-slate-800"
             />
             <div className="flex flex-wrap gap-1 mt-1">
               <span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{'{nombre}'}</span>
