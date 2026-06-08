@@ -85,16 +85,29 @@ export function GruposClientView({
   const [filtroTipo, setFiltroTipo] = useState<'todos' | 'grupos' | 'talleres'>('todos')
   const [incluirArchivados, setIncluirArchivados] = useState(false)
   const [incluirArchivadosTalleres, setIncluirArchivadosTalleres] = useState(false)
+  const [soloVencidos, setSoloVencidos] = useState(false)
   const [filtrosOpen, setFiltrosOpen] = useState(false)
 
   // Aplica filtro desde URL si existe
   useEffect(() => {
     const filtro = searchParams.get('filtro')
-    if (filtro === 'archivados') {
+    if (filtro === 'vencidos') {
       setFiltroTipo('talleres')
-      setIncluirArchivadosTalleres(true)
+      setSoloVencidos(true)
+      setIncluirArchivadosTalleres(false)
     }
   }, [searchParams])
+
+  // Helper para detectar si un taller está vencido
+  const esTallerVencido = (grupo: any) => {
+    if (!grupo.es_temporal || !grupo.fecha_fin) return false
+    const [y, m, d] = String(grupo.fecha_fin).split('-').map(Number)
+    if (!y || !m || !d) return false
+    const fin = new Date(y, m - 1, d)
+    const hoy = new Date()
+    hoy.setHours(0, 0, 0, 0)
+    return fin < hoy
+  }
 
   // Safeguard: clear invalid situation options if type changes
   useEffect(() => {
@@ -111,7 +124,7 @@ export function GruposClientView({
   const filtroTipoActivo = filtroTipo !== 'todos'
   const incluirArchivadosActivo = incluirArchivados
   const incluirArchivadosTalleresActivo = incluirArchivadosTalleres
-  const hayCambios = filtroTipoActivo || incluirArchivadosActivo || incluirArchivadosTalleresActivo
+  const hayCambios = filtroTipoActivo || incluirArchivadosActivo || incluirArchivadosTalleresActivo || soloVencidos
 
   // Lists matching query and filters
   const { dentroFiltro, fueraFiltro } = useMemo(() => {
@@ -121,6 +134,14 @@ export function GruposClientView({
     }
 
     const matchesFilters = (g: any) => {
+      // Si está activo el filtro de vencidos, solo mostrar talleres vencidos activos
+      if (soloVencidos) {
+        if (!g.es_temporal) return false
+        if (g.estado !== 'activo') return false
+        if (!esTallerVencido(g)) return false
+        return true
+      }
+
       // Tipo Filter
       if (filtroTipo === 'grupos' && g.es_temporal) return false
       if (filtroTipo === 'talleres' && !g.es_temporal) return false
@@ -148,7 +169,7 @@ export function GruposClientView({
     }
 
     return { dentroFiltro: dentro, fueraFiltro: fuera }
-  }, [grupos, hayBusqueda, cleanQuery, filtroTipo, incluirArchivados, incluirArchivadosTalleres])
+  }, [grupos, hayBusqueda, cleanQuery, filtroTipo, incluirArchivados, incluirArchivadosTalleres, soloVencidos])
 
   const visibleGrupos = dentroFiltro.filter((g) => !g.es_temporal).length
   const visibleTalleres = dentroFiltro.filter((g) => g.es_temporal).length
@@ -166,6 +187,7 @@ export function GruposClientView({
     setFiltroTipo('todos')
     setIncluirArchivados(false)
     setIncluirArchivadosTalleres(false)
+    setSoloVencidos(false)
   }
 
   return (
@@ -254,6 +276,14 @@ export function GruposClientView({
                   color="#9CA3AF"
                   icon={<CalendarDays className="h-3 w-3 text-muted-foreground" />}
                   onRemove={() => setIncluirArchivadosTalleres(false)}
+                />
+              )}
+              {soloVencidos && (
+                <ResumenChip
+                  label="Talleres vencidos"
+                  color="#F59E0B"
+                  icon={<CalendarDays className="h-3 w-3 text-amber-500" />}
+                  onRemove={() => setSoloVencidos(false)}
                 />
               )}
             </div>

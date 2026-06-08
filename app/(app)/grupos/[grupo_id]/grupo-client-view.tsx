@@ -239,7 +239,9 @@ export function GrupoClientView({
           {esTaller && grupo.fecha_fin && (
             <ListonBadge
               icon={<CalendarDays className={cn("h-3 w-3", grupo.cupo_maximo != null && totalAlumnos >= grupo.cupo_maximo ? "text-amber-600 dark:text-amber-500" : "text-muted-foreground")} />}
-              className={grupo.cupo_maximo != null && totalAlumnos >= grupo.cupo_maximo ? 'bg-white dark:bg-zinc-950 text-amber-600 dark:text-amber-500 border-border' : ''}
+              className={fechaFinFuturaTaller
+                ? (grupo.cupo_maximo != null && totalAlumnos >= grupo.cupo_maximo ? 'bg-white dark:bg-zinc-950 text-amber-600 dark:text-amber-500 border-border' : '')
+                : 'text-muted-foreground bg-muted/30'}
             >
               {fechaFinFuturaTaller ? 'finaliza' : 'finalizó'}: {formatFechaCorta(grupo.fecha_fin)}
             </ListonBadge>

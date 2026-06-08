@@ -58,7 +58,7 @@ const DEF_FILAS: Omit<Fila & { key: Exclude<keyof AlertasOperativas, 'talleresVe
       if (ids.length === 1) {
         return `/grupos/${ids[0]}?abrir_archiva=true`
       }
-      return '/grupos?filtro=archivados'
+      return '/grupos?filtro=vencidos'
     },
   },
   {
