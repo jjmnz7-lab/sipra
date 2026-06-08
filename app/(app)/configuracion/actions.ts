@@ -248,7 +248,7 @@ export async function guardarPagosAtrasadosAction(
 /* Logo (sin dirty: guarda al instante)                                       */
 /* -------------------------------------------------------------------------- */
 
-export async function guardarLogoAction(logoUrl: string): Promise<FormState> {
+export async function guardarLogoAction(logoUrl: string | null): Promise<FormState> {
   const { supabase, academiaId } = await getAcademiaId()
   if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
 
@@ -262,13 +262,13 @@ export async function guardarLogoAction(logoUrl: string): Promise<FormState> {
 
   const { error } = await supabase
     .from('academia')
-    .update({ metadata: { ...currentMetadata, logo_url: logoUrl } } as any)
+    .update({ metadata: { ...currentMetadata, logo_url: logoUrl || null } } as any)
     .eq('id', academiaId)
 
   if (error) return { message: translateRpcError(error), success: false }
 
   revalidatePath('/', 'layout')
-  return { success: true, message: 'Logo actualizado.' }
+  return { success: true, message: logoUrl ? 'Logo actualizado.' : 'Logo eliminado.' }
 }
 
 /* -------------------------------------------------------------------------- */

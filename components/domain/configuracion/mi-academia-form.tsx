@@ -9,7 +9,7 @@ import {
 } from '@/app/(app)/configuracion/actions'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Loader2, Camera } from 'lucide-react'
+import { Loader2, Camera, Trash2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
 import { resizeImage } from '@/lib/utils/image'
@@ -48,6 +48,29 @@ export function MiAcademiaForm({
   const onCancel = () => setNombre(snapshot.nombre)
 
   const handleLogoClick = () => fileInputRef.current?.click()
+
+  const handleLogoDelete = async () => {
+    setUploadingLogo(true)
+    setLogoError(null)
+    try {
+      const supabase = createClient()
+      const path = `${academiaId}/logo.webp`
+      // Borra el objeto del storage (si falla, igual limpiamos la referencia).
+      await supabase.storage.from('logos').remove([path])
+      const saveResult = await guardarLogoAction(null)
+      if (saveResult?.success === false) {
+        setLogoError(saveResult.message || 'No se pudo quitar el logo.')
+        return
+      }
+      setCurrentLogoUrl(null)
+      router.refresh()
+    } catch (err: any) {
+      console.error('Error al quitar logo:', err)
+      setLogoError(err?.message || 'Ocurrió un error al quitar el logo.')
+    } finally {
+      setUploadingLogo(false)
+    }
+  }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -123,6 +146,16 @@ export function MiAcademiaForm({
         <p className="text-xs text-muted-foreground">
           {currentLogoUrl ? 'Toca para cambiar' : 'Agregar logo'}
         </p>
+        {currentLogoUrl && !uploadingLogo && (
+          <button
+            type="button"
+            onClick={handleLogoDelete}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-destructive transition-colors"
+          >
+            <Trash2 className="h-3 w-3" />
+            Quitar logo
+          </button>
+        )}
         {logoError && (
           <p className="text-xs text-destructive text-center max-w-xs">
             {logoError}
