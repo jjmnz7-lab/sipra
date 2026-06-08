@@ -80,7 +80,7 @@ export function AnularPagoDrawer({
                   className="h-11 border-red-200 focus-visible:ring-red-500" 
                   placeholder="Ej. Me equivoqué de alumno" 
                 />
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted-foreground">
                   Esta acción quedará registrada en el historial.
                 </p>
                 {state?.errors?.motivo && <p className="text-sm text-red-600">{state.errors.motivo[0]}</p>}

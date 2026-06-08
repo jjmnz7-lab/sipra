@@ -1,0 +1,571 @@
+'use client'
+
+import { useMemo, useRef, useState, useEffect } from 'react'
+import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
+import { Search, X, Filter, ArrowUpDown, Tag, AlertTriangle, ChevronRight } from 'lucide-react'
+import { formatCurrency } from '@/lib/utils/currency'
+import { cn } from '@/lib/utils'
+import {
+  ESTADOS_FINANCIEROS,
+  colorEstado,
+  type EstadoFinancieroAlumno,
+  type EstadoFinancieroDef,
+} from '@/lib/constants/alumno-finanzas'
+import { colorPorSlug } from '@/lib/constants/grupo-apariencia'
+import { CrearPersonaDrawer } from '@/components/domain/persona/crear-persona-drawer'
+import { FiltrosBottomSheet } from '@/components/domain/alumno/filtros-bottom-sheet'
+import type { AlumnoListItem, GrupoFiltro, PlanCobroItem } from './page'
+
+type Props = {
+  alumnos: AlumnoListItem[]
+  grupos: GrupoFiltro[]
+  planes: PlanCobroItem[]
+  modoProrrateo: 'proporcional' | 'completo'
+  multiPlanEnabled: boolean
+  montoInscripcionDefault?: number
+  cobrarInscripcionDefault?: boolean
+}
+
+const COLOR_AL_DIA = ESTADOS_FINANCIEROS[0].hex // #5C8F78
+const SORT_DEFAULT = 'nombre'
+
+const ORDEN_LABEL: Record<string, string> = {
+  nombre: 'Nombre A-Z',
+  fecha: 'Fecha de registro',
+  grupo: 'Grupo',
+}
+
+function getIniciales(nombre: string, apellido: string | null) {
+  const a = (nombre?.[0] ?? '').toUpperCase()
+  const b = (apellido?.[0] ?? '').toUpperCase()
+  return (a + b) || '?'
+}
+
+function normalizar(s: string | null | undefined) {
+  return (s ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+}
+
+export function AlumnosClientView({ alumnos, grupos, planes, modoProrrateo, multiPlanEnabled, montoInscripcionDefault = 0, cobrarInscripcionDefault = false }: Props) {
+  // Search
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const inputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (searchOpen) inputRef.current?.focus()
+  }, [searchOpen])
+
+  // Filtros — defaults
+  const [filtroEstado, setFiltroEstado] = useState<Set<string>>(new Set())          // vacío = sin filtro (todos)
+  const [filtroGrupos, setFiltroGrupos] = useState<Set<string>>(new Set())          // vacío = todos
+  const [filtroPlanes, setFiltroPlanes] = useState<Set<string>>(new Set())          // vacío = todos (solo multi-plan)
+  const [filtroSituacion, setFiltroSituacion] = useState<string>('activos')         // default: activos (siempre aplica como filtro)
+  const [orden, setOrden] = useState<string>(SORT_DEFAULT)
+  const [soloHuerfanos, setSoloHuerfanos] = useState(false)                          // control de huérfanos
+
+  // Activa el filtro de huérfanos si se llega con ?filtro=huerfanos (desde Pendientes).
+  const searchParams = useSearchParams()
+  useEffect(() => {
+    if (searchParams.get('filtro') === 'huerfanos') setSoloHuerfanos(true)
+  }, [searchParams])
+
+  // Bottom sheet de filtros
+  const [filtrosOpen, setFiltrosOpen] = useState(false)
+
+  // Scroll indicator for filter chips
+  const [scrollInfo, setScrollInfo] = useState({ ratio: 1, left: 0, show: false })
+  const chipsContainerRef = useRef<HTMLDivElement | null>(null)
+
+  const updateScrollInfo = () => {
+    const el = chipsContainerRef.current
+    if (!el) return
+    const { scrollWidth, clientWidth, scrollLeft } = el
+    const show = scrollWidth > clientWidth
+    const ratio = show ? clientWidth / scrollWidth : 1
+    const left = show ? scrollLeft / scrollWidth : 0
+    setScrollInfo({ ratio, left, show })
+  }
+
+  const handleScroll = () => {
+    updateScrollInfo()
+  }
+
+  useEffect(() => {
+    updateScrollInfo()
+    window.addEventListener('resize', updateScrollInfo)
+    return () => window.removeEventListener('resize', updateScrollInfo)
+  }, [filtroEstado, filtroGrupos, filtroPlanes, filtroSituacion, orden])
+
+  const cleanQuery = useMemo(() => normalizar(query.trim()), [query])
+  const hayBusqueda = cleanQuery.length > 0
+
+  // Determinar si cada dimensión está NO-default (para el resumen/visibilidad de health strip).
+  // Nota: situación SIEMPRE filtra; 'activos' es la opción default y no genera chip.
+  const estadoActivo = filtroEstado.size > 0
+  const gruposActivo = filtroGrupos.size > 0
+  const planesActivo = filtroPlanes.size > 0
+  const situacionActivo = filtroSituacion !== 'activos'
+  const ordenActivo = orden !== SORT_DEFAULT
+  const hayCambios = estadoActivo || gruposActivo || planesActivo || situacionActivo || ordenActivo || soloHuerfanos
+
+  // Lookup helpers
+  const grupoById = useMemo(() => {
+    const m = new Map<string, GrupoFiltro>()
+    for (const g of grupos) m.set(g.id, g)
+    return m
+  }, [grupos])
+  const planById = useMemo(() => {
+    const m = new Map<string, PlanCobroItem>()
+    for (const p of planes) m.set(p.id, p)
+    return m
+  }, [planes])
+  const estadoById = useMemo(() => {
+    const m = new Map<string, EstadoFinancieroDef>()
+    for (const e of ESTADOS_FINANCIEROS) m.set(e.slug, e)
+    return m
+  }, [])
+
+  // Listas separadas: "dentro del filtro" y "fuera del filtro" (sólo cuando hay búsqueda).
+  const { dentroFiltro, fueraFiltro } = useMemo(() => {
+    const matchesQuery = (a: AlumnoListItem) => {
+      if (!hayBusqueda) return true
+      const full = normalizar(`${a.nombre} ${a.apellido ?? ''}`)
+      const tel = normalizar(a.telefono_whatsapp)
+      return full.includes(cleanQuery) || tel.includes(cleanQuery)
+    }
+
+    const matchesFilters = (a: AlumnoListItem) => {
+      if (estadoActivo && !filtroEstado.has(a.estadoFinanciero)) return false
+      if (gruposActivo) {
+        const gid = a.grupo?.id ?? '__sin__'
+        if (!filtroGrupos.has(gid)) return false
+      }
+      if (planesActivo) {
+        const tieneAlguno = a.planes.some((p) => filtroPlanes.has(p.id))
+        if (!tieneAlguno) return false
+      }
+      if (soloHuerfanos && !a.esHuerfano) return false
+      // Situación siempre se aplica (default 'activos').
+      const op = a.estado_registro === 'activo' ? 'activos' : 'suspendidos'
+      if (op !== filtroSituacion) return false
+      return true
+    }
+
+    const sortFn = (a: AlumnoListItem, b: AlumnoListItem) => {
+      if (orden === 'fecha') return (b.created_at ?? '').localeCompare(a.created_at ?? '')
+      if (orden === 'grupo') {
+        const ga = a.grupo?.nombre ?? '~zzz'
+        const gb = b.grupo?.nombre ?? '~zzz'
+        const cmp = ga.localeCompare(gb, 'es')
+        if (cmp !== 0) return cmp
+      }
+      return `${a.nombre} ${a.apellido ?? ''}`.localeCompare(`${b.nombre} ${b.apellido ?? ''}`, 'es')
+    }
+
+    const dentro: AlumnoListItem[] = []
+    const fuera: AlumnoListItem[] = []
+    for (const a of alumnos) {
+      if (!matchesQuery(a)) continue
+      if (matchesFilters(a)) dentro.push(a)
+      else if (hayBusqueda) fuera.push(a)
+    }
+    dentro.sort(sortFn)
+    fuera.sort(sortFn)
+    return { dentroFiltro: dentro, fueraFiltro: fuera }
+  }, [alumnos, hayBusqueda, cleanQuery, estadoActivo, filtroEstado, gruposActivo, filtroGrupos, planesActivo, filtroPlanes, soloHuerfanos, filtroSituacion, orden])
+
+  // Total visible (para el contador del subheader).
+  const totalVisible = dentroFiltro.length + fueraFiltro.length
+
+  // Health strip — global (no filtrado). Hide cuando hay búsqueda o cualquier filtro
+  const totalGlobal = alumnos.length
+  const segmentos = useMemo(() => {
+    return ESTADOS_FINANCIEROS.map(e => {
+      const count = alumnos.filter(a => a.estadoFinanciero === e.slug).length
+      const pct = totalGlobal > 0 ? (count / totalGlobal) * 100 : 0
+      return { ...e, count, pct }
+    })
+  }, [alumnos, totalGlobal])
+
+  // Helpers
+  const limpiarTodo = () => {
+    setFiltroEstado(new Set())
+    setFiltroGrupos(new Set())
+    setFiltroPlanes(new Set())
+    setFiltroSituacion('activos')
+    setOrden(SORT_DEFAULT)
+    setSoloHuerfanos(false)
+  }
+
+  const removerEstado = (slug: string) => {
+    const next = new Set(filtroEstado)
+    next.delete(slug)
+    setFiltroEstado(next)
+  }
+  const removerGrupo = (id: string) => {
+    const next = new Set(filtroGrupos)
+    next.delete(id)
+    setFiltroGrupos(next)
+  }
+  const removerPlan = (id: string) => {
+    const next = new Set(filtroPlanes)
+    next.delete(id)
+    setFiltroPlanes(next)
+  }
+  const removerSituacion = () => setFiltroSituacion('activos')
+  const removerOrden = () => setOrden(SORT_DEFAULT)
+
+  // Texto del chip de situación (sólo se muestra si NO es el default 'activos')
+  const situacionLabel = filtroSituacion === 'suspendidos' ? 'Suspendidos' : 'Activos'
+
+  return (
+    <div className="flex flex-col h-full min-h-screen bg-background pb-24">
+      {/* Subheader custom (sticky) */}
+      <div className="sticky top-[56px] z-30 bg-card/95 backdrop-blur-sm border-b border-border h-14 px-4 flex items-center w-full">
+        {searchOpen ? (
+          <div className="flex items-center w-full gap-2">
+            <Search className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Buscar por nombre, apellidos o teléfono"
+              className="flex-1 bg-transparent border-0 outline-none text-sm placeholder:text-muted-foreground"
+            />
+            <button
+              onClick={() => { setQuery(''); setSearchOpen(false) }}
+              className="p-2 -mr-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-full transition-colors"
+              aria-label="Cerrar búsqueda"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between w-full gap-3">
+            <h1 className="text-xl font-bold tracking-tight text-foreground truncate">
+              Alumnos <span className="text-muted-foreground font-medium">({totalVisible})</span>
+            </h1>
+
+            {!hayCambios && (
+              <HealthStripGlobal segmentos={segmentos} totalGlobal={totalGlobal} />
+            )}
+
+            <div className="flex items-center flex-shrink-0">
+              <button
+                onClick={() => setSearchOpen(true)}
+                className="p-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-full transition-colors"
+                aria-label="Buscar alumno"
+              >
+                <Search className="h-5 w-5" />
+              </button>
+              <button
+                onClick={() => setFiltrosOpen(true)}
+                className={`p-2 -mr-2 rounded-full transition-colors ${
+                  hayCambios
+                    ? 'text-[#22887c] hover:bg-[#22887c]/10'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                }`}
+                aria-label="Filtrar alumnos"
+              >
+                <Filter className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Listón compacto con resumen — solo si hay cambios */}
+      {hayCambios && (
+        <div className="sticky top-[112px] z-20 bg-background/95 backdrop-blur-sm border-b border-border px-3 py-1.5 flex items-center justify-between gap-3">
+          <div className="relative flex-1 overflow-hidden flex flex-col gap-1.5">
+            <div
+              ref={chipsContainerRef}
+              onScroll={handleScroll}
+              className="flex items-center gap-1.5 overflow-x-auto hide-scrollbar scroll-smooth pb-0.5"
+            >
+              {/* Chips removibles por filtro */}
+              {Array.from(filtroEstado).map(slug => {
+                const e = estadoById.get(slug)
+                if (!e) return null
+                return (
+                  <ResumenChip
+                    key={`est-${slug}`}
+                    label={e.label}
+                    color={e.hex}
+                    onRemove={() => removerEstado(slug)}
+                  />
+                )
+              })}
+              {Array.from(filtroGrupos).map(id => {
+                const g = id === '__sin__' ? null : grupoById.get(id)
+                const label = g?.nombre ?? 'Sin grupo'
+                const color = g ? colorPorSlug(g.color).hex : '#FFFFFF'
+                const dotClassName = g ? undefined : 'border border-gray-400 dark:border-gray-500'
+                return (
+                  <ResumenChip
+                    key={`gru-${id}`}
+                    label={label}
+                    color={color}
+                    dotClassName={dotClassName}
+                    onRemove={() => removerGrupo(id)}
+                  />
+                )
+              })}
+              {Array.from(filtroPlanes).map(id => {
+                const p = planById.get(id)
+                if (!p) return null
+                return (
+                  <ResumenChip
+                    key={`plan-${id}`}
+                    label={p.nombre}
+                    icon={<Tag className="h-3 w-3 text-primary" />}
+                    onRemove={() => removerPlan(id)}
+                  />
+                )
+              })}
+              {soloHuerfanos && (
+                <ResumenChip
+                  label="Sin grupo/plan"
+                  icon={<AlertTriangle className="h-3 w-3 text-amber-600" />}
+                  onRemove={() => setSoloHuerfanos(false)}
+                />
+              )}
+              {situacionActivo && (
+                <ResumenChip
+                  label={situacionLabel}
+                  color="#9CA3AF"
+                  onRemove={removerSituacion}
+                />
+              )}
+              {ordenActivo && (
+                <ResumenChip
+                  label={ORDEN_LABEL[orden]}
+                  icon={<ArrowUpDown className="h-3 w-3 text-primary" />}
+                  onRemove={removerOrden}
+                />
+              )}
+            </div>
+            {scrollInfo.show && (
+              <div className="w-full h-[2px] bg-muted/40 rounded-full relative overflow-hidden">
+                <div
+                  className="absolute h-full bg-primary/50 rounded-full transition-all duration-75"
+                  style={{
+                    width: `${scrollInfo.ratio * 100}%`,
+                    left: `${scrollInfo.left * 100}%`,
+                  }}
+                />
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={limpiarTodo}
+            className="text-[11px] text-muted-foreground hover:text-foreground font-semibold underline-offset-2 hover:underline whitespace-nowrap flex-shrink-0 px-1 border-l border-border pl-2"
+          >
+            Limpiar
+          </button>
+        </div>
+      )}
+
+      {/* Bottom sheet de filtros */}
+      <FiltrosBottomSheet
+        open={filtrosOpen}
+        onOpenChange={setFiltrosOpen}
+        grupos={grupos}
+        planes={multiPlanEnabled ? planes.map((p) => ({ id: p.id, nombre: p.nombre })) : undefined}
+        currentEstado={filtroEstado}
+        currentGrupos={filtroGrupos}
+        currentPlanes={filtroPlanes}
+        currentSituacion={filtroSituacion}
+        currentOrden={orden}
+        onApply={(next) => {
+          setFiltroEstado(next.estado)
+          setFiltroGrupos(next.grupos)
+          setFiltroPlanes(next.planes)
+          setFiltroSituacion(next.situacion)
+          setOrden(next.orden)
+        }}
+      />
+
+      {/* Lista de alumnos */}
+      <div className="p-4 space-y-2.5">
+        {dentroFiltro.map(a => <AlumnoCard key={a.id} a={a} multiPlanEnabled={multiPlanEnabled} />)}
+
+        {hayBusqueda && fueraFiltro.length > 0 && (
+          <>
+            <div className="flex items-center gap-3 my-4">
+              <div className="flex-1 h-[1px] bg-slate-100 dark:bg-slate-900/30" />
+              <span className="text-[10px] font-bold text-slate-100 dark:text-slate-900/30 tracking-wider uppercase whitespace-nowrap">
+                Coincidencias fuera del filtro
+              </span>
+              <div className="flex-1 h-[1px] bg-slate-100 dark:bg-slate-900/30" />
+            </div>
+            {fueraFiltro.map(a => <AlumnoCard key={a.id} a={a} multiPlanEnabled={multiPlanEnabled} />)}
+          </>
+        )}
+
+        {dentroFiltro.length === 0 && fueraFiltro.length === 0 && (
+          <div className="text-center py-16 px-4 border border-dashed border-border rounded-xl bg-muted/20">
+            <p className="text-sm text-muted-foreground">
+              {hayBusqueda
+                ? 'No hay alumnos que coincidan con tu búsqueda.'
+                : hayCambios
+                  ? 'No hay alumnos que coincidan con los filtros aplicados.'
+                  : 'Aún no hay alumnos registrados. Toca el botón + para agregar el primero.'}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* FAB - reutiliza el FAB embebido del CrearPersonaDrawer */}
+      <CrearPersonaDrawer
+        grupos={grupos as any}
+        planes={planes as any}
+        modoProrrateo={modoProrrateo}
+        multiPlanEnabled={multiPlanEnabled}
+        montoInscripcionDefault={montoInscripcionDefault}
+        cobrarInscripcionDefault={cobrarInscripcionDefault}
+      />
+    </div>
+  )
+}
+
+function AlumnoCard({ a, multiPlanEnabled }: { a: AlumnoListItem; multiPlanEnabled: boolean }) {
+  const estado = colorEstado(a.estadoFinanciero)
+  const iniciales = getIniciales(a.nombre, a.apellido)
+  const grupoColor = a.grupo ? colorPorSlug(a.grupo.color) : null
+  const suspendido = a.estado_registro !== 'activo'
+  const planPrincipal = a.planes[0]
+  const planesExtra = a.planes.length - 1
+
+  return (
+    <Link href={`/seguimiento/${a.id}?from=alumnos`} className="block">
+      <div
+        className={`relative overflow-hidden border rounded-xl py-2.5 pr-3 pl-5 flex items-center gap-3 transition-[transform,border-color,box-shadow,background-color] duration-150 hover:border-primary/50 active:scale-[0.985] active:border-[#22887c]/60 active:shadow-[0_0_0_1px_rgba(34,136,124,0.18),0_10px_24px_rgba(34,136,124,0.08)] ${
+          suspendido ? 'bg-card/65 border-border/65' : 'bg-card border-border'
+        }`}
+      >
+        {/* Indicator strip (8px, color del semáforo financiero) */}
+        <div
+          className="absolute left-0 top-0 bottom-0 w-[8px]"
+          style={{ backgroundColor: estado.hex }}
+        />
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
+          <div className="flex items-center gap-2 min-w-0">
+            <p
+              className={`text-sm font-semibold truncate ${
+                suspendido ? 'text-muted-foreground/65' : 'text-foreground'
+              }`}
+            >
+              {suspendido && <span className="inline-block w-1.5 h-1.5 rounded-full bg-gray-400 mr-1.5 align-middle" />}
+              {a.nombre} {a.apellido}
+            </p>
+            {/* Badge de plan: peligro si está sin plan; si no, en modo multi-plan */}
+            {a.sinPlan ? (
+              <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold border border-amber-300 bg-amber-50 text-amber-700 rounded-full px-1.5 py-0.5 flex-shrink-0">
+                ⚠️ Sin plan
+              </span>
+            ) : multiPlanEnabled && planPrincipal ? (
+              <span
+                className="inline-flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full border border-primary/30 bg-primary/10 text-primary max-w-[110px] truncate flex-shrink-0"
+                title={a.planes.map((p) => p.nombre).join(', ')}
+              >
+                {planPrincipal.nombre}{planesExtra > 0 ? ` +${planesExtra}` : ''}
+              </span>
+            ) : null}
+          </div>
+        </div>
+        <div className="flex flex-col items-end flex-shrink-0 max-w-[120px]">
+          {a.grupo && grupoColor ? (
+            <span
+              className="inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full border max-w-full truncate"
+              style={{ borderColor: `${grupoColor.hex}66`, color: grupoColor.hex, backgroundColor: `${grupoColor.hex}14` }}
+              title={a.grupo.nombre}
+            >
+              {a.grupo.nombre}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold border border-amber-300 bg-amber-50 text-amber-700 rounded-full px-1.5 py-0.5 max-w-full truncate">
+              ⚠️ Sin grupo
+            </span>
+          )}
+        </div>
+        <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+      </div>
+    </Link>
+  )
+}
+
+function ResumenChip({
+  label,
+  color,
+  dotClassName,
+  icon,
+  onRemove,
+}: {
+  label: string
+  color?: string
+  dotClassName?: string
+  icon?: React.ReactNode
+  onRemove: () => void
+}) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 bg-primary/10 text-primary rounded-full text-[11px] font-semibold pl-2 pr-1.5 py-0.5 border border-primary/20 whitespace-nowrap flex-shrink-0"
+    >
+      {icon && <span className="flex-shrink-0">{icon}</span>}
+      {color && !icon && (
+        <span
+          className={cn(
+            "inline-block h-2 w-2 rounded-full flex-shrink-0",
+            dotClassName
+          )}
+          style={{ backgroundColor: color }}
+          aria-hidden="true"
+        />
+      )}
+      <span className="truncate max-w-[140px]">{label}</span>
+      <button
+        onClick={onRemove}
+        className="p-0.5 rounded-full hover:bg-primary/15 transition-colors ml-0.5"
+        aria-label={`Quitar filtro ${label}`}
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </span>
+  )
+}
+
+function HealthStripGlobal({
+  segmentos,
+  totalGlobal,
+}: {
+  segmentos: { slug: EstadoFinancieroAlumno; hex: string; pct: number; count: number; label: string }[]
+  totalGlobal: number
+}) {
+  if (totalGlobal === 0) {
+    return <div className="w-[150px] sm:w-[200px] h-[3px] rounded-full bg-muted/40" aria-hidden="true" />
+  }
+  return (
+    <div
+      className="w-[150px] sm:w-[200px] h-[3px] rounded-full flex overflow-hidden bg-muted/40"
+      aria-label="Distribución financiera global"
+      title={segmentos.map(s => `${s.label}: ${s.count}`).join(' · ')}
+    >
+      {segmentos.map(s =>
+        s.pct > 0 ? (
+          <div
+            key={s.slug}
+            className="h-full transition-all duration-300"
+            style={{ width: `${s.pct}%`, backgroundColor: s.hex }}
+          />
+        ) : null,
+      )}
+    </div>
+  )
+}

@@ -34,12 +34,20 @@ function SubmitButton() {
 
 export function CrearPromesaDrawer({ 
   personaId, 
-  children 
+  children,
+  open: controlledOpen,
+  onOpenChange 
 }: { 
   personaId: string, 
-  children: React.ReactNode 
+  children?: React.ReactNode,
+  open?: boolean,
+  onOpenChange?: (open: boolean) => void 
 }) {
-  const [open, setOpen] = useState(false)
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
+  const isControlled = controlledOpen !== undefined
+  const open = isControlled ? controlledOpen : uncontrolledOpen
+  const setOpen = isControlled && onOpenChange ? onOpenChange : setUncontrolledOpen
+
   const [state, formAction] = useActionState(crearPromesaAction, initialState)
 
   useEffect(() => {
@@ -53,9 +61,11 @@ export function CrearPromesaDrawer({
 
   return (
     <Drawer open={open} onOpenChange={setOpen}>
-      <DrawerTrigger asChild>
-        {children}
-      </DrawerTrigger>
+      {children && (
+        <DrawerTrigger asChild>
+          {children}
+        </DrawerTrigger>
+      )}
       <DrawerContent>
         <div className="mx-auto w-full max-w-sm">
           <DrawerHeader>

@@ -47,6 +47,6 @@ export async function loginAction(prevState: LoginState, formData: FormData): Pr
     }
   }
 
-  // Si es exitoso, middleware redirigirá a pendientes, pero podemos hacerlo explícito aquí.
-  redirect('/pendientes')
+  // Si es exitoso, middleware redirigirá a inicio, pero podemos hacerlo explícito aquí.
+  redirect('/inicio')
 }

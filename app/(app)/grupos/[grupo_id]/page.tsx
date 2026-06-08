@@ -1,13 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Users, Banknote, ClipboardList, Bell, ChevronRight } from 'lucide-react'
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { formatCurrency } from '@/lib/utils/currency'
+import { GrupoClientView } from './grupo-client-view'
+import { clasificarAlumno, type EstadoFinancieroAlumno } from '@/lib/constants/alumno-finanzas'
 
-export default async function GrupoDetallePage({ params }: { params: Promise<{ grupo_id: string }> }) {
+export default async function GrupoDetallePage({ params, searchParams }: { params: Promise<{ grupo_id: string }>; searchParams: Promise<Record<string, string>> }) {
   const { grupo_id } = await params
+  const { abrir_archiva } = await searchParams
   const supabase = await createClient()
 
   // Fetch grupo
@@ -21,113 +19,146 @@ export default async function GrupoDetallePage({ params }: { params: Promise<{ g
     notFound()
   }
 
+  // Planes de cobro + modo de prorrateo para el drawer de inscripción
+  const { data: planes } = await supabase
+    .from('planes_cobro')
+    .select('id, nombre, monto, frecuencia, requiere_inscripcion')
+    .eq('academia_id', grupo.academia_id)
+    .eq('activo', true)
+    .order('nombre', { ascending: true }) as any
+
+  const { data: academia } = await supabase
+    .from('academia')
+    .select('config_cobro, multi_plan_enabled, monto_inscripcion_default, cobrar_inscripcion_default, timezone')
+    .eq('id', grupo.academia_id)
+    .single() as any
+  const modoProrrateo = (academia?.config_cobro?.modo_prorrateo as 'proporcional' | 'completo') || 'proporcional'
+  const multiPlanEnabled = !!academia?.multi_plan_enabled
+  const montoInscripcionDefault = Number(academia?.monto_inscripcion_default ?? 0)
+  const cobrarInscripcionDefault = !!academia?.cobrar_inscripcion_default
+  const timezone = academia?.timezone || 'America/Mexico_City'
+
+  // Otros grupos activos (destino opcional al archivar este grupo)
+  const { data: gruposDestino } = await supabase
+    .from('grupo')
+    .select('id, nombre')
+    .eq('academia_id', grupo.academia_id)
+    .eq('estado', 'activo')
+    .neq('id', grupo_id)
+    .order('nombre', { ascending: true }) as any
+
   // Fetch alumnos inscritos
   const { data: inscripciones } = await supabase
     .from('persona_grupo')
     .select(`
       id, estado, fecha_inscripcion,
-      persona (id, nombre, apellido, telefono_whatsapp, estado_global)
+      persona (id, nombre, apellido, telefono_whatsapp, estado_registro)
     `)
     .eq('grupo_id', grupo_id)
-    .eq('estado', 'activo')
-    .order('fecha_inscripcion', { ascending: false }) as any
+    .eq('estado', 'activo') as any
 
-  const personaIds = inscripciones?.map((i: any) => i.persona?.id) || []
+  // Orden A–Z por nombre completo (case-insensitive)
+  const inscripcionesOrdenadas = [...(inscripciones ?? [])].sort((a: any, b: any) => {
+    const an = `${a.persona?.nombre ?? ''} ${a.persona?.apellido ?? ''}`.trim().toLowerCase()
+    const bn = `${b.persona?.nombre ?? ''} ${b.persona?.apellido ?? ''}`.trim().toLowerCase()
+    return an.localeCompare(bn, 'es')
+  })
 
-  // Fetch cargos de los alumnos para el resumen financiero
+  const personaIds = inscripcionesOrdenadas
+    .map((i: any) => i.persona?.id)
+    .filter(Boolean) as string[]
+
+  // Fetch cargos activos (con fecha_vencimiento para clasificación crítico)
   const { data: cargos } = await supabase
     .from('cargo')
-    .select('persona_id, concepto, saldo_pendiente, estado_financiero')
-    .in('persona_id', personaIds)
+    .select('persona_id, concepto, saldo_pendiente, estado_financiero, fecha_vencimiento')
+    .in('persona_id', personaIds.length ? personaIds : ['00000000-0000-0000-0000-000000000000'])
     .in('estado_financiero', ['vencido', 'pendiente', 'parcial']) as any
 
-  // Calcular KPIs
-  const totalAlumnos = inscripciones?.length || 0
-  const alCorriente = inscripciones?.filter((i: any) => i.persona?.estado_global === 'al_corriente').length || 0
-  const vencidos = inscripciones?.filter((i: any) => i.persona?.estado_global === 'vencido').length || 0
-  const pendienteGrupo = cargos?.reduce((acc: number, c: any) => acc + Number(c.saldo_pendiente), 0) || 0
-
-  const getConceptoCorto = (personaId: string) => {
-    const c = cargos?.find((c: any) => c.persona_id === personaId)
-    return c ? c.concepto : 'Al corriente'
+  // Clasificación del semáforo financiero (4 estados estándar) usando la misma
+  // función que la pantalla Alumnos, para mantener una única regla en todo el sistema.
+  const now = new Date()
+  const cargosPorPersona: Record<string, any[]> = {}
+  for (const c of (cargos ?? [])) {
+    if (!c.persona_id) continue
+    ;(cargosPorPersona[c.persona_id] ||= []).push(c)
   }
 
+  const mapEstadoMiembro: Record<string, EstadoFinancieroAlumno> = {}
+  let alDia = 0
+  let pendientes = 0
+  let atrasados = 0
+  let urgentes = 0
+
+  for (const ins of inscripcionesOrdenadas) {
+    const p = ins.persona
+    if (!p?.id) continue
+    const cargosP = cargosPorPersona[p.id] ?? []
+    const estado = clasificarAlumno(cargosP, now)
+    mapEstadoMiembro[p.id] = estado
+    if (p.estado_registro === 'activo') {
+      if (estado === 'al_dia') alDia++
+      else if (estado === 'pendiente') pendientes++
+      else if (estado === 'atrasado') atrasados++
+      else if (estado === 'urgente') urgentes++
+    }
+  }
+
+  const totalAlumnos = inscripcionesOrdenadas.filter((ins: any) => ins.persona?.estado_registro === 'activo').length
+  const pendienteGrupo = (cargos ?? []).reduce((acc: number, c: any) => acc + Number(c.saldo_pendiente), 0)
+
+  // Planes asignados a cada alumno del grupo (badge multi-plan en la tarjeta).
+  const planById = new Map<string, { id: string; nombre: string; monto: number; frecuencia: string }>()
+  for (const p of (planes ?? []) as any[]) {
+    planById.set(p.id, { id: p.id, nombre: p.nombre, monto: Number(p.monto ?? 0), frecuencia: p.frecuencia })
+  }
+  const { data: alumnoPlanesRows } = await supabase
+    .from('alumno_planes')
+    .select('alumno_id, plan_cobro_id')
+    .eq('academia_id', grupo.academia_id)
+    .in('alumno_id', personaIds.length ? personaIds : ['00000000-0000-0000-0000-000000000000']) as any
+  const planesPorAlumno: Record<string, { id: string; nombre: string; monto: number; frecuencia: string }[]> = {}
+  for (const r of (alumnoPlanesRows ?? []) as any[]) {
+    const plan = planById.get(r.plan_cobro_id)
+    if (!plan) continue
+    ;(planesPorAlumno[r.alumno_id] ||= []).push(plan)
+  }
+
+  // Alumnos disponibles para inscribir: activos, no inscritos a este grupo.
+  const inscritosIds = new Set<string>(personaIds)
+  const { data: activosTodos } = await supabase
+    .from('persona')
+    .select('id, nombre, apellido, telefono_whatsapp')
+    .eq('academia_id', grupo.academia_id)
+    .eq('etiqueta', 'alumno')
+    .eq('estado_registro', 'activo')
+    .order('nombre', { ascending: true }) as any
+  const alumnosDisponibles = ((activosTodos ?? []) as any[])
+    .filter((a) => !inscritosIds.has(a.id))
+    .map((a) => ({ id: a.id, nombre: a.nombre, apellido: a.apellido ?? null, telefono_whatsapp: a.telefono_whatsapp ?? null }))
+
   return (
-    <div className="flex flex-col h-full min-h-screen bg-slate-50 pb-24">
-      {/* Header (spec §2.B) */}
-      <div className="bg-white border-b border-slate-200 p-4 sticky top-0 z-10 flex items-center space-x-3">
-        <Link href="/grupos" className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-          <ArrowLeft className="h-5 w-5 text-slate-600" />
-        </Link>
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900">{grupo.nombre}</h1>
-          <p className="text-xs text-slate-500">{totalAlumnos} alumnos activos</p>
-        </div>
-      </div>
-
-      <div className="p-4 space-y-4">
-        {/* Snapshot Operativo (spec §2.B) */}
-        <Card className="bg-white border-slate-200 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-medium text-slate-500">Estado del Grupo</span>
-              <span className="text-xs text-slate-400">💰 Pendiente: {formatCurrency(pendienteGrupo)}</span>
-            </div>
-            <div className="flex gap-2 text-xs font-semibold">
-              <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full flex-1 text-center">
-                🟢 {alCorriente} Al corriente
-              </span>
-              <span className="bg-red-50 text-red-700 px-3 py-1 rounded-full flex-1 text-center">
-                🔴 {vencidos} Pendientes
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Herramientas de Acción Masiva (spec §2.B) */}
-        <div className="grid grid-cols-3 gap-2">
-          <button className="flex flex-col items-center justify-center bg-white border border-slate-200 rounded-xl p-3 hover:bg-slate-50 transition-colors">
-            <Banknote className="h-5 w-5 text-indigo-600 mb-1" />
-            <span className="text-[10px] font-bold text-slate-700">Nuevo cargo</span>
-          </button>
-          <button className="flex flex-col items-center justify-center bg-white border border-slate-200 rounded-xl p-3 hover:bg-slate-50 transition-colors">
-            <ClipboardList className="h-5 w-5 text-indigo-600 mb-1" />
-            <span className="text-[10px] font-bold text-slate-700">Resumen</span>
-          </button>
-          <button className="flex flex-col items-center justify-center bg-white border border-slate-200 rounded-xl p-3 hover:bg-slate-50 transition-colors">
-            <Bell className="h-5 w-5 text-indigo-600 mb-1" />
-            <span className="text-[10px] font-bold text-slate-700">Nuevo aviso</span>
-          </button>
-        </div>
-
-        {/* Lista de Miembros (spec §2.B) */}
-        <div>
-          <h2 className="text-sm font-bold text-slate-900 mb-3">Miembros</h2>
-          <div className="space-y-2">
-            {inscripciones?.map(({ persona }: any) => {
-              const concepto = getConceptoCorto(persona.id)
-              const isVencido = persona.estado_global === 'vencido'
-
-              return (
-                <Link href={`/seguimiento/${persona.id}`} key={persona.id} className="block">
-                  <div className="flex items-center justify-between bg-white border border-slate-100 rounded-lg p-3 hover:border-indigo-100 transition-colors">
-                    <div className="flex items-center min-w-0">
-                      <span className={`w-2.5 h-2.5 rounded-full mr-3 flex-shrink-0 ${isVencido ? 'bg-red-500' : 'bg-emerald-500'}`} />
-                      <div className="truncate">
-                        <p className="text-sm font-semibold text-slate-900 truncate">
-                          {persona.nombre} {persona.apellido}
-                        </p>
-                        <p className="text-xs text-slate-400 truncate">{concepto}</p>
-                      </div>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-slate-300 ml-2 flex-shrink-0" />
-                  </div>
-                </Link>
-              )
-            })}
-          </div>
-        </div>
-      </div>
-    </div>
+    <GrupoClientView
+      grupo={grupo}
+      inscripciones={inscripcionesOrdenadas}
+      planes={planes || []}
+      modoProrrateo={modoProrrateo}
+      multiPlanEnabled={multiPlanEnabled}
+      montoInscripcionDefault={montoInscripcionDefault}
+      cobrarInscripcionDefault={cobrarInscripcionDefault}
+      gruposDestino={gruposDestino || []}
+      cargos={cargos || []}
+      totalAlumnos={totalAlumnos}
+      alDia={alDia}
+      pendientes={pendientes}
+      atrasados={atrasados}
+      urgentes={urgentes}
+      pendienteGrupo={pendienteGrupo}
+      mapEstadoMiembro={mapEstadoMiembro}
+      planesPorAlumno={planesPorAlumno}
+      alumnosDisponibles={alumnosDisponibles}
+      timezone={timezone}
+      abrirArchivar={abrir_archiva === 'true'}
+    />
   )
 }

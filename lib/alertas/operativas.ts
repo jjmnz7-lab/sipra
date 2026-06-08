@@ -1,0 +1,154 @@
+/**
+ * Centro de alertas operativas (data layer).
+ *
+ * Calcula los conteos de "higiene de datos" que pueden romper la operación o el
+ * motor de cobro. Se ejecuta del lado servidor (lo invoca el layout) y devuelve
+ * solo números para que el header pinte el badge y el bottom sheet renderice las
+ * filas activas.
+ */
+
+export type AlertasOperativas = {
+  /** Alumnos activos sin grupo asignado (excluye alumnos con plan por_visita). */
+  sinGrupo: number
+  /** Alumnos activos sin ningún plan de cobro activo. */
+  sinPlan: number
+  /** Alumnos con adeudo sin teléfono/WhatsApp registrado. */
+  adeudoSinTelefono: number
+  /** Alumnos activos con algún plan asignado que está inactivo/archivado. */
+  planInactivo: number
+  /** Talleres temporales cuya fecha de fin ya pasó pero siguen activos. */
+  talleresVencidos: number
+  /** IDs de talleres vencidos (para navegación especial cuando hay solo 1). */
+  talleresVencidosIds?: string[]
+  /** [info] Alumnos sin adeudo que no tienen teléfono/WhatsApp registrado. */
+  sinAdeudoSinTelefono: number
+  /** [info] Alumnos suspendidos con saldo en $0. */
+  suspendidosSaldoCero: number
+  /** Número de alertas activas (con casos > 0), contando cada alerta como 1 e incluyendo las informativas. */
+  total: number
+}
+
+const VACIO: AlertasOperativas = {
+  sinGrupo: 0,
+  sinPlan: 0,
+  adeudoSinTelefono: 0,
+  planInactivo: 0,
+  talleresVencidos: 0,
+  talleresVencidosIds: [],
+  sinAdeudoSinTelefono: 0,
+  suspendidosSaldoCero: 0,
+  total: 0,
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function computeAlertasOperativas(supabase: any, academiaId?: string | null): Promise<AlertasOperativas> {
+  if (!academiaId) return VACIO
+
+  const hoy = new Date().toISOString().slice(0, 10)
+
+  const [
+    personasRes,
+    pgRes,
+    apRes,
+    planesRes,
+    cargosRes,
+    talleresRes,
+  ] = await Promise.all([
+    supabase
+      .from('persona')
+      .select('id, estado_registro, telefono_whatsapp')
+      .eq('academia_id', academiaId)
+      .eq('etiqueta', 'alumno'),
+    supabase
+      .from('persona_grupo')
+      .select('persona_id')
+      .eq('academia_id', academiaId)
+      .eq('estado', 'activo'),
+    supabase
+      .from('alumno_planes')
+      .select('alumno_id, plan_cobro_id')
+      .eq('academia_id', academiaId),
+    supabase
+      .from('planes_cobro')
+      .select('id, activo, frecuencia')
+      .eq('academia_id', academiaId),
+    supabase
+      .from('cargo')
+      .select('persona_id, saldo_pendiente')
+      .in('estado_financiero', ['vencido', 'pendiente', 'parcial']),
+    supabase
+      .from('grupo')
+      .select('id')
+      .eq('academia_id', academiaId)
+      .eq('es_temporal', true)
+      .eq('estado', 'activo')
+      .lt('fecha_fin', hoy),
+  ])
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const personas: any[] = personasRes.data ?? []
+  const activos = personas.filter((p) => p.estado_registro === 'activo')
+  const inactivos = personas.filter((p) => p.estado_registro !== 'activo')
+  const telById = new Map<string, string | null>(personas.map((p) => [p.id, p.telefono_whatsapp]))
+
+  const conGrupo = new Set<string>((pgRes.data ?? []).map((r: { persona_id: string }) => r.persona_id))
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const planes: any[] = planesRes.data ?? []
+  const planActivo = new Map<string, boolean>(planes.map((p) => [p.id, !!p.activo]))
+  const planFrec = new Map<string, string>(planes.map((p) => [p.id, p.frecuencia]))
+
+  const planesPorAlumno = new Map<string, string[]>()
+  for (const r of (apRes.data ?? []) as { alumno_id: string; plan_cobro_id: string }[]) {
+    const arr = planesPorAlumno.get(r.alumno_id) ?? []
+    arr.push(r.plan_cobro_id)
+    planesPorAlumno.set(r.alumno_id, arr)
+  }
+
+  const conAdeudo = new Set<string>()
+  for (const c of (cargosRes.data ?? []) as { persona_id: string; saldo_pendiente: number | string }[]) {
+    if (c.persona_id && Number(c.saldo_pendiente) > 0) conAdeudo.add(c.persona_id)
+  }
+
+  const tienePlanActivo = (id: string) =>
+    (planesPorAlumno.get(id) ?? []).some((pid) => planActivo.get(pid) === true)
+  const tienePorVisitaActivo = (id: string) =>
+    (planesPorAlumno.get(id) ?? []).some((pid) => planActivo.get(pid) === true && planFrec.get(pid) === 'por_visita')
+  const tienePlanInactivo = (id: string) =>
+    (planesPorAlumno.get(id) ?? []).some((pid) => planActivo.get(pid) === false)
+
+  const tieneTelefono = (id: string) => !!(telById.get(id) ?? '').toString().trim()
+
+  // REGLA ESTRICTA: un alumno con plan por_visita no necesita grupo → no es falso positivo.
+  const sinGrupo = activos.filter((p) => !conGrupo.has(p.id) && !tienePorVisitaActivo(p.id)).length
+  const sinPlan = activos.filter((p) => !tienePlanActivo(p.id)).length
+  const adeudoSinTelefono = personas.filter((p) => conAdeudo.has(p.id) && !tieneTelefono(p.id)).length
+  const planInactivo = activos.filter((p) => tienePlanInactivo(p.id)).length
+  const talleresVencidosIds = (talleresRes.data ?? []).map((t: { id: string }) => t.id)
+  const talleresVencidos = talleresVencidosIds.length
+  const sinAdeudoSinTelefono = personas.filter((p) => !conAdeudo.has(p.id) && !tieneTelefono(p.id)).length
+  const suspendidosSaldoCero = inactivos.filter((p) => !conAdeudo.has(p.id)).length
+
+  // Se cuentan ALERTAS (cada una vale 1 si tiene casos), incluidas las informativas — no los casos.
+  const total = [
+    sinGrupo,
+    sinPlan,
+    adeudoSinTelefono,
+    planInactivo,
+    talleresVencidos,
+    sinAdeudoSinTelefono,
+    suspendidosSaldoCero,
+  ].filter((c) => c > 0).length
+
+  return {
+    sinGrupo,
+    sinPlan,
+    adeudoSinTelefono,
+    planInactivo,
+    talleresVencidos,
+    talleresVencidosIds,
+    sinAdeudoSinTelefono,
+    suspendidosSaldoCero,
+    total,
+  }
+}

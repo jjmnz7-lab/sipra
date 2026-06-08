@@ -6,15 +6,9 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { translateRpcError } from '@/lib/utils/rpc-errors'
 
-const ajustesSchema = z.object({
-  nombre_academia: z.string().min(2, { message: 'El nombre de la academia es requerido' }),
-  nombre_responsable: z.string().min(2, { message: 'El nombre del responsable es requerido' }),
-  telefono_recordatorios: z.string().min(8, { message: 'El teléfono es requerido' }),
-  nivel_automatizacion: z.enum(['asistido', 'semi-automatico', 'automatico']),
-  ventana_cobro_inicio: z.coerce.number().min(1).max(31),
-  ventana_cobro_fin: z.coerce.number().min(1).max(31),
-  template_recordatorio: z.string().min(10, { message: 'La plantilla debe ser más descriptiva' }),
-})
+/* -------------------------------------------------------------------------- */
+/* Tipos compartidos                                                          */
+/* -------------------------------------------------------------------------- */
 
 export type FormState = {
   errors?: Record<string, string[]>
@@ -22,45 +16,154 @@ export type FormState = {
   success?: boolean
 }
 
-export async function guardarAjustesAction(prevState: FormState, formData: FormData): Promise<FormState> {
-  const payload = {
-    nombre_academia: formData.get('nombre_academia') as string,
-    nombre_responsable: formData.get('nombre_responsable') as string,
-    telefono_recordatorios: formData.get('telefono_recordatorios') as string,
-    nivel_automatizacion: formData.get('nivel_automatizacion') as string,
-    ventana_cobro_inicio: formData.get('ventana_cobro_inicio') as string,
-    ventana_cobro_fin: formData.get('ventana_cobro_fin') as string,
-    template_recordatorio: formData.get('template_recordatorio') as string,
-  }
+/* -------------------------------------------------------------------------- */
+/* Schemas Zod                                                                */
+/* -------------------------------------------------------------------------- */
 
-  const validatedFields = ajustesSchema.safeParse(payload)
+const miAcademiaSchema = z.object({
+  nombre_academia: z.string().min(2, { message: 'El nombre de la academia es requerido' }),
+})
 
-  if (!validatedFields.success) {
+const planCobroSchema = z.object({
+  nombre: z.string().min(2, { message: 'El nombre del plan es muy corto' }),
+  monto: z.coerce.number().nonnegative({ message: 'El monto no puede ser negativo' }),
+  frecuencia: z.enum(['mensual', 'semanal', 'por_visita', 'pago_unico']).default('mensual'),
+})
+
+const reglaDiasSchema = z.object({
+  dia_inicio: z.number().int().min(1).max(31),
+  dia_fin: z.union([z.number().int().min(1).max(31), z.literal('fin_mes')]),
+  accion: z.enum(['completo', 'proporcional', 'no_cobrar']),
+})
+
+const cobroConfigSchema = z
+  .object({
+    regimen_alta: z.enum(['completo', 'proporcional', 'no_cobrar', 'reglas_dias']),
+    proporcional_redondeo: z.enum(['ninguno', '1', '5', '10', '50', '100']).default('ninguno'),
+    reglas_dias: z.array(reglaDiasSchema).min(2).max(3),
+  })
+  .superRefine((data, ctx) => {
+    const r = data.reglas_dias
+    if (r[0].dia_inicio !== 1) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'La primera regla debe iniciar el día 1' })
+    }
+    if (r[r.length - 1].dia_fin !== 'fin_mes') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'La última regla debe terminar en "fin_mes"' })
+    }
+    for (let i = 1; i < r.length; i++) {
+      const prevFin = r[i - 1].dia_fin === 'fin_mes' ? 28 : (r[i - 1].dia_fin as number)
+      if (r[i].dia_inicio !== prevFin + 1) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `La regla ${i + 1} no encadena con la anterior`,
+        })
+      }
+    }
+  })
+
+const reglaRecargoSchema = z.object({
+  dia: z.number().int().min(1).max(31),
+  tipo: z.enum(['porcentaje', 'monto_fijo']),
+  valor: z.number().min(0).max(100000),
+})
+
+const recargosConfigSchema = z
+  .object({
+    marcar_critico: z.object({
+      activo: z.boolean(),
+      dia_umbral: z.number().int().min(6).max(25),
+    }),
+    aplicar_recargos: z.boolean(),
+    reglas: z.array(reglaRecargoSchema).max(2),
+  })
+  .superRefine((data, ctx) => {
+    if (data.reglas.length === 2 && data.reglas[1].dia <= data.reglas[0].dia) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'La 2da regla debe aplicar después de la 1ra (día mayor).',
+      })
+    }
+    data.reglas.forEach((r, i) => {
+      if (r.tipo === 'porcentaje' && r.valor > 100) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Regla ${i + 1}: el porcentaje no puede exceder 100.`,
+        })
+      }
+    })
+  })
+
+/* -------------------------------------------------------------------------- */
+/* Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
+
+async function getAcademiaId() {
+  const supabase = (await createClient()) as any
+  const { data: { user } } = await supabase.auth.getUser()
+  const academiaId = user?.app_metadata?.academia_id as string | undefined
+  return { supabase, academiaId }
+}
+
+/* -------------------------------------------------------------------------- */
+/* 1. Mi Academia — guarda sólo el nombre                                     */
+/* -------------------------------------------------------------------------- */
+
+export async function guardarMiAcademiaAction(
+  _prevState: FormState,
+  formData: FormData
+): Promise<FormState> {
+  const payload = { nombre_academia: (formData.get('nombre_academia') as string) || '' }
+  const parsed = miAcademiaSchema.safeParse(payload)
+  if (!parsed.success) {
     return {
-      errors: validatedFields.error.flatten().fieldErrors,
-      message: 'Faltan campos por completar o son inválidos.',
-      success: false
+      errors: parsed.error.flatten().fieldErrors,
+      message: 'El nombre de la academia es inválido.',
+      success: false,
     }
   }
 
-  const supabase = (await createClient()) as any
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  const academiaId = user?.app_metadata?.academia_id
-
+  const { supabase, academiaId } = await getAcademiaId()
   if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
 
-  // 1. Actualizar nombre de la academia (en la tabla academia)
-  const { error: academiaError } = await supabase
+  const { error } = await supabase
     .from('academia')
-    .update({ nombre: validatedFields.data.nombre_academia } as any)
+    .update({ nombre: parsed.data.nombre_academia } as any)
     .eq('id', academiaId)
 
-  if (academiaError) {
-    return { message: translateRpcError(academiaError), success: false }
+  if (error) return { message: translateRpcError(error), success: false }
+
+  revalidatePath('/configuracion')
+  return { success: true, message: 'Nombre actualizado.' }
+}
+
+/* -------------------------------------------------------------------------- */
+/* 2. Cobranza — guarda config_cobro                                          */
+/* -------------------------------------------------------------------------- */
+
+export async function guardarCobranzaAction(
+  _prevState: FormState,
+  formData: FormData
+): Promise<FormState> {
+  const raw = (formData.get('config_cobro_json') as string) || ''
+  if (!raw) return { message: 'La configuración de cobranza es inválida.', success: false }
+
+  let parsedCobro: z.infer<typeof cobroConfigSchema>
+  try {
+    const obj = JSON.parse(raw)
+    const result = cobroConfigSchema.safeParse(obj)
+    if (!result.success) {
+      return { message: 'La configuración de cobranza es inválida.', success: false }
+    }
+    parsedCobro = result.data
+  } catch {
+    return { message: 'La configuración de cobranza no se pudo leer.', success: false }
   }
 
-  // 2. Actualizar config_cobro (en la tabla academia)
+  const { supabase, academiaId } = await getAcademiaId()
+  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
+
+  // Merge sobre la config existente para no pisar claves legacy
+  // (cobra_inscripcion, dias_generacion, horas_minimas_recordatorio, etc.).
   const { data: academiaData } = await supabase
     .from('academia')
     .select('config_cobro')
@@ -68,79 +171,227 @@ export async function guardarAjustesAction(prevState: FormState, formData: FormD
     .single() as any
 
   const currentConfig = academiaData?.config_cobro || {}
-  
   const updatedConfig = {
     ...currentConfig,
-    nombre_responsable: validatedFields.data.nombre_responsable,
-    telefono_recordatorios: validatedFields.data.telefono_recordatorios,
-    nivel_automatizacion: validatedFields.data.nivel_automatizacion,
-    ventana_cobro_inicio: validatedFields.data.ventana_cobro_inicio,
-    ventana_cobro_fin: validatedFields.data.ventana_cobro_fin,
-    template_recordatorio: validatedFields.data.template_recordatorio,
-  }
-
-  const { error: configError } = await supabase
-    .from('academia')
-    .update({ config_cobro: updatedConfig } as any)
-    .eq('id', academiaId)
-
-  if (configError) {
-    return { message: translateRpcError(configError), success: false }
-  }
-
-  revalidatePath('/configuracion')
-  return { success: true, message: 'Ajustes guardados con éxito.' }
-}
-
-export async function guardarConfiguracionRecargosAction(prevState: FormState, formData: FormData): Promise<FormState> {
-  const supabase = (await createClient()) as any
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  const academiaId = user?.app_metadata?.academia_id
-
-  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
-
-  const activo = formData.get('activo') === 'on'
-  
-  const escalones = []
-  for (let i = 1; i <= 5; i++) {
-    const dias = formData.get(`dias_${i}`)
-    const monto = formData.get(`monto_${i}`)
-    if (dias && monto) {
-      escalones.push({ nivel: i, dias_retraso: Number(dias), monto: Number(monto) })
-    }
+    regimen_alta: parsedCobro.regimen_alta,
+    proporcional_redondeo: parsedCobro.proporcional_redondeo,
+    reglas_dias: parsedCobro.reglas_dias,
+    modo_prorrateo: parsedCobro.regimen_alta === 'completo' ? 'completo' : 'proporcional',
   }
 
   const { error } = await supabase
     .from('academia')
-    .update({ config_recargos: { activo, escalones } } as any)
+    .update({ config_cobro: updatedConfig } as any)
     .eq('id', academiaId)
 
-  if (error) {
-    return { message: translateRpcError(error), success: false }
-  }
+  if (error) return { message: translateRpcError(error), success: false }
 
   revalidatePath('/configuracion')
-  return { success: true, message: 'Reglas de recargos guardadas con éxito.' }
+  return { success: true, message: 'Cobranza guardada.' }
 }
 
-export async function ejecutarMotorRecargosAction(prevState: FormState, formData: FormData): Promise<FormState> {
-  const supabase = (await createClient()) as any
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  const academiaId = user?.app_metadata?.academia_id
+/* -------------------------------------------------------------------------- */
+/* 3. Pagos atrasados — guarda config_recargos                                */
+/* -------------------------------------------------------------------------- */
 
+export async function guardarPagosAtrasadosAction(
+  _prevState: FormState,
+  formData: FormData
+): Promise<FormState> {
+  const raw = (formData.get('config_recargos_json') as string) || ''
+  if (!raw) return { message: 'La configuración de pagos atrasados es inválida.', success: false }
+
+  let parsed: z.infer<typeof recargosConfigSchema>
+  try {
+    const obj = JSON.parse(raw)
+    const result = recargosConfigSchema.safeParse(obj)
+    if (!result.success) {
+      return { message: 'La configuración de pagos atrasados es inválida.', success: false }
+    }
+    parsed = result.data
+  } catch {
+    return { message: 'La configuración de pagos atrasados no se pudo leer.', success: false }
+  }
+
+  const { supabase, academiaId } = await getAcademiaId()
   if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
 
-  const { data, error } = await supabase.rpc('procesar_recargos_v1', { p_academia_id: academiaId })
+  // Mantener compatibilidad con claves legacy (`activo`, `escalones`):
+  // ya no las escribimos, pero las preservamos por si quedan en la BD para
+  // alguna academia migrada parcialmente.
+  const { data: academiaData } = await supabase
+    .from('academia')
+    .select('config_recargos')
+    .eq('id', academiaId)
+    .single() as any
 
-  if (error) {
-    return { message: translateRpcError(error), success: false }
+  const currentConfig = academiaData?.config_recargos || {}
+  const updatedConfig = {
+    ...currentConfig,
+    marcar_critico: parsed.marcar_critico,
+    aplicar_recargos: parsed.aplicar_recargos,
+    reglas: parsed.reglas,
   }
 
+  const { error } = await supabase
+    .from('academia')
+    .update({ config_recargos: updatedConfig } as any)
+    .eq('id', academiaId)
+
+  if (error) return { message: translateRpcError(error), success: false }
+
   revalidatePath('/configuracion')
-  return { success: true, message: 'Motor ejecutado con éxito. Se procesaron las deudas.' }
+  return { success: true, message: 'Pagos atrasados guardados.' }
 }
+
+/* -------------------------------------------------------------------------- */
+/* Logo (sin dirty: guarda al instante)                                       */
+/* -------------------------------------------------------------------------- */
+
+export async function guardarLogoAction(logoUrl: string): Promise<FormState> {
+  const { supabase, academiaId } = await getAcademiaId()
+  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
+
+  const { data: academiaData } = await supabase
+    .from('academia')
+    .select('metadata')
+    .eq('id', academiaId)
+    .single() as any
+
+  const currentMetadata = academiaData?.metadata || {}
+
+  const { error } = await supabase
+    .from('academia')
+    .update({ metadata: { ...currentMetadata, logo_url: logoUrl } } as any)
+    .eq('id', academiaId)
+
+  if (error) return { message: translateRpcError(error), success: false }
+
+  revalidatePath('/', 'layout')
+  return { success: true, message: 'Logo actualizado.' }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Planes de cobro — catálogo de tarifas recurrentes                          */
+/* -------------------------------------------------------------------------- */
+
+export async function crearPlanCobroAction(
+  _prevState: FormState,
+  formData: FormData
+): Promise<FormState> {
+  const payload = {
+    nombre: formData.get('nombre') as string,
+    monto: formData.get('monto'),
+    frecuencia: (formData.get('frecuencia') as string) || 'mensual',
+  }
+
+  const parsed = planCobroSchema.safeParse(payload)
+  if (!parsed.success) {
+    return {
+      errors: parsed.error.flatten().fieldErrors,
+      message: 'Revisa los datos del plan.',
+      success: false,
+    }
+  }
+
+  const { supabase, academiaId } = await getAcademiaId()
+  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
+
+  const { error } = await supabase.from('planes_cobro').insert({
+    academia_id: academiaId,
+    nombre: parsed.data.nombre,
+    monto: parsed.data.monto,
+    frecuencia: parsed.data.frecuencia,
+  } as any)
+
+  if (error) return { message: translateRpcError(error), success: false }
+
+  revalidatePath('/configuracion')
+  revalidatePath('/grupos')
+  revalidatePath('/alumnos')
+  return { success: true, message: 'Plan de cobro creado.' }
+}
+
+/**
+ * Archiva un plan (soft-delete) protegiendo el Ledger. Si se pasa
+ * `planIdDestino`, migra en lote a los alumnos del plan viejo al nuevo; si no,
+ * rompe las relaciones dejando huérfanos (el cron deja de generarles cargos).
+ */
+export async function archivarPlanCobroAction(
+  planId: string,
+  planIdDestino?: string | null,
+): Promise<FormState> {
+  if (!planId) return { message: 'Plan inválido.', success: false }
+
+  const { supabase, academiaId } = await getAcademiaId()
+  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
+
+  const { error } = await (supabase as any).rpc('archivar_plan_v1', {
+    p_academia_id: academiaId,
+    p_plan_id: planId,
+    p_plan_id_destino: planIdDestino ?? null,
+  })
+
+  if (error) return { message: translateRpcError(error), success: false }
+
+  revalidatePath('/configuracion')
+  revalidatePath('/grupos')
+  revalidatePath('/alumnos')
+  return {
+    success: true,
+    message: planIdDestino ? 'Plan archivado y alumnos migrados.' : 'Plan archivado.',
+  }
+}
+
+/** Compat: el botón actual de la UI ahora archiva (soft-delete) en vez de borrar. */
+export async function eliminarPlanCobroAction(planId: string): Promise<FormState> {
+  return archivarPlanCobroAction(planId, null)
+}
+
+/** Activa el modo multi-plan (no requiere migración). */
+export async function activarMultiPlanAction(): Promise<FormState> {
+  const { supabase, academiaId } = await getAcademiaId()
+  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
+
+  const { error } = await supabase
+    .from('academia')
+    .update({ multi_plan_enabled: true } as any)
+    .eq('id', academiaId)
+
+  if (error) return { message: translateRpcError(error), success: false }
+
+  revalidatePath('/configuracion')
+  revalidatePath('/grupos')
+  revalidatePath('/alumnos')
+  return { success: true, message: 'Modo multi-plan activado.' }
+}
+
+/**
+ * Convierte la academia de multi-plan a plan único: mueve a todos los alumnos
+ * activos al plan fallback y archiva el resto de planes.
+ */
+export async function convertirAPlanUnicoAction(planIdFallback: string): Promise<FormState> {
+  if (!planIdFallback) return { message: 'Selecciona el plan que se quedará.', success: false }
+
+  const { supabase, academiaId } = await getAcademiaId()
+  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
+
+  const { error } = await (supabase as any).rpc('convertir_a_plan_unico_v1', {
+    p_academia_id: academiaId,
+    p_plan_id_fallback: planIdFallback,
+  })
+
+  if (error) return { message: translateRpcError(error), success: false }
+
+  revalidatePath('/configuracion')
+  revalidatePath('/grupos')
+  revalidatePath('/alumnos')
+  return { success: true, message: 'Academia convertida a plan único.' }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Logout                                                                     */
+/* -------------------------------------------------------------------------- */
 
 export async function logoutAction() {
   const supabase = await createClient()

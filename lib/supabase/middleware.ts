@@ -40,9 +40,9 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user && isAuthRoute) {
-    // Si hay usuario y está en login, mandar a pendientes
+    // Si hay usuario y está en login, mandar a inicio
     const url = request.nextUrl.clone()
-    url.pathname = '/pendientes'
+    url.pathname = '/inicio'
     return NextResponse.redirect(url)
   }
 

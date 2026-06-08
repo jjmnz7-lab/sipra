@@ -4,10 +4,56 @@ import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { translateRpcError } from '@/lib/utils/rpc-errors'
+import { alumnoSuspendido, MSG_ALUMNO_SUSPENDIDO } from '@/lib/utils/guards'
+import type { PostgrestError } from '@supabase/supabase-js'
+
+const HHMM_REGEX = /^\d{2}:\d{2}$/
 
 const grupoSchema = z.object({
   nombre: z.string().min(2, { message: 'El nombre debe tener al menos 2 caracteres' }),
-  descripcion: z.string().optional(),
+  color: z.string().optional(),
+  emoji: z.string().optional(),
+  plan_sugerido_id: z.string().uuid().optional().or(z.literal('').transform(() => undefined)),
+  es_temporal: z.coerce.boolean().default(false),
+  fecha_inicio: z.string().optional(),
+  fecha_fin: z.string().optional(),
+  costo_taller: z.coerce.number().optional(),
+  /** Días de la semana 0..6 (0=Dom). Vacío permitido. */
+  dias_semana: z.array(z.number().int().min(0).max(6)).default([]),
+  /** HH:MM (opcional). */
+  hora_inicio: z.string().regex(HHMM_REGEX).optional().or(z.literal('').transform(() => undefined)),
+  hora_fin: z.string().regex(HHMM_REGEX).optional().or(z.literal('').transform(() => undefined)),
+  cupo_maximo: z.number().int().min(1).max(999).optional().nullable(),
+}).refine((data) => !data.hora_fin || (data.hora_inicio && data.hora_fin > data.hora_inicio), {
+  message: 'La hora de fin debe ser mayor que la de inicio.',
+  path: ['hora_fin'],
+}).refine(data => {
+  if (data.es_temporal) {
+    return !!data.fecha_inicio && !!data.fecha_fin && data.costo_taller !== undefined && data.costo_taller >= 0
+  }
+  return true
+}, {
+  message: 'Para un taller, debes capturar las fechas de inicio/fin y un costo válido.',
+  path: ['costo_taller']
+})
+
+const editarGrupoSchema = z.object({
+  grupo_id: z.string().uuid({ message: 'Grupo inválido' }),
+  nombre: z.string().min(2, { message: 'El nombre debe tener al menos 2 caracteres' }),
+  color: z.string().optional(),
+  emoji: z.string().optional(),
+  plan_sugerido_id: z.string().uuid().optional().or(z.literal('').transform(() => undefined)),
+  dias_semana: z.array(z.number().int().min(0).max(6)).default([]),
+  hora_inicio: z.string().regex(HHMM_REGEX).optional().or(z.literal('').transform(() => undefined)),
+  hora_fin: z.string().regex(HHMM_REGEX).optional().or(z.literal('').transform(() => undefined)),
+  cupo_maximo: z.number().int().min(1).max(999).optional().nullable(),
+  es_temporal: z.coerce.boolean().default(false),
+  fecha_inicio: z.string().optional(),
+  fecha_fin: z.string().optional(),
+  costo_taller: z.coerce.number().optional(),
+}).refine((data) => !data.hora_fin || (data.hora_inicio && data.hora_fin > data.hora_inicio), {
+  message: 'La hora de fin debe ser mayor que la de inicio.',
+  path: ['hora_fin'],
 })
 
 const personaSchema = z.object({
@@ -15,19 +61,60 @@ const personaSchema = z.object({
   apellido: z.string().optional(),
   telefono_whatsapp: z.string().optional(),
   email: z.string().email({ message: 'Email inválido' }).optional().or(z.literal('')),
-  grupo_id: z.string().optional(),
+  // Soporta 1..N grupos y 0..N planes (modo simple usa arrays de un elemento).
+  grupo_ids: z.array(z.string().uuid()).min(1, { message: 'Selecciona al menos un grupo' }),
+  plan_ids: z.array(z.string().uuid()).default([]),
+  // Monto inicial editable (solo modo simple, 1 plan). En avanzado se usa el monto del plan.
+  monto: z.coerce.number().nonnegative().optional(),
 })
+
+function parseIdArray(raw: FormDataEntryValue | null): string[] {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw.toString())
+    return Array.isArray(parsed) ? parsed.filter((v) => typeof v === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function parseDiasSemana(raw: FormDataEntryValue | null): number[] {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw.toString())
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .map((v) => Number(v))
+      .filter((n) => Number.isInteger(n) && n >= 0 && n <= 6)
+  } catch {
+    return []
+  }
+}
 
 export type FormState = {
   errors?: Record<string, string[]>
   message?: string | null
   success?: boolean
+  /** ID de la persona recién creada (lo usa el drawer para encadenar el cargo de inscripción). */
+  personaId?: string
 }
 
 export async function crearGrupoAction(prevState: FormState, formData: FormData): Promise<FormState> {
+  const cupoIlimitado = formData.get('cupo_ilimitado') === 'true'
+  const cupoMaximoRaw = formData.get('cupo_maximo')
   const payload = {
     nombre: formData.get('nombre') as string,
-    descripcion: formData.get('descripcion') as string,
+    color: (formData.get('color') as string) || undefined,
+    emoji: (formData.get('emoji') as string) || undefined,
+    plan_sugerido_id: (formData.get('plan_sugerido_id') as string) || '',
+    es_temporal: formData.get('es_temporal') === 'true',
+    fecha_inicio: (formData.get('fecha_inicio') as string) || undefined,
+    fecha_fin: (formData.get('fecha_fin') as string) || undefined,
+    costo_taller: formData.get('costo_taller') != null && formData.get('costo_taller') !== '' ? Number(formData.get('costo_taller')) : undefined,
+    dias_semana: parseDiasSemana(formData.get('dias_semana')),
+    hora_inicio: (formData.get('hora_inicio') as string) || '',
+    hora_fin: (formData.get('hora_fin') as string) || '',
+    cupo_maximo: cupoIlimitado ? null : (cupoMaximoRaw ? Number(cupoMaximoRaw) : null),
   }
 
   const validatedFields = grupoSchema.safeParse(payload)
@@ -35,23 +122,100 @@ export async function crearGrupoAction(prevState: FormState, formData: FormData)
   if (!validatedFields.success) {
     return {
       errors: validatedFields.error.flatten().fieldErrors,
-      message: 'Faltan campos por completar o son inválidos.',
+      message: 'Faltan campos por completar o son inválidos para un taller.',
       success: false
     }
   }
 
   const supabase = await createClient()
-  
-  // Extraer tenant
   const { data: { user } } = await supabase.auth.getUser()
   const academiaId = user?.app_metadata?.academia_id
 
   if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
 
+  const { data: academia } = await supabase
+    .from('academia')
+    .select('timezone')
+    .eq('id', academiaId)
+    .single() as any
+
+  const timezone = academia?.timezone || 'America/Mexico_City'
+  const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: timezone })
+
+  // Validaciones lógicas de fechas para taller (Crear)
+  if (validatedFields.data.es_temporal) {
+    const fInicio = validatedFields.data.fecha_inicio
+    const fFin = validatedFields.data.fecha_fin
+
+    if (!fInicio || !fFin) {
+      return {
+        message: 'Las fechas de inicio y fin son requeridas para un taller.',
+        success: false
+      }
+    }
+
+    if (fInicio < todayStr) {
+      return {
+        errors: { fecha_inicio: ['La fecha de inicio no debe ser anterior al día actual.'] },
+        message: 'La fecha de inicio no debe ser anterior al día actual.',
+        success: false
+      }
+    }
+
+    if (fFin <= todayStr) {
+      return {
+        errors: { fecha_fin: ['La fecha de fin debe ser mayor al día actual.'] },
+        message: 'La fecha de fin debe ser mayor al día actual.',
+        success: false
+      }
+    }
+
+    if (fFin <= fInicio) {
+      return {
+        errors: { fecha_fin: ['La fecha de fin debe ser posterior a la fecha de inicio.'] },
+        message: 'La fecha de fin debe ser posterior a la fecha de inicio.',
+        success: false
+      }
+    }
+  }
+
+  let planSugeridoId = validatedFields.data.plan_sugerido_id
+
+  // Si es un taller, crear plan sugerido automático de pago único
+  if (validatedFields.data.es_temporal) {
+    const { data: nuevoPlan, error: planError } = await supabase
+      .from('planes_cobro')
+      .insert({
+        academia_id: academiaId,
+        nombre: `Taller: ${validatedFields.data.nombre}`,
+        monto: validatedFields.data.costo_taller,
+        frecuencia: 'pago_unico',
+        activo: true,
+        requiere_inscripcion: false,
+      } as any)
+      .select('id')
+      .single() as any
+
+    if (planError) {
+      return { message: 'Fallo al crear plan sugerido automático: ' + translateRpcError(planError), success: false }
+    }
+    planSugeridoId = nuevoPlan.id
+  }
+
   const { error } = await supabase.from('grupo').insert({
     academia_id: academiaId,
     nombre: validatedFields.data.nombre,
-    descripcion: validatedFields.data.descripcion || null,
+    color: validatedFields.data.color || null,
+    emoji: validatedFields.data.emoji || null,
+    plan_sugerido_id: planSugeridoId ?? null,
+    es_temporal: validatedFields.data.es_temporal,
+    fecha_inicio: validatedFields.data.fecha_inicio || null,
+    fecha_fin: validatedFields.data.fecha_fin || null,
+    dias_semana: validatedFields.data.dias_semana.length > 0 ? validatedFields.data.dias_semana : null,
+    hora_inicio: validatedFields.data.hora_inicio ?? null,
+    hora_fin: validatedFields.data.hora_fin ?? null,
+    costo_taller: validatedFields.data.costo_taller ?? null,
+    cupo_maximo: validatedFields.data.cupo_maximo ?? null,
   } as any)
 
   if (error) {
@@ -59,7 +223,144 @@ export async function crearGrupoAction(prevState: FormState, formData: FormData)
   }
 
   revalidatePath('/grupos')
-  return { success: true, message: 'Grupo creado con éxito.' }
+  return { success: true, message: 'Grupo/Taller creado con éxito.' }
+}
+
+export async function editarGrupoAction(prevState: FormState, formData: FormData): Promise<FormState> {
+  const cupoIlimitado = formData.get('cupo_ilimitado') === 'true'
+  const cupoMaximoRaw = formData.get('cupo_maximo')
+  const payload = {
+    grupo_id: formData.get('grupo_id') as string,
+    nombre: formData.get('nombre') as string,
+    color: (formData.get('color') as string) || undefined,
+    emoji: (formData.get('emoji') as string) || undefined,
+    plan_sugerido_id: (formData.get('plan_sugerido_id') as string) || '',
+    dias_semana: parseDiasSemana(formData.get('dias_semana')),
+    hora_inicio: (formData.get('hora_inicio') as string) || '',
+    hora_fin: (formData.get('hora_fin') as string) || '',
+    cupo_maximo: cupoIlimitado ? null : (cupoMaximoRaw ? Number(cupoMaximoRaw) : null),
+    es_temporal: formData.get('es_temporal') === 'true',
+    fecha_inicio: (formData.get('fecha_inicio') as string) || undefined,
+    fecha_fin: (formData.get('fecha_fin') as string) || undefined,
+    costo_taller: formData.get('costo_taller') != null && formData.get('costo_taller') !== '' ? Number(formData.get('costo_taller')) : undefined,
+  }
+
+  const validated = editarGrupoSchema.safeParse(payload)
+  if (!validated.success) {
+    return {
+      errors: validated.error.flatten().fieldErrors,
+      message: 'Revisa los campos.',
+      success: false,
+    }
+  }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const academiaId = user?.app_metadata?.academia_id
+  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
+
+  const { data: grupoExistente } = await supabase
+    .from('grupo')
+    .select('es_temporal, fecha_inicio')
+    .eq('id', validated.data.grupo_id)
+    .eq('academia_id', academiaId)
+    .single() as any
+
+  if (!grupoExistente) return { message: 'El grupo no existe.', success: false }
+
+  const { data: academia } = await supabase
+    .from('academia')
+    .select('timezone')
+    .eq('id', academiaId)
+    .single() as any
+
+  const timezone = academia?.timezone || 'America/Mexico_City'
+  const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: timezone })
+
+  const esTemporal = grupoExistente.es_temporal || validated.data.es_temporal
+  const fechaInicio = validated.data.fecha_inicio || grupoExistente.fecha_inicio
+  const fechaFin = validated.data.fecha_fin
+
+  // Validaciones lógicas de fechas para taller (Editar)
+  if (esTemporal) {
+    if (!fechaFin) {
+      return {
+        message: 'La fecha de fin es requerida para un taller.',
+        success: false
+      }
+    }
+
+    if (fechaFin <= todayStr) {
+      return {
+        errors: { fecha_fin: ['La fecha de fin debe ser mayor al día actual.'] },
+        message: 'La fecha de fin debe ser mayor al día actual.',
+        success: false
+      }
+    }
+
+    if (fechaInicio && fechaFin <= fechaInicio) {
+      return {
+        errors: { fecha_fin: ['La fecha de fin debe ser posterior a la fecha de inicio.'] },
+        message: 'La fecha de fin debe ser posterior a la fecha de inicio.',
+        success: false
+      }
+    }
+  }
+
+  const { error } = await (supabase as any)
+    .from('grupo')
+    .update({
+      nombre: validated.data.nombre,
+      color: validated.data.color ?? null,
+      emoji: validated.data.emoji ?? null,
+      plan_sugerido_id: validated.data.plan_sugerido_id ?? null,
+      dias_semana: validated.data.dias_semana.length > 0 ? validated.data.dias_semana : null,
+      hora_inicio: validated.data.hora_inicio ?? null,
+      hora_fin: validated.data.hora_fin ?? null,
+      cupo_maximo: validated.data.cupo_maximo ?? null,
+      fecha_inicio: validated.data.fecha_inicio ?? null,
+      fecha_fin: validated.data.fecha_fin ?? null,
+      costo_taller: validated.data.costo_taller ?? null,
+    })
+    .eq('id', validated.data.grupo_id)
+    .eq('academia_id', academiaId)
+
+  if (error) return { message: translateRpcError(error), success: false }
+
+  revalidatePath('/grupos')
+  revalidatePath('/grupos/[grupo_id]', 'page')
+  return { success: true, message: 'Grupo actualizado.' }
+}
+
+/**
+ * Archiva un grupo (estado='archivado') de forma segura. Si se pasa
+ * `grupoIdDestino`, migra en lote a sus miembros activos al grupo destino; si no,
+ * rompe las inscripciones (persona_grupo='removido') dejando huérfanos.
+ * El Ledger no se toca (los cargos son por plan, no por grupo).
+ */
+export async function archivarGrupoAction(grupoId: string, grupoIdDestino?: string | null): Promise<FormState> {
+  if (!grupoId) return { message: 'Grupo inválido.', success: false }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const academiaId = user?.app_metadata?.academia_id
+  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
+
+  const { error } = await (supabase as any).rpc('archivar_grupo_v1', {
+    p_academia_id: academiaId,
+    p_grupo_id: grupoId,
+    p_grupo_id_destino: grupoIdDestino ?? null,
+  })
+
+  if (error) return { message: translateRpcError(error), success: false }
+
+  revalidatePath('/grupos')
+  revalidatePath('/grupos/[grupo_id]', 'page')
+  revalidatePath('/alumnos')
+  return {
+    success: true,
+    message: grupoIdDestino ? 'Grupo archivado y alumnos migrados.' : 'Grupo archivado.',
+  }
 }
 
 export async function crearPersonaAction(prevState: FormState, formData: FormData): Promise<FormState> {
@@ -68,7 +369,9 @@ export async function crearPersonaAction(prevState: FormState, formData: FormDat
     apellido: (formData.get('apellido') as string) || '',
     telefono_whatsapp: (formData.get('telefono_whatsapp') as string) || '',
     email: (formData.get('email') as string) || '',
-    grupo_id: (formData.get('grupo_id') as string) || '',
+    grupo_ids: parseIdArray(formData.get('grupo_ids')),
+    plan_ids: parseIdArray(formData.get('plan_ids')),
+    monto: formData.get('monto') != null && formData.get('monto') !== '' ? Number(formData.get('monto')) : undefined,
   }
 
   const validatedFields = personaSchema.safeParse(payload)
@@ -81,8 +384,9 @@ export async function crearPersonaAction(prevState: FormState, formData: FormDat
     }
   }
 
+  const { grupo_ids, plan_ids, monto } = validatedFields.data
   const supabase = await createClient()
-  
+
   const { data: { user } } = await supabase.auth.getUser()
   const academiaId = user?.app_metadata?.academia_id
 
@@ -101,19 +405,330 @@ export async function crearPersonaAction(prevState: FormState, formData: FormDat
     return { message: personaError ? translateRpcError(personaError) : 'Error al crear persona', success: false }
   }
 
-  // 2. Si hay un grupo, inscribirlo atómicamente
-  if (validatedFields.data.grupo_id && validatedFields.data.grupo_id !== 'none') {
-    const { error: pgError } = await supabase.from('persona_grupo').insert({
-      academia_id: academiaId,
-      persona_id: personaData.id,
-      grupo_id: validatedFields.data.grupo_id,
-    } as any)
+  const personaId = personaData.id
+  const anchorGrupo = grupo_ids[0]
 
-    if (pgError) {
-       return { message: 'Alumno creado, pero hubo error al inscribirlo al grupo: ' + pgError.message, success: false }
+  // 2. Montos por plan: en modo simple (1 plan) se respeta el monto editado;
+  //    en avanzado (varios planes) se cobra el monto de cada plan.
+  let montoPorPlan: Record<string, number> = {}
+  if (plan_ids.length > 0) {
+    const { data: planesData } = await supabase
+      .from('planes_cobro')
+      .select('id, monto')
+      .in('id', plan_ids)
+      .eq('academia_id', academiaId) as any
+    montoPorPlan = Object.fromEntries((planesData ?? []).map((p: any) => [p.id, Number(p.monto)]))
+    if (plan_ids.length === 1 && monto != null) {
+      montoPorPlan[plan_ids[0]] = monto
+    }
+  }
+
+  // 3. Inscribir a todos los grupos (solo logística, sin cargo).
+  for (const grupoId of grupo_ids) {
+    const { error } = await (supabase as any).rpc('inscribir_alumno_a_grupo_v1', {
+      p_academia_id: academiaId,
+      p_persona_id: personaId,
+      p_grupo_id: grupoId,
+      p_plan_cobro_id: null,
+      p_monto: 0,
+      p_concepto: null,
+    })
+    if (error) {
+      return { message: 'Alumno creado, pero falló la inscripción al grupo: ' + translateRpcError(error), success: false }
+    }
+  }
+
+  // 4. Vincular cada plan + cargo inicial (ancla en el primer grupo).
+  for (const planId of plan_ids) {
+    const { error } = await (supabase as any).rpc('inscribir_alumno_a_grupo_v1', {
+      p_academia_id: academiaId,
+      p_persona_id: personaId,
+      p_grupo_id: anchorGrupo,
+      p_plan_cobro_id: planId,
+      p_monto: montoPorPlan[planId] ?? 0,
+      p_concepto: null,
+    })
+    if (error) {
+      return { message: 'Alumno inscrito, pero falló la asignación de un plan: ' + translateRpcError(error), success: false }
     }
   }
 
   revalidatePath('/grupos')
-  return { success: true, message: 'Alumno creado con éxito.' }
+  revalidatePath('/alumnos')
+  return { success: true, message: 'Alumno inscrito con éxito.', personaId }
+}
+
+// Server action ligera: devuelve preview del primer cargo de un plan para el drawer
+// (calcula prorrateo del lado de la BD para usar la misma lógica que la RPC final).
+export async function calcularCargoPlanAction(plan_cobro_id: string, fecha_inscripcion?: string) {
+  if (!plan_cobro_id) return null
+  const supabase = await createClient()
+  const { data, error } = await (supabase as any).rpc('calcular_cargo_plan_v1', {
+    p_plan_cobro_id: plan_cobro_id,
+    p_fecha_inscripcion: fecha_inscripcion ?? new Date().toISOString().slice(0, 10),
+  })
+  if (error) return null
+  return data as {
+    plan_cobro_id: string
+    plan_nombre: string
+    frecuencia: 'mensual' | 'semanal' | 'por_visita' | 'pago_unico'
+    monto_plan: number
+    modo_prorrateo: 'proporcional' | 'completo'
+    dias_mes: number
+    dias_restantes: number
+    monto_calculado: number
+    fecha_vencimiento: string
+  }
+}
+
+const cargoGrupalSchema = z.object({
+  grupo_id: z.string().uuid(),
+  concepto: z.string().min(2, { message: 'El concepto es muy corto' }),
+  monto: z.coerce.number().positive({ message: 'El monto debe ser mayor a 0' }),
+  fecha_vencimiento: z.string().refine((val) => !isNaN(Date.parse(val)), { message: 'Fecha inválida' }),
+  excluded_persona_ids: z.array(z.string().uuid()).default([]),
+  idempotency_key: z.string().uuid(),
+})
+
+export async function crearCargoGrupalAction(prevState: FormState, formData: FormData): Promise<FormState> {
+  const payload = {
+    grupo_id: formData.get('grupo_id') as string,
+    concepto: formData.get('concepto') as string,
+    monto: formData.get('monto'),
+    fecha_vencimiento: formData.get('fecha_vencimiento') as string,
+    excluded_persona_ids: JSON.parse((formData.get('excluded_persona_ids') as string) || '[]'),
+    idempotency_key: formData.get('idempotency_key') as string,
+  }
+
+  const validatedFields = cargoGrupalSchema.safeParse(payload)
+
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+      message: 'Faltan campos por completar o son inválidos.',
+      success: false
+    }
+  }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const academiaId = user?.app_metadata?.academia_id
+  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
+
+  // Excluir del cargo masivo a los alumnos suspendidos del grupo: no se les generan cargos $.
+  const { data: miembrosGrupo } = await (supabase as any)
+    .from('persona_grupo')
+    .select('persona_id, persona ( estado_registro )')
+    .eq('academia_id', academiaId)
+    .eq('grupo_id', validatedFields.data.grupo_id)
+    .eq('estado', 'activo')
+  const suspendidosIds: string[] = (miembrosGrupo ?? [])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .filter((m: any) => m.persona && m.persona.estado_registro !== 'activo')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map((m: any) => m.persona_id)
+  const excluidosFinal = Array.from(
+    new Set<string>([...validatedFields.data.excluded_persona_ids, ...suspendidosIds]),
+  )
+
+  type CrearCargoGrupalRpc = (
+    fn: 'crear_cargo_grupal_v1',
+    args: {
+      p_academia_id: string
+      p_grupo_id: string
+      p_concepto: string
+      p_monto: number
+      p_fecha_vencimiento: string
+      p_excluded_persona_ids: string[]
+      p_idempotency_key: string
+    }
+  ) => Promise<{
+    data: { idempotent_hit: boolean; cargos_creados: number } | null
+    error: PostgrestError | null
+  }>
+
+  const rpcCrearCargo = supabase.rpc as unknown as CrearCargoGrupalRpc
+  const { data, error } = await rpcCrearCargo('crear_cargo_grupal_v1', {
+    p_academia_id: academiaId,
+    p_grupo_id: validatedFields.data.grupo_id,
+    p_concepto: validatedFields.data.concepto,
+    p_monto: validatedFields.data.monto,
+    p_fecha_vencimiento: validatedFields.data.fecha_vencimiento,
+    p_excluded_persona_ids: excluidosFinal,
+    p_idempotency_key: validatedFields.data.idempotency_key,
+  })
+
+  if (error) {
+    return { message: translateRpcError(error), success: false }
+  }
+
+  revalidatePath('/grupos')
+  revalidatePath(`/grupos/${validatedFields.data.grupo_id}`)
+  
+  if (data?.idempotent_hit) {
+     return { success: true, message: 'El cargo ya había sido procesado (Idempotencia).' }
+  }
+
+  return { success: true, message: `Se generaron ${data?.cargos_creados || 0} cargos masivos con éxito.` }
+}
+
+const avisoGrupalSchema = z.object({
+  grupo_id: z.string().uuid(),
+  titulo: z.string().min(2, { message: 'El título es muy corto' }),
+  descripcion: z.string().optional(),
+})
+
+export async function crearAvisoGrupalAction(prevState: FormState, formData: FormData): Promise<FormState> {
+  const payload = {
+    grupo_id: formData.get('grupo_id') as string,
+    titulo: formData.get('titulo') as string,
+    descripcion: formData.get('descripcion') as string,
+  }
+
+  const validatedFields = avisoGrupalSchema.safeParse(payload)
+
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+      message: 'Faltan campos por completar o son inválidos.',
+      success: false
+    }
+  }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const academiaId = user?.app_metadata?.academia_id
+  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
+
+  type CrearAvisoGrupalRpc = (
+    fn: 'crear_aviso_grupal_v1',
+    args: {
+      p_academia_id: string
+      p_grupo_id: string
+      p_titulo: string
+      p_descripcion: string
+    }
+  ) => Promise<{
+    data: null
+    error: PostgrestError | null
+  }>
+
+  const rpcCrearAviso = supabase.rpc as unknown as CrearAvisoGrupalRpc
+  const { error } = await rpcCrearAviso('crear_aviso_grupal_v1', {
+    p_academia_id: academiaId,
+    p_grupo_id: validatedFields.data.grupo_id,
+    p_titulo: validatedFields.data.titulo,
+    p_descripcion: validatedFields.data.descripcion || '',
+  })
+
+  if (error) {
+    return { message: translateRpcError(error), success: false }
+  }
+
+  revalidatePath('/grupos')
+  revalidatePath(`/grupos/${validatedFields.data.grupo_id}`)
+  return { success: true, message: 'Aviso grupal generado con éxito.' }
+}
+
+/**
+ * Inscribe a un alumno EXISTENTE en un grupo. Si el grupo tiene plan_sugerido y
+ * la academia cobra inscripción (o el plan la requiere), se puede generar el
+ * cargo de inscripción con un monto editable.
+ *
+ * Reglas:
+ *   - El alumno NO debe estar suspendido (no se le pueden generar cargos $).
+ *   - El plan_sugerido se AGREGA al alumno (no reemplaza los que ya tiene).
+ *   - Si la inscripción no aplica, plan_id es null o inscripcion_monto = 0,
+ *     solo se hace la inscripción al grupo sin cargo.
+ */
+const asignarAlumnoSchema = z.object({
+  grupo_id: z.string().uuid({ message: 'Grupo inválido' }),
+  persona_id: z.string().uuid({ message: 'Alumno inválido' }),
+  plan_id: z.string().uuid().nullable(),
+  /** Si > 0, se inyecta un cargo de inscripción inmediato. */
+  inscripcion_monto: z.coerce.number().min(0).default(0),
+})
+
+export async function asignarAlumnoAGrupoAction(prevState: FormState, formData: FormData): Promise<FormState> {
+  const payload = {
+    grupo_id: formData.get('grupo_id') as string,
+    persona_id: formData.get('persona_id') as string,
+    plan_id: (formData.get('plan_id') as string) || null,
+    inscripcion_monto: formData.get('inscripcion_monto'),
+  }
+
+  const validated = asignarAlumnoSchema.safeParse(payload)
+  if (!validated.success) {
+    return {
+      errors: validated.error.flatten().fieldErrors,
+      message: 'Revisa los campos requeridos.',
+      success: false,
+    }
+  }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const academiaId = user?.app_metadata?.academia_id
+  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
+
+  // No se inscribe a un alumno suspendido (no se le pueden generar cargos).
+  if (await alumnoSuspendido(supabase, academiaId, validated.data.persona_id)) {
+    return { message: MSG_ALUMNO_SUSPENDIDO, success: false }
+  }
+
+  // 1. Inscribir al grupo (logística, sin cargo).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: errGrupo } = await (supabase as any).rpc('inscribir_alumno_a_grupo_v1', {
+    p_academia_id: academiaId,
+    p_persona_id: validated.data.persona_id,
+    p_grupo_id: validated.data.grupo_id,
+    p_plan_cobro_id: null,
+    p_monto: 0,
+    p_concepto: null,
+  })
+  if (errGrupo) return { message: translateRpcError(errGrupo), success: false }
+
+  // 2. Si hay plan sugerido, agregarlo al alumno (sin duplicar si ya lo tiene).
+  if (validated.data.plan_id) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: yaAsignado } = await (supabase as any)
+      .from('alumno_planes')
+      .select('plan_cobro_id')
+      .eq('academia_id', academiaId)
+      .eq('alumno_id', validated.data.persona_id)
+      .eq('plan_cobro_id', validated.data.plan_id)
+      .maybeSingle()
+
+    if (!yaAsignado) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: errPlan } = await (supabase as any).from('alumno_planes').insert({
+        academia_id: academiaId,
+        alumno_id: validated.data.persona_id,
+        plan_cobro_id: validated.data.plan_id,
+      })
+      if (errPlan) {
+        return { message: 'Inscrito al grupo, pero falló al agregar el plan: ' + translateRpcError(errPlan), success: false }
+      }
+    }
+  }
+
+  // 3. Si hay monto de inscripción > 0, inyectar cargo único.
+  if (validated.data.inscripcion_monto > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: errCargo } = await (supabase as any).rpc('crear_cargo_manual_v1', {
+      p_academia_id: academiaId,
+      p_alumno_id: validated.data.persona_id,
+      p_monto: validated.data.inscripcion_monto,
+      p_concepto: 'Inscripción',
+    })
+    if (errCargo) {
+      return { message: 'Inscrito, pero falló el cargo de inscripción: ' + translateRpcError(errCargo), success: false }
+    }
+  }
+
+  revalidatePath('/grupos')
+  revalidatePath(`/grupos/${validated.data.grupo_id}`)
+  revalidatePath('/alumnos')
+  revalidatePath('/inicio')
+  return { success: true, message: 'Alumno inscrito al grupo.' }
 }

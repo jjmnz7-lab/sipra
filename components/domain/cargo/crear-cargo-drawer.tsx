@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useActionState, useEffect, useState } from 'react'
-import { crearCargoAction, type FormState } from '@/app/(app)/pendientes/actions'
+import { crearCargoAction, type FormState } from '@/app/(app)/inicio/actions'
 import { useFormStatus } from 'react-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -49,7 +49,7 @@ export function CrearCargoDrawer({ alumnos = [], open: controlledOpen, onOpenCha
     <Drawer open={open} onOpenChange={setOpen}>
       {controlledOpen === undefined && (
         <DrawerTrigger asChild>
-          <Button className="h-14 w-14 rounded-full shadow-lg bg-indigo-600 hover:bg-indigo-700 fixed bottom-20 right-4 lg:static lg:h-10 lg:w-auto lg:rounded-lg lg:shadow-none z-40">
+          <Button className="h-14 w-14 rounded-full shadow-lg bg-[#15435a] hover:bg-[#0f3245] fixed bottom-20 right-4 lg:static lg:h-10 lg:w-auto lg:rounded-lg lg:shadow-none z-40">
             <PlusCircle className="h-6 w-6 lg:mr-2 lg:h-4 lg:w-4" />
             <span className="hidden lg:inline">Nuevo Cargo</span>
           </Button>

@@ -24,7 +24,7 @@ const initialState: FormState = {}
 function SubmitButton() {
   const { pending } = useFormStatus()
   return (
-    <Button type="submit" className="w-full h-11 bg-indigo-600 hover:bg-indigo-700" disabled={pending}>
+    <Button type="submit" className="w-full h-11 bg-[#15435a] hover:bg-[#0f3245]" disabled={pending}>
       {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
       {pending ? 'Guardando...' : 'Guardar Nota'}
     </Button>
@@ -33,12 +33,20 @@ function SubmitButton() {
 
 export function CrearNotaDrawer({ 
   personaId, 
-  children 
+  children,
+  open: controlledOpen,
+  onOpenChange
 }: { 
   personaId: string, 
-  children: React.ReactNode 
+  children?: React.ReactNode,
+  open?: boolean,
+  onOpenChange?: (open: boolean) => void 
 }) {
-  const [open, setOpen] = useState(false)
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
+  const isControlled = controlledOpen !== undefined
+  const open = isControlled ? controlledOpen : uncontrolledOpen
+  const setOpen = isControlled && onOpenChange ? onOpenChange : setUncontrolledOpen
+
   const [state, formAction] = useActionState(crearNotaAction, initialState)
 
   useEffect(() => {
@@ -49,13 +57,15 @@ export function CrearNotaDrawer({
 
   return (
     <Drawer open={open} onOpenChange={setOpen}>
-      <DrawerTrigger asChild>
-        {children}
-      </DrawerTrigger>
+      {children && (
+        <DrawerTrigger asChild>
+          {children}
+        </DrawerTrigger>
+      )}
       <DrawerContent>
         <div className="mx-auto w-full max-w-sm">
           <DrawerHeader>
-            <DrawerTitle className="flex items-center text-indigo-700">
+            <DrawerTitle className="flex items-center text-[#0f3245]">
               <FileText className="mr-2 h-5 w-5" /> Agregar Nota
             </DrawerTitle>
             <DrawerDescription>
@@ -73,7 +83,7 @@ export function CrearNotaDrawer({
                   id="contenido" 
                   name="contenido" 
                   required 
-                  className="min-h-[100px] focus-visible:ring-indigo-500" 
+                  className="min-h-[100px] focus-visible:ring-[#15435a]" 
                   placeholder="Ej. El papá llamó para avisar que..." 
                 />
                 {state?.errors?.contenido && <p className="text-sm text-red-600">{state.errors.contenido[0]}</p>}

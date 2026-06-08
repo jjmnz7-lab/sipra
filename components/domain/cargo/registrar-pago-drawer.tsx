@@ -2,12 +2,12 @@
 
 import * as React from 'react'
 import { useActionState, useEffect, useState } from 'react'
-import { registrarPagoAction, type FormState } from '@/app/(app)/pendientes/actions'
+import { registrarPagoAction, type FormState } from '@/app/(app)/inicio/actions'
 import { useFormStatus } from 'react-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Loader2, Banknote } from 'lucide-react'
+import { Loader2, Banknote, Landmark, CheckCircle2 } from 'lucide-react'
 import {
   Drawer,
   DrawerClose,
@@ -18,114 +18,193 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from '@/components/ui/drawer'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { CargoConPersona } from '@/lib/types/domain'
-import { METODOS_PAGO } from '@/lib/types/domain'
 
 const initialState: FormState = {}
 
-function SubmitButton() {
+function SubmitButton({ label, disabled }: { label: string; disabled?: boolean }) {
   const { pending } = useFormStatus()
   return (
-    <Button type="submit" className="w-full h-14 text-lg font-bold bg-emerald-600 hover:bg-emerald-700" disabled={pending}>
-      {pending ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-      {pending ? 'Procesando...' : 'Confirmar Pago'}
+    <Button type="submit" className="w-full h-14 text-lg font-bold bg-primary hover:bg-primary/90" disabled={pending || disabled}>
+      {pending ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckCircle2 className="mr-2 h-5 w-5" />}
+      {pending ? 'Procesando...' : label}
     </Button>
   )
 }
 
-export function RegistrarPagoDrawer({ cargo, children }: { cargo: CargoConPersona, children: React.ReactNode }) {
-  const [open, setOpen] = useState(false)
+interface RegistrarPagoDrawerProps {
+  /** Modo single-cargo (lista de pendientes). */
+  cargo?: CargoConPersona
+  /** Modo saldo global del alumno (perfil). */
+  personaId?: string
+  personaNombre?: string
+  cargoIds?: string[]
+  saldoTotal?: number
+  /** Bandera de la academia. Si false, no se permiten abonos parciales. */
+  allowPartial?: boolean
+  children?: React.ReactNode
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+}
+
+export function RegistrarPagoDrawer({
+  cargo,
+  personaId,
+  personaNombre,
+  cargoIds,
+  saldoTotal,
+  allowPartial = true,
+  children,
+  open: controlledOpen,
+  onOpenChange,
+}: RegistrarPagoDrawerProps) {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
+  const isControlled = controlledOpen !== undefined
+  const open = isControlled ? controlledOpen : uncontrolledOpen
+  const setOpen = isControlled && onOpenChange ? onOpenChange : setUncontrolledOpen
+
+  // Normalizar ambos modos
+  const adeudo = cargo ? Number(cargo.saldo_pendiente) : Number(saldoTotal ?? 0)
+  const ids = cargo ? [cargo.id] : (cargoIds ?? [])
+  const pid = cargo ? cargo.persona_id : (personaId ?? '')
+  const nombre = cargo
+    ? `${cargo.persona?.nombre ?? '—'} ${cargo.persona?.apellido ?? ''}`.trim()
+    : (personaNombre ?? '')
+
   const [state, formAction] = useActionState(registrarPagoAction, initialState)
   const [idempotencyKey, setIdempotencyKey] = useState('')
+  const [monto, setMonto] = useState<number | ''>(adeudo > 0 ? adeudo : '')
 
+  const montoNumerico = typeof monto === 'number' ? monto : 0
+  const esCobroLibre = adeudo <= 0                       // sin deuda → anticipo puro
+  const faltante = adeudo - montoNumerico                // >0 = aún debe
+  const excedente = montoNumerico - adeudo               // >0 = saldo a favor
+  const parcialBloqueado = !allowPartial && adeudo > 0 && montoNumerico < adeudo
+  const montoInvalido = montoNumerico <= 0 || parcialBloqueado
+
+  // El botón refleja la naturaleza del cobro.
+  const esAbono = allowPartial && adeudo > 0 && montoNumerico > 0 && montoNumerico < adeudo
+  const botonLabel = esCobroLibre ? 'Registrar cobro' : esAbono ? 'Registrar Abono' : 'Registrar Pago'
+
+  // Reset al abrir: nuevo idempotency key + monto = adeudo actual (vacío si no hay deuda)
   useEffect(() => {
     if (open) {
-      // Generamos un idempotency_key cada vez que se abre el modal para evitar dobles cobros
       setIdempotencyKey(crypto.randomUUID())
+      setMonto(adeudo > 0 ? adeudo : '')
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   useEffect(() => {
-    if (state.success) {
-      setOpen(false)
-    }
+    if (state.success) setOpen(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.success])
 
   return (
     <Drawer open={open} onOpenChange={setOpen}>
-      <DrawerTrigger asChild>
-        {children}
-      </DrawerTrigger>
+      {children && <DrawerTrigger asChild>{children}</DrawerTrigger>}
       <DrawerContent>
         <div className="mx-auto w-full max-w-sm">
           <DrawerHeader className="text-left">
-            <DrawerTitle className="flex items-center text-emerald-700">
-              <Banknote className="mr-2 h-5 w-5" /> Registrar Pago
+            <DrawerTitle className="flex items-center text-foreground">
+              <Banknote className="mr-2 h-5 w-5 text-primary" /> Registrar cobro
             </DrawerTitle>
             <DrawerDescription>
-              Cobro a <strong>{cargo.persona?.nombre ?? '—'} {cargo.persona?.apellido ?? ''}</strong> por {cargo.concepto}.
+              <strong>{nombre.toUpperCase()}</strong>
+              {!cargo && (
+                <span className="block text-xs mt-0.5">
+                  {esCobroLibre
+                    ? 'Sin adeudo: el cobro se registrará como saldo a favor.'
+                    : `Saldo deudor actual: $${adeudo.toFixed(2)}`}
+                </span>
+              )}
             </DrawerDescription>
           </DrawerHeader>
-          
+
           <form action={formAction}>
-            <input type="hidden" name="cargo_id" value={cargo.id} />
-            <input type="hidden" name="persona_id" value={cargo.persona_id} />
+            <input type="hidden" name="cargo_ids" value={JSON.stringify(ids)} />
+            <input type="hidden" name="persona_id" value={pid} />
             <input type="hidden" name="idempotency_key" value={idempotencyKey} />
 
             <div className="p-4 pb-0 space-y-5">
-              
               <div className="space-y-3">
-                <Label htmlFor="monto_pago" className="text-sm font-semibold text-slate-700">Monto a cobrar ($)</Label>
-                <Input 
-                  id="monto_pago" 
-                  name="monto_pago" 
-                  type="number" 
-                  step="0.01" 
-                  min="1" 
-                  max={cargo.saldo_pendiente}
-                  defaultValue={cargo.saldo_pendiente}
-                  inputMode="decimal" 
-                  required 
-                  className="h-16 text-3xl font-bold text-center text-emerald-700 bg-emerald-50 border-emerald-200" 
+                <Label htmlFor="monto_pago" className="text-xs font-semibold text-muted-foreground tracking-wider">
+                  Monto a cobrar ($)
+                </Label>
+                <Input
+                  id="monto_pago"
+                  name="monto_pago"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={monto}
+                  onChange={(e) => setMonto(e.target.value ? parseFloat(e.target.value) : '')}
+                  inputMode="decimal"
+                  required
+                  placeholder="0.00"
+                  className="h-16 text-3xl font-bold text-center text-primary bg-primary/10 border-primary/20"
                 />
-                <p className="text-xs text-center text-slate-500">Saldo pendiente: ${cargo.saldo_pendiente}</p>
+                <div className="text-center mt-2 font-medium text-sm min-h-[20px]">
+                  {esCobroLibre && montoNumerico > 0 && (
+                    <span className="text-[#15435a]">Se registrará como saldo a favor: ${montoNumerico.toFixed(2)}</span>
+                  )}
+                  {!esCobroLibre && faltante === 0 && montoNumerico > 0 && (
+                    <span className="text-[#22887c] flex items-center justify-center">
+                      <CheckCircle2 className="w-4 h-4 mr-1" /> El saldo quedará liquidado
+                    </span>
+                  )}
+                  {!esCobroLibre && faltante > 0 && allowPartial && (
+                    <span className="text-amber-600">Quedará pendiente: ${faltante.toFixed(2)}</span>
+                  )}
+                  {!esCobroLibre && faltante > 0 && !allowPartial && (
+                    <span className="text-red-600">Esta academia exige cubrir al menos ${adeudo.toFixed(2)}</span>
+                  )}
+                  {!esCobroLibre && excedente > 0 && (
+                    <span className="text-[#15435a]">Genera saldo a favor: ${excedente.toFixed(2)}</span>
+                  )}
+                </div>
                 {state?.errors?.monto_pago && <p className="text-sm text-red-600 text-center">{state.errors.monto_pago[0]}</p>}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="metodo_pago">Método de Pago</Label>
-                <Select name="metodo_pago" defaultValue="efectivo" required>
-                  <SelectTrigger className="h-12">
-                    <SelectValue placeholder="Selecciona el método" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {METODOS_PAGO.map(m => (
-                      <SelectItem key={m} value={m}>
-                        {m.charAt(0).toUpperCase() + m.slice(1)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {state?.errors?.metodo_pago && <p className="text-sm text-red-600">{state.errors.metodo_pago[0]}</p>}
+              <div className="space-y-3">
+                <Label className="text-xs font-semibold text-muted-foreground tracking-wider">Método de pago</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <Label
+                    htmlFor="efectivo"
+                    className="flex flex-col items-center justify-center h-16 px-2 border border-border rounded-xl cursor-pointer hover:bg-accent transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5 has-[:checked]:text-primary text-muted-foreground"
+                  >
+                    <input type="radio" name="metodo_pago" value="efectivo" id="efectivo" className="sr-only" defaultChecked />
+                    <Banknote className="h-6 w-6 mb-1" />
+                    <span className="text-sm font-medium">Efectivo</span>
+                  </Label>
+                  <Label
+                    htmlFor="transferencia"
+                    className="flex flex-col items-center justify-center h-16 px-2 border border-border rounded-xl cursor-pointer hover:bg-accent transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5 has-[:checked]:text-primary text-muted-foreground"
+                  >
+                    <input type="radio" name="metodo_pago" value="transferencia" id="transferencia" className="sr-only" />
+                    <Landmark className="h-6 w-6 mb-1" />
+                    <span className="text-sm font-medium">Transferencia</span>
+                  </Label>
+                </div>
+                {state?.errors?.metodo_pago && <p className="text-sm text-destructive">{state.errors.metodo_pago[0]}</p>}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="referencia">Referencia / Folio (opcional)</Label>
-                <Input id="referencia" name="referencia" className="h-11" placeholder="Ej. Terminación 4590" />
+                <Label htmlFor="nota" className="text-xs font-semibold text-muted-foreground tracking-wider">Nota (opcional)</Label>
+                <Input id="nota" name="nota" className="h-11 text-sm leading-relaxed border-input bg-background focus-visible:ring-ring" />
               </div>
 
               {state?.message && !state.success && (
                 <div className="p-3 bg-red-50 text-red-700 text-sm rounded-md border border-red-200">
-                  {state.message}
+                  <p className="font-bold">{state.message}</p>
                 </div>
               )}
             </div>
-            
+
             <DrawerFooter className="mt-4">
-              <SubmitButton />
+              <SubmitButton label={botonLabel} disabled={montoInvalido} />
               <DrawerClose asChild>
-                <Button variant="ghost" className="h-11 text-slate-500">Cancelar</Button>
+                <Button variant="ghost" className="h-11 text-muted-foreground">Cancelar</Button>
               </DrawerClose>
             </DrawerFooter>
           </form>

@@ -2,6 +2,7 @@ const RPC_ERROR_MAP: Record<string, string> = {
   'ACCESO_DENEGADO':         'No tienes permiso para realizar esta acción.',
   'MONTO_INVALIDO':          'El monto debe ser mayor a cero.',
   'SALDO_INSUFICIENTE':      'El monto supera el saldo pendiente.',
+  'PAGO_PARCIAL_NO_PERMITIDO':'Esta academia no permite abonos parciales. Debes liquidar el total del adeudo.',
   'CONCEPTO_REQUERIDO':      'El concepto del cargo es obligatorio.',
   'FECHA_VENCIMIENTO_PASADA':'La fecha de vencimiento no puede ser en el pasado.',
   '23505':                   'Esta operación ya fue procesada anteriormente.',
