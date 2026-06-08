@@ -66,11 +66,14 @@ export function MiAcademiaClientView({
         </div>
 
         {/* Cerrar Sesión */}
-        <form action={logoutAction}>
-          <Button type="submit" variant="destructive" className="w-full">
-            Cerrar Sesión
-          </Button>
-        </form>
+        <div className="flex justify-between items-center p-4 bg-muted/30 border border-border rounded-lg">
+          <p className="text-xs text-muted-foreground">Salir de tu cuenta de forma segura.</p>
+          <form action={logoutAction}>
+            <Button type="submit" variant="destructive" size="sm">
+              Cerrar Sesión
+            </Button>
+          </form>
+        </div>
       </div>
     </div>
   )

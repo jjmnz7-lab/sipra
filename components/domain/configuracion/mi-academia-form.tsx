@@ -10,6 +10,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2, Camera } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
 import { resizeImage } from '@/lib/utils/image'
 import { useRouter } from 'next/navigation'
@@ -91,7 +92,9 @@ export function MiAcademiaForm({
   }
 
   return (
-    <form action={formAction} className="space-y-5">
+    <Card>
+      <CardContent>
+        <form action={formAction} className="space-y-5">
       {/* Logo Upload — guarda al instante, no participa del dirty */}
       <div className="flex flex-col items-center gap-2">
         <Label className="text-foreground font-semibold w-full justify-center">Logo</Label>
@@ -144,16 +147,17 @@ export function MiAcademiaForm({
           value={nombre}
           onChange={(e) => setNombre(e.target.value)}
           required
-          className="h-10 text-center text-[17px] font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-br from-foreground to-foreground/70 caret-foreground"
-          style={{ letterSpacing: '-0.02em' }}
+          className="h-10 text-center text-[17px] font-bold tracking-tight"
         />
       </div>
 
-      <SectionFooter
-        dirty={dirty}
-        onCancel={onCancel}
-        errorMessage={state.success === false ? state.message : null}
-      />
-    </form>
+          <SectionFooter
+            dirty={dirty}
+            onCancel={onCancel}
+            errorMessage={state.success === false ? state.message : null}
+          />
+        </form>
+      </CardContent>
+    </Card>
   )
 }
