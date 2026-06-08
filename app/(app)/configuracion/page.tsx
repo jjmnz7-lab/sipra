@@ -1,11 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
-import { MiAcademiaForm } from '@/components/domain/configuracion/mi-academia-form'
 import { CobranzaFormSection } from '@/components/domain/configuracion/cobranza-form-section'
 import { PlanesCobroSection, type PlanCobro } from '@/components/domain/configuracion/planes-cobro-section'
 import { PagosAtrasadosForm } from '@/components/domain/configuracion/pagos-atrasados-form'
-import { logoutAction } from '@/app/(app)/configuracion/actions'
 import { PageSubheader } from '@/components/layout/page-subheader'
-import { Button } from '@/components/ui/button'
 import { Sparkles } from 'lucide-react'
 
 export default async function ConfiguracionPage({
@@ -23,7 +20,7 @@ export default async function ConfiguracionPage({
 
   const { data: academia } = await supabase
     .from('academia')
-    .select('config_recargos, config_cobro, nombre, metadata, multi_plan_enabled')
+    .select('config_recargos, config_cobro, multi_plan_enabled')
     .eq('id', academiaId)
     .single() as any
 
@@ -57,7 +54,6 @@ export default async function ConfiguracionPage({
 
   const configRecargos = academia?.config_recargos || {}
   const configCobro = academia?.config_cobro || {}
-  const logoUrl = academia?.metadata?.logo_url || null
 
   return (
     <div className="flex flex-col h-full min-h-screen bg-background pb-20">
@@ -78,12 +74,6 @@ export default async function ConfiguracionPage({
           </div>
         )}
 
-        <MiAcademiaForm
-          initialNombre={academia?.nombre || ''}
-          academiaId={academiaId}
-          logoUrl={logoUrl}
-        />
-
         <CobranzaFormSection initialConfig={configCobro} />
 
         <PlanesCobroSection
@@ -92,19 +82,6 @@ export default async function ConfiguracionPage({
         />
 
         <PagosAtrasadosForm initialConfig={configRecargos} />
-
-        {/* Cerrar Sesión — standalone */}
-        <div className="flex justify-between items-center p-4 bg-muted/30 border border-border rounded-lg">
-          <div>
-            <h4 className="text-sm font-semibold text-foreground">Cerrar Sesión</h4>
-            <p className="text-xs text-muted-foreground">Salir de tu cuenta de forma segura.</p>
-          </div>
-          <form action={logoutAction}>
-            <Button type="submit" variant="destructive" size="sm">
-              Cerrar Sesión
-            </Button>
-          </form>
-        </div>
       </div>
     </div>
   )

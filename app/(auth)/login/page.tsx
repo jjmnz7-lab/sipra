@@ -51,9 +51,8 @@ export default function LoginPage() {
                 id="email"
                 name="email"
                 type="email"
-                placeholder="tu@correo.com"
                 required
-                className="sipra-auth-input h-11 border-slate-300 text-center text-lg font-bold text-[#22887c] focus-visible:border-[#22887c] focus-visible:ring-3 focus-visible:ring-[#22887c]/50"
+                className="sipra-auth-input h-11 border-slate-300 text-center text-lg font-bold text-[#22887c] placeholder:text-[#22887c]/35 focus-visible:border-[#22887c] focus-visible:ring-3 focus-visible:ring-[#22887c]/50"
               />
               {state?.errors?.email && (
                 <p className="text-sm text-red-600">{state.errors.email[0]}</p>
