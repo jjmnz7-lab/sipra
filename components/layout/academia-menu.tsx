@@ -63,7 +63,7 @@ export function AcademiaMenu() {
     {
       key: 'reportes',
       icon: <BarChart3 className="h-5 w-5" />,
-      color: '#15435a',
+      color: '#22887c',
       titulo: 'Reportes',
       desc: 'Cobranza del mes, ingresos y deuda acumulada.',
       href: '/reportes',

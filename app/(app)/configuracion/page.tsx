@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { CobranzaFormSection } from '@/components/domain/configuracion/cobranza-form-section'
 import { PlanesCobroSection, type PlanCobro } from '@/components/domain/configuracion/planes-cobro-section'
 import { PagosAtrasadosForm } from '@/components/domain/configuracion/pagos-atrasados-form'
-import { PageSubheader } from '@/components/layout/page-subheader'
+import { ConfiguracionSubheader } from './configuracion-subheader'
 import { Sparkles } from 'lucide-react'
 
 export default async function ConfiguracionPage({
@@ -57,7 +57,7 @@ export default async function ConfiguracionPage({
 
   return (
     <div className="flex flex-col h-full min-h-screen bg-background pb-20">
-      <PageSubheader title="Configuración" />
+      <ConfiguracionSubheader />
 
       <div className="p-4 space-y-6">
         {showPlanesOnboarding && (

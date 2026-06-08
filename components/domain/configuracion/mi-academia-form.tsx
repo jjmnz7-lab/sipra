@@ -10,7 +10,6 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2, Camera } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
 import { resizeImage } from '@/lib/utils/image'
 import { useRouter } from 'next/navigation'
@@ -92,73 +91,69 @@ export function MiAcademiaForm({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">Mi Academia</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form action={formAction} className="space-y-4">
-          {/* Logo Upload — guarda al instante, no participa del dirty */}
-          <div className="flex flex-col items-center gap-2">
-            <button
-              type="button"
-              onClick={handleLogoClick}
-              disabled={uploadingLogo}
-              className="relative w-20 h-20 rounded-full border-2 border-dashed border-border hover:border-primary/50 transition-colors flex items-center justify-center overflow-hidden bg-muted/30 group"
-            >
-              {currentLogoUrl ? (
-                <img src={currentLogoUrl} alt="Logo" className="w-full h-full object-cover" />
-              ) : (
-                <Camera className="h-8 w-8 text-muted-foreground group-hover:text-primary transition-colors" />
-              )}
-              {uploadingLogo && (
-                <div className="absolute inset-0 bg-background/70 flex items-center justify-center">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                </div>
-              )}
-              {currentLogoUrl && !uploadingLogo && (
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <Camera className="h-5 w-5 text-white" />
-                </div>
-              )}
-            </button>
-            <p className="text-xs text-muted-foreground">
-              {currentLogoUrl ? 'Toca para cambiar' : 'Agregar logo'}
-            </p>
-            {logoError && (
-              <p className="text-xs text-destructive text-center max-w-xs">
-                {logoError}
-              </p>
-            )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleFileChange}
-            />
-          </div>
+    <form action={formAction} className="space-y-5">
+      {/* Logo Upload — guarda al instante, no participa del dirty */}
+      <div className="flex flex-col items-center gap-2">
+        <Label className="text-foreground font-semibold w-full justify-center">Logo</Label>
+        <button
+          type="button"
+          onClick={handleLogoClick}
+          disabled={uploadingLogo}
+          className="relative w-24 h-24 rounded-full border-2 border-dashed border-border hover:border-primary/50 transition-colors flex items-center justify-center overflow-hidden bg-muted/30 group"
+        >
+          {currentLogoUrl ? (
+            <img src={currentLogoUrl} alt="Logo" className="w-full h-full object-cover" />
+          ) : (
+            <Camera className="h-9 w-9 text-muted-foreground group-hover:text-primary transition-colors" />
+          )}
+          {uploadingLogo && (
+            <div className="absolute inset-0 bg-background/70 flex items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          )}
+          {currentLogoUrl && !uploadingLogo && (
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <Camera className="h-5 w-5 text-white" />
+            </div>
+          )}
+        </button>
+        <p className="text-xs text-muted-foreground">
+          {currentLogoUrl ? 'Toca para cambiar' : 'Agregar logo'}
+        </p>
+        {logoError && (
+          <p className="text-xs text-destructive text-center max-w-xs">
+            {logoError}
+          </p>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+      </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="nombre_academia" className="text-foreground font-semibold">
-              Nombre de la academia
-            </Label>
-            <Input
-              id="nombre_academia"
-              name="nombre_academia"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              required
-            />
-          </div>
+      <div className="space-y-2">
+        <Label htmlFor="nombre_academia" className="text-foreground font-semibold w-full justify-center">
+          Nombre
+        </Label>
+        <Input
+          id="nombre_academia"
+          name="nombre_academia"
+          value={nombre}
+          onChange={(e) => setNombre(e.target.value)}
+          required
+          className="h-10 text-center text-[17px] font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-br from-foreground to-foreground/70 caret-foreground"
+          style={{ letterSpacing: '-0.02em' }}
+        />
+      </div>
 
-          <SectionFooter
-            dirty={dirty}
-            onCancel={onCancel}
-            errorMessage={state.success === false ? state.message : null}
-          />
-        </form>
-      </CardContent>
-    </Card>
+      <SectionFooter
+        dirty={dirty}
+        onCancel={onCancel}
+        errorMessage={state.success === false ? state.message : null}
+      />
+    </form>
   )
 }

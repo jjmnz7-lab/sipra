@@ -36,8 +36,8 @@ export function MiAcademiaClientView({
 
         {/* Conteo de alumnos */}
         <div className="grid grid-cols-2 gap-3">
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
+          <Card className="justify-center">
+            <CardContent className="flex items-center gap-3 px-4">
               <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#5C8F78]/12 text-[#5C8F78]">
                 <UserCheck className="h-5 w-5" />
               </span>
@@ -50,8 +50,8 @@ export function MiAcademiaClientView({
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
+          <Card className="justify-center">
+            <CardContent className="flex items-center gap-3 px-4">
               <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
                 <UserX className="h-5 w-5" />
               </span>
@@ -65,18 +65,12 @@ export function MiAcademiaClientView({
           </Card>
         </div>
 
-        {/* Cerrar Sesión — standalone */}
-        <div className="flex justify-between items-center p-4 bg-muted/30 border border-border rounded-lg">
-          <div>
-            <h4 className="text-sm font-semibold text-foreground">Cerrar Sesión</h4>
-            <p className="text-xs text-muted-foreground">Salir de tu cuenta de forma segura.</p>
-          </div>
-          <form action={logoutAction}>
-            <Button type="submit" variant="destructive" size="sm">
-              Cerrar Sesión
-            </Button>
-          </form>
-        </div>
+        {/* Cerrar Sesión */}
+        <form action={logoutAction}>
+          <Button type="submit" variant="destructive" className="w-full">
+            Cerrar Sesión
+          </Button>
+        </form>
       </div>
     </div>
   )
