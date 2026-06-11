@@ -4,36 +4,43 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { PageSubheader } from '@/components/layout/page-subheader'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils/currency'
+import Link from 'next/link'
+import { cn } from '@/lib/utils'
 import {
   Clock,
   Banknote,
   MessageCircle,
-  MoreHorizontal,
   MoreVertical,
   Users,
   Phone,
-  RefreshCcw,
+  Plus,
+  Copy,
+  X,
+  RefreshCw,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react'
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from '@/components/ui/drawer'
+import { clasificarAlumno, colorEstado } from '@/lib/constants/alumno-finanzas'
 
 import { RegistrarPagoDrawer } from '@/components/domain/cargo/registrar-pago-drawer'
 import { RecordatorioMensajeDrawer } from '@/components/domain/envio/recordatorio-mensaje-drawer'
 import { CrearPromesaDrawer } from '@/components/domain/timeline/crear-promesa-drawer'
-import { AnularPagoDrawer } from '@/components/domain/timeline/anular-pago-drawer'
 import { CrearCargoIndividualDrawer } from '@/components/domain/cargo/crear-cargo-individual-drawer'
-import { CrearCargoUnicoDrawer } from '@/components/domain/cargo/crear-cargo-unico-drawer'
 import { AnularCargoDrawer } from '@/components/domain/cargo/anular-cargo-drawer'
 import { VisitaExpressDrawer, type PlanVisita } from '@/components/domain/cargo/visita-express-drawer'
 import { AccionesAlumnoSheet } from '@/components/domain/persona/acciones-alumno-sheet'
 import { EditarAlumnoDrawer } from '@/components/domain/persona/editar-alumno-drawer'
 import { FaltaTelefonoAlert } from '@/components/domain/persona/falta-telefono-alert'
 import { MasAccionesSheet } from '@/components/domain/seguimiento/mas-acciones-sheet'
-import { HistorialCompletoDrawer } from '@/components/domain/timeline/historial-completo-drawer'
-import { iconoEvento } from '@/components/domain/timeline/evento-icono'
-import { LedgerCargoRow } from '@/components/domain/timeline/ledger-cargo-row'
-import { esEventoCargo, computeSaldosResultantes } from '@/lib/utils/ledger'
+import { EventoRow } from '@/components/domain/timeline/evento-row'
 
 const TIMELINE_PREVIEW = 4
 
@@ -45,7 +52,8 @@ function getIniciales(nombre: string, apellido: string | null) {
 
 export function SeguimientoClientView({
   persona,
-  grupoNombre,
+  gruposAlumno = [],
+  planesAlumno = [],
   cargosActivos,
   deudaTotal,
   saldoAFavor = 0,
@@ -60,7 +68,8 @@ export function SeguimientoClientView({
   currentPlanIds = [],
 }: {
   persona: any
-  grupoNombre: string | null
+  gruposAlumno?: { id: string; nombre: string }[]
+  planesAlumno?: { id: string; nombre: string }[]
   cargosActivos: any[]
   deudaTotal: number
   saldoAFavor?: number
@@ -81,15 +90,28 @@ export function SeguimientoClientView({
   const [isRecordatorioOpen, setIsRecordatorioOpen] = useState(false)
   const [isPromesaOpen, setIsPromesaOpen] = useState(false)
   const [isCargoOpen, setIsCargoOpen] = useState(false)
-  const [isCargoUnicoOpen, setIsCargoUnicoOpen] = useState(false)
   const [isAnularCargoOpen, setIsAnularCargoOpen] = useState(false)
   const [isMasAccionesOpen, setIsMasAccionesOpen] = useState(false)
   const [isVisitaOpen, setIsVisitaOpen] = useState(false)
   const [isKebabOpen, setIsKebabOpen] = useState(false)
   const [isEditarOpen, setIsEditarOpen] = useState(false)
-  const [isHistorialOpen, setIsHistorialOpen] = useState(false)
   const [isAlertOpen, setIsAlertOpen] = useState(false)
   const [editFocus, setEditFocus] = useState<'telefono' | null>(null)
+
+  const [groupsExpanded, setGroupsExpanded] = useState(false)
+  const [plansExpanded, setPlansExpanded] = useState(false)
+  const [isPhoneOptionsOpen, setIsPhoneOptionsOpen] = useState(false)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg)
+    setTimeout(() => {
+      setToastMessage(null)
+    }, 1000)
+  }
+
+  const estadoFinanciero = clasificarAlumno(cargosActivos)
+  const estadoDef = colorEstado(estadoFinanciero)
 
   const handleBack = () => {
     setIsExiting(true)
@@ -100,25 +122,20 @@ export function SeguimientoClientView({
   const tieneHistorial = (timeline?.length ?? 0) > 0
   const iniciales = getIniciales(persona.nombre, persona.apellido)
   const eventosPreview = timeline.slice(0, TIMELINE_PREVIEW)
-  const eventosOcultos = Math.max(0, timeline.length - TIMELINE_PREVIEW)
-
-  // Saldo corriente acumulado por evento (estado de cuenta). Se calcula sobre el
-  // timeline COMPLETO anclando al saldo vivo, para que el preview encadene igual
-  // que el historial completo.
-  const saldoActual = Number(persona.saldo_acumulado ?? deudaTotal)
-  const saldosLedger = computeSaldosResultantes(timeline, saldoActual)
 
   return (
     <div
-      className={`flex flex-col h-full min-h-screen bg-background pb-32 transition-all duration-200 ${
+      className={`flex flex-col h-full min-h-screen bg-background pb-48 transition-all duration-200 ${
         isExiting ? 'animate-out slide-out-to-right fade-out' : 'animate-in slide-in-from-right'
       }`}
     >
       {/* Sub-header con avatar de iniciales + kebab */}
       <PageSubheader
         title={
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span className="truncate">{persona.nombre} {persona.apellido}</span>
+          <div className="flex items-center justify-between w-full min-w-0 gap-2">
+            <span className={cn("truncate mr-2", suspendido && "text-muted-foreground/65")}>
+              {persona.nombre} {persona.apellido}
+            </span>
           </div>
         }
         onBack={handleBack}
@@ -134,50 +151,110 @@ export function SeguimientoClientView({
       />
 
       {/* Listón de badges */}
-      <div className="bg-card border-b border-border px-4 py-2.5 flex flex-wrap gap-2">
-        <Badge
-          variant="outline"
-          className={`gap-1.5 font-medium ${
-            suspendido
-              ? 'bg-muted text-muted-foreground border-border'
-              : 'bg-[#22887c]/10 text-[#1a6b62] border-[#22887c]/30'
-          }`}
-        >
-          <span
-            className={`inline-block h-1.5 w-1.5 rounded-full ${
-              suspendido ? 'bg-muted-foreground' : 'bg-[#22887c]'
-            }`}
-          />
-          {suspendido ? 'Suspendido' : 'Activo'}
-        </Badge>
+      <div className="sticky top-[112px] z-20 bg-background/95 backdrop-blur-sm border-b border-border w-full overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <div className="flex gap-1.5 items-center justify-center min-w-full px-3 py-1.5 flex-nowrap">
+          {suspendido && (
+            <ListonBadge
+              icon={<span className="inline-block h-1.5 w-1.5 rounded-full bg-gray-400" />}
+              className="bg-muted text-muted-foreground border-border"
+            >
+              suspendido
+            </ListonBadge>
+          )}
+          {/* Badge de teléfono */}
+          <ListonBadge
+            icon={<Phone className="h-3 w-3" />}
+            onClick={() => {
+              if (persona.telefono_whatsapp) {
+                setIsPhoneOptionsOpen(true)
+              } else {
+                setIsAlertOpen(true)
+              }
+            }}
+          >
+            {persona.telefono_whatsapp || '- - - - -'}
+            <ChevronDown className="h-3 w-3 text-[#22887c] ml-1" />
+          </ListonBadge>
 
-        {grupoNombre && (
-          <Badge variant="outline" className="gap-1.5 font-medium bg-secondary/60 text-secondary-foreground border-border">
-            <Users className="h-3 w-3" />
-            {grupoNombre}
-          </Badge>
-        )}
+          {/* Badge de grupos */}
+          {gruposAlumno.length === 0 ? (
+            <ListonBadge className="bg-amber-500/10 text-amber-700 dark:text-amber-500 border-amber-500/30">
+              ⚠️ sin grupo
+            </ListonBadge>
+          ) : gruposAlumno.length === 1 ? (
+            <ListonBadge icon={<Users className="h-3 w-3" />}>
+              {gruposAlumno[0]!.nombre}
+            </ListonBadge>
+          ) : (
+            <ListonBadge
+              icon={<Users className="h-3 w-3" />}
+              onClick={() => setGroupsExpanded(!groupsExpanded)}
+              className={cn(groupsExpanded && "border-[#22887c]/30 bg-[#22887c]/15 text-[#22887c]")}
+            >
+              {groupsExpanded ? (
+                gruposAlumno.map((g) => g.nombre).join(', ')
+              ) : (
+                <>
+                  <span>{gruposAlumno[0]!.nombre}</span>
+                  <span className="inline-flex items-center justify-center bg-[#22887c]/15 text-[#22887c] rounded-full px-1.5 py-[1px] text-[9px] font-bold ml-1">
+                    +{gruposAlumno.length - 1}
+                  </span>
+                </>
+              )}
+            </ListonBadge>
+          )}
 
-        {persona.telefono_whatsapp && (
-          <Badge variant="outline" className="gap-1.5 font-medium bg-secondary/60 text-secondary-foreground border-border">
-            <Phone className="h-3 w-3" />
-            {persona.telefono_whatsapp}
-          </Badge>
-        )}
+          {/* Badge de esquemas de cobro */}
+          {planesAlumno.length === 0 ? (
+            <ListonBadge className="bg-amber-500/10 text-amber-700 dark:text-amber-500 border-amber-500/30">
+              ⚠️ sin esquema de pago
+            </ListonBadge>
+          ) : planesAlumno.length === 1 ? (
+            <ListonBadge icon={<RefreshCw className="h-3 w-3" />}>
+              {planesAlumno[0]!.nombre}
+            </ListonBadge>
+          ) : (
+            <ListonBadge
+              icon={<RefreshCw className="h-3 w-3" />}
+              onClick={() => setPlansExpanded(!plansExpanded)}
+              className={cn(plansExpanded && "border-[#22887c]/30 bg-[#22887c]/15 text-[#22887c]")}
+            >
+              {plansExpanded ? (
+                planesAlumno.map((p) => p.nombre).join(', ')
+              ) : (
+                <>
+                  <span>{planesAlumno[0]!.nombre}</span>
+                  <span className="inline-flex items-center justify-center bg-[#22887c]/15 text-[#22887c] rounded-full px-1.5 py-[1px] text-[9px] font-bold ml-1">
+                    +{planesAlumno.length - 1}
+                  </span>
+                </>
+              )}
+            </ListonBadge>
+          )}
+        </div>
       </div>
 
       <div className="p-4 space-y-4">
         {/* Snapshot: total + desglose */}
-        <div className="bg-card rounded-xl p-4 border border-border">
-          <div className="mb-3">
-            <p className="text-xs text-muted-foreground font-medium">Pendiente total</p>
-            <p
-              className={`text-2xl font-black leading-none mt-0.5 ${
-                deudaTotal > 0 ? 'text-destructive' : 'text-[#22887c]'
-              }`}
-            >
-              {formatCurrency(deudaTotal)}
-            </p>
+        <div className="bg-card rounded-xl p-4 border border-border flex items-start justify-between">
+          <div>
+            <p className="text-xs text-muted-foreground font-medium">Saldo</p>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span
+                className="text-2xl font-black leading-none"
+                style={{ color: estadoDef.hex }}
+              >
+                {formatCurrency(deudaTotal)}
+              </span>
+              <span
+                className="text-[10px] font-bold uppercase tracking-wider bg-transparent border-0"
+                style={{
+                  color: estadoDef.hex
+                }}
+              >
+                {estadoDef.label}
+              </span>
+            </div>
             {saldoAFavor > 0 && (
               <p className="mt-1.5 text-xs font-semibold text-[#15435a] flex items-center gap-1.5">
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#15435a]" aria-hidden="true" />
@@ -185,60 +262,6 @@ export function SeguimientoClientView({
               </p>
             )}
           </div>
-
-          {cargosActivos.length > 0 && (
-            <div className="border-t border-border pt-3 space-y-2">
-              {cargosActivos.map((c: any) => (
-                <div key={c.id} className="flex items-baseline gap-2">
-                  <p className="text-xs text-muted-foreground truncate flex-shrink-0">{c.concepto}</p>
-                  <span
-                    className="flex-1 border-b border-dotted border-border/70 translate-y-[-3px]"
-                    aria-hidden="true"
-                  />
-                  <span
-                    className={`text-xs font-semibold flex-shrink-0 ${
-                      c.estado_financiero === 'vencido' ? 'text-destructive' : 'text-amber-500'
-                    }`}
-                  >
-                    {formatCurrency(c.saldo_pendiente)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {deudaTotal === 0 && <p className="text-xs text-[#22887c] font-medium">Al corriente</p>}
-        </div>
-
-        {/* 3 botones fijos */}
-        <div className="flex gap-2">
-          <Button
-            onClick={() => setIsPagoOpen(true)}
-            className="flex-[2] h-11 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm"
-          >
-            <Banknote className="h-4 w-4 mr-1.5" /> Registrar Pago
-          </Button>
-
-          <Button
-            onClick={() => {
-              if (persona.telefono_whatsapp) {
-                setIsRecordatorioOpen(true)
-              } else {
-                setIsAlertOpen(true)
-              }
-            }}
-            className="flex-[1.5] h-11 rounded-lg bg-[#22887c] hover:bg-[#1a6b62] text-white font-semibold text-sm"
-          >
-            <MessageCircle className="h-4 w-4 mr-1.5" /> Recordar pago
-          </Button>
-
-          <Button
-            onClick={() => setIsMasAccionesOpen(true)}
-            variant="outline"
-            className="flex-1 h-11 rounded-lg font-semibold text-sm"
-          >
-            <MoreHorizontal className="h-4 w-4 mr-1" /> Más
-          </Button>
         </div>
 
         {/* Modales / drawers */}
@@ -272,12 +295,6 @@ export function SeguimientoClientView({
           tituloDrawer="Nuevo cargo"
         />
 
-        <CrearCargoUnicoDrawer
-          alumnoId={persona.id}
-          open={isCargoUnicoOpen}
-          onOpenChange={setIsCargoUnicoOpen}
-        />
-
         <AnularCargoDrawer
           open={isAnularCargoOpen}
           onOpenChange={setIsAnularCargoOpen}
@@ -288,7 +305,6 @@ export function SeguimientoClientView({
           open={isMasAccionesOpen}
           onOpenChange={setIsMasAccionesOpen}
           onAgregarCargo={() => setIsCargoOpen(true)}
-          onCargoUnico={() => setIsCargoUnicoOpen(true)}
           onRegistrarPromesa={() => setIsPromesaOpen(true)}
           onAnularCargo={() => setIsAnularCargoOpen(true)}
           onRegistrarVisita={() => setIsVisitaOpen(true)}
@@ -347,19 +363,22 @@ export function SeguimientoClientView({
           }}
         />
 
-        <HistorialCompletoDrawer
-          open={isHistorialOpen}
-          onOpenChange={setIsHistorialOpen}
-          personaId={persona.id}
-          iniciales={timeline}
-          saldoActual={saldoActual}
-        />
-
         {/* Historial reciente */}
         <div className="pt-2">
-          <h2 className="text-sm font-semibold text-foreground flex items-center mb-3">
-            <Clock className="h-4 w-4 mr-2 text-muted-foreground" /> Historial reciente
-          </h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-foreground flex items-center">
+              <Clock className="h-4 w-4 mr-2 text-muted-foreground" /> Historial reciente
+            </h2>
+            {timeline.length > 0 && (
+              <Link
+                href={`/seguimiento/${persona.id}/historial`}
+                className="flex items-center gap-0.5 text-xs font-semibold text-[#22887c] hover:underline"
+              >
+                ver completo
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Link>
+            )}
+          </div>
 
           {eventosPreview.length === 0 ? (
             <div className="text-center py-8 px-4 border border-dashed border-border rounded-xl bg-muted/20">
@@ -370,130 +389,127 @@ export function SeguimientoClientView({
               </p>
             </div>
           ) : (
-            <>
-              <div className="relative border-l-2 border-border ml-3 space-y-5">
-                {eventosPreview.map((evento: any) => {
-                  // Cargos → fila ultra-compacta con saldo resultante (estado de cuenta).
-                  if (esEventoCargo(evento.tipo)) {
-                    return (
-                      <LedgerCargoRow
-                        key={evento.id}
-                        evento={evento}
-                        saldoResultante={saldosLedger.get(evento.id)}
-                      />
-                    )
-                  }
+            <div>
+              {eventosPreview.map((evento: any, i: number) => (
+                <EventoRow
+                  key={evento.id}
+                  evento={evento}
+                  isLast={i === eventosPreview.length - 1}
+                />
+              ))}
+            </div>
+          )}
+        </div>
 
-                  // Resto (abonos, promesas, notas, anulaciones…) → Card sin cambios.
-                  const { Icon, color, bg } = iconoEvento(evento.tipo)
-                  const isPago = evento.tipo === 'abono_registrado'
-                  const isCargo = false
-                  const isAnulacion = evento.tipo === 'pago_anulado' || evento.tipo === 'cargo_anulado'
-                  const meta = evento.metadata as Record<string, any> | null
-                  const montoEvento = typeof meta?.monto === 'number' ? Number(meta.monto) : null
-                  const mostrarMonto = montoEvento != null && (isCargo || isPago)
+        {/* 3 botones fijos (fijos abajo justo arriba del menú principal) */}
+        <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-40 bg-card/95 backdrop-blur-sm border-t border-border p-4 flex gap-2">
+          <Button
+            onClick={() => setIsPagoOpen(true)}
+            className="flex-[2] h-11 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm"
+          >
+            <Banknote className="h-4 w-4 mr-1.5" /> Registrar Pago
+          </Button>
 
-                  return (
-                    <div key={evento.id} className="relative pl-6">
-                      <div
-                        className={`absolute -left-[13px] top-1 h-6 w-6 rounded-full border-4 border-background flex items-center justify-center ${bg}`}
-                      >
-                        <Icon className={`h-3 w-3 ${color}`} />
-                      </div>
-
-                      <Card
-                        className={`overflow-hidden shadow-sm ${
-                          isAnulacion ? 'border-destructive/20 bg-destructive/5' : 'border-border'
-                        }`}
-                      >
-                        <CardContent className="p-3">
-                          <div className="flex justify-between items-start mb-1 gap-2">
-                            <h3
-                              className={`text-sm font-bold ${
-                                isAnulacion ? 'text-destructive' : 'text-foreground'
-                              }`}
-                            >
-                              {evento.titulo}
-                            </h3>
-                            <div className="flex flex-col items-end flex-shrink-0">
-                              {mostrarMonto && (
-                                <span
-                                  className={`text-sm font-bold leading-none ${
-                                    isPago ? 'text-[#22887c]' : 'text-foreground'
-                                  }`}
-                                >
-                                  {isPago ? '−' : '+'}{formatCurrency(montoEvento!)}
-                                </span>
-                              )}
-                              <span className="text-[10px] text-muted-foreground/80 font-medium whitespace-nowrap mt-0.5">
-                                {new Date(evento.fecha_evento).toLocaleDateString('es-MX', {
-                                  day: 'numeric',
-                                  month: 'short',
-                                })}
-                              </span>
-                            </div>
-                          </div>
-                          {evento.descripcion && (
-                            <p
-                              className={`text-xs ${
-                                isAnulacion ? 'text-destructive/90' : 'text-muted-foreground'
-                              }`}
-                            >
-                              {evento.descripcion}
-                            </p>
-                          )}
-
-                          {isPago && meta?.movimiento_id && (
-                            <div className="mt-3 flex justify-end border-t border-border/50 pt-2">
-                              <AnularPagoDrawer movimientoId={meta.movimiento_id} monto={meta.monto}>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-                                >
-                                  <RefreshCcw className="h-3 w-3 mr-1" /> Anular
-                                </Button>
-                              </AnularPagoDrawer>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {eventosOcultos > 0 && (
-                <div className="flex items-center justify-center gap-3 pt-4">
-                  <div className="flex gap-1">
-                    <span className="h-1 w-1 rounded-full bg-muted-foreground/40" />
-                    <span className="h-1 w-1 rounded-full bg-muted-foreground/40" />
-                    <span className="h-1 w-1 rounded-full bg-muted-foreground/40" />
-                  </div>
-                  <button
-                    onClick={() => setIsHistorialOpen(true)}
-                    className="text-xs font-semibold text-primary hover:underline"
-                  >
-                    Ver todo ({timeline.length})
-                  </button>
-                </div>
-              )}
-            </>
+          {deudaTotal > 0 && (
+            <Button
+              onClick={() => {
+                if (persona.telefono_whatsapp) {
+                  setIsRecordatorioOpen(true)
+                } else {
+                  setIsAlertOpen(true)
+                }
+              }}
+              className="flex-[1.5] h-11 rounded-lg bg-[#22887c] hover:bg-[#1a6b62] text-white font-semibold text-sm"
+            >
+              <MessageCircle className="h-4 w-4 mr-1.5" /> Recordar pago
+            </Button>
           )}
 
-          {/* Saldo Corriente acumulado (saldo vivo del alumno) */}
-          <div className="mt-5 flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Saldo Corriente</span>
-            <span
-              className={`text-lg font-black ${
-                Number(persona.saldo_acumulado ?? deudaTotal) > 0 ? 'text-destructive' : 'text-[#22887c]'
-              }`}
-            >
-              {formatCurrency(Number(persona.saldo_acumulado ?? deudaTotal))}
-            </span>
-          </div>
+          <Button
+            variant="outline"
+            onClick={() => setIsMasAccionesOpen(true)}
+            className="flex-1 h-11 rounded-lg border-2 border-[#1c686e] bg-white dark:bg-white hover:bg-[#1c686e]/10 hover:text-[#1c686e] transition-colors"
+          >
+            <Plus className="h-[22px] w-[22px] text-[#1c686e]" strokeWidth={3.5} />
+          </Button>
         </div>
+
+        {/* Drawers adicionales */}
+        <Drawer open={isPhoneOptionsOpen} onOpenChange={setIsPhoneOptionsOpen}>
+          <DrawerContent className="max-h-[40vh]">
+            <div className="mx-auto w-full max-w-sm pb-6">
+              <DrawerHeader>
+                <DrawerTitle className="text-center text-sm font-semibold">{persona.telefono_whatsapp}</DrawerTitle>
+              </DrawerHeader>
+              <div className="px-4 space-y-2 flex flex-col">
+                <a
+                  href={`tel:${persona.telefono_whatsapp}`}
+                  className="w-full flex items-center justify-center gap-2 py-3 text-sm font-normal border-b border-border hover:bg-accent rounded-lg"
+                  onClick={() => setIsPhoneOptionsOpen(false)}
+                >
+                  <Phone className="h-4 w-4 text-muted-foreground" />
+                  <span>Llamar</span>
+                </a>
+                <button
+                  onClick={() => {
+                    if (persona.telefono_whatsapp) {
+                      navigator.clipboard.writeText(persona.telefono_whatsapp)
+                      showToast("Número telefónico copiado.")
+                    }
+                    setIsPhoneOptionsOpen(false)
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-3 text-sm font-normal hover:bg-accent rounded-lg"
+                >
+                  <Copy className="h-4 w-4 text-muted-foreground" />
+                  <span>Copiar</span>
+                </button>
+                <button
+                  onClick={() => setIsPhoneOptionsOpen(false)}
+                  className="w-full flex items-center justify-center gap-2 py-3 text-sm font-normal border-t border-border hover:bg-accent rounded-lg"
+                >
+                  <span>Cerrar</span>
+                </button>
+              </div>
+            </div>
+          </DrawerContent>
+        </Drawer>
       </div>
+
+      {/* Toast sutil */}
+      {toastMessage && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-[#22887c]/70 backdrop-blur-sm text-white text-xs px-3.5 py-2 rounded-lg shadow-md animate-in fade-in slide-in-from-bottom-2 duration-150">
+          {toastMessage}
+        </div>
+      )}
     </div>
+  )
+}
+
+function ListonBadge({
+  children,
+  icon,
+  className,
+  onClick,
+}: {
+  children: React.ReactNode
+  icon?: React.ReactNode
+  className?: string
+  onClick?: () => void
+}) {
+  const Component = onClick ? 'button' : 'span'
+  return (
+    <Component
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center flex-shrink-0 text-[10px] font-semibold px-2 py-1 rounded-full whitespace-nowrap",
+        onClick 
+          ? "cursor-pointer active:scale-95 transition-all border border-border bg-card text-foreground/85 hover:bg-accent"
+          : "border border-border bg-card text-foreground/85",
+        className
+      )}
+    >
+      {icon && <span className="text-muted-foreground mr-1.5">{icon}</span>}
+      {children}
+    </Component>
   )
 }

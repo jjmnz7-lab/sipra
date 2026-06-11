@@ -1,16 +1,13 @@
 'use client'
 
 import { useMemo, useRef, useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Search, X, Filter, ChevronRight, Users, CalendarDays, ChevronDown } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
+import { Search, X, Filter, ChevronRight, Users, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { colorPorSlug } from '@/lib/constants/grupo-apariencia'
 import { formatearDiasSemanaCorto, formatearHorario } from '@/lib/constants/dias-semana'
 import { CrearPersonaDrawer } from '@/components/domain/persona/crear-persona-drawer'
-import { clasificarAlumno, type EstadoFinancieroAlumno } from '@/lib/constants/alumno-finanzas'
 import { CrearGrupoDrawer } from '@/components/domain/grupo/crear-grupo-drawer'
 import {
   Drawer,
@@ -36,32 +33,6 @@ function normalizar(s: string | null | undefined) {
     .toLowerCase()
 }
 
-function darkenHex(hex: string, factor: number = 0.55) {
-  const cleanHex = hex.replace('#', '')
-  let r = parseInt(cleanHex.substring(0, 2), 16)
-  let g = parseInt(cleanHex.substring(2, 4), 16)
-  let b = parseInt(cleanHex.substring(4, 6), 16)
-
-  r = Math.floor(r * factor)
-  g = Math.floor(g * factor)
-  b = Math.floor(b * factor)
-
-  const rs = r.toString(16).padStart(2, '0')
-  const gs = g.toString(16).padStart(2, '0')
-  const bs = b.toString(16).padStart(2, '0')
-
-  return `#${rs}${gs}${bs}`
-}
-
-function formatTallerDate(dateStr: string | null) {
-  if (!dateStr) return ''
-  const [year, month, day] = dateStr.split('-').map(Number)
-  if (!year || !month || !day) return dateStr
-  const date = new Date(year, month - 1, day)
-  const formatted = date.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })
-  return formatted.replace(/\.$/, '')
-}
-
 export function GruposClientView({
   grupos,
   planes,
@@ -69,7 +40,6 @@ export function GruposClientView({
   multiPlanEnabled,
   montoInscripcionDefault = 0,
   cobrarInscripcionDefault = false,
-  timezone = 'America/Mexico_City',
 }: Props) {
   // Search state
   const [searchOpen, setSearchOpen] = useState(false)
@@ -81,50 +51,12 @@ export function GruposClientView({
   }, [searchOpen])
 
   // Filters state
-  const searchParams = useSearchParams()
-  const [filtroTipo, setFiltroTipo] = useState<'todos' | 'grupos' | 'talleres'>('todos')
   const [incluirArchivados, setIncluirArchivados] = useState(false)
-  const [incluirArchivadosTalleres, setIncluirArchivadosTalleres] = useState(false)
-  const [soloVencidos, setSoloVencidos] = useState(false)
   const [filtrosOpen, setFiltrosOpen] = useState(false)
-
-  // Aplica filtro desde URL si existe
-  useEffect(() => {
-    const filtro = searchParams.get('filtro')
-    if (filtro === 'vencidos') {
-      setFiltroTipo('talleres')
-      setSoloVencidos(true)
-      setIncluirArchivadosTalleres(false)
-    }
-  }, [searchParams])
-
-  // Helper para detectar si un taller está vencido
-  const esTallerVencido = (grupo: any) => {
-    if (!grupo.es_temporal || !grupo.fecha_fin) return false
-    const [y, m, d] = String(grupo.fecha_fin).split('-').map(Number)
-    if (!y || !m || !d) return false
-    const fin = new Date(y, m - 1, d)
-    const hoy = new Date()
-    hoy.setHours(0, 0, 0, 0)
-    return fin < hoy
-  }
-
-  // Safeguard: clear invalid situation options if type changes
-  useEffect(() => {
-    if (filtroTipo === 'grupos') {
-      setIncluirArchivadosTalleres(false)
-    } else if (filtroTipo === 'talleres') {
-      setIncluirArchivados(false)
-    }
-  }, [filtroTipo])
 
   const cleanQuery = useMemo(() => normalizar(query.trim()), [query])
   const hayBusqueda = cleanQuery.length > 0
-
-  const filtroTipoActivo = filtroTipo !== 'todos'
-  const incluirArchivadosActivo = incluirArchivados
-  const incluirArchivadosTalleresActivo = incluirArchivadosTalleres
-  const hayCambios = filtroTipoActivo || incluirArchivadosActivo || incluirArchivadosTalleresActivo || soloVencidos
+  const hayCambios = incluirArchivados
 
   // Lists matching query and filters
   const { dentroFiltro, fueraFiltro } = useMemo(() => {
@@ -134,25 +66,7 @@ export function GruposClientView({
     }
 
     const matchesFilters = (g: any) => {
-      // Si está activo el filtro de vencidos, solo mostrar talleres vencidos activos
-      if (soloVencidos) {
-        if (!g.es_temporal) return false
-        if (g.estado !== 'activo') return false
-        if (!esTallerVencido(g)) return false
-        return true
-      }
-
-      // Tipo Filter
-      if (filtroTipo === 'grupos' && g.es_temporal) return false
-      if (filtroTipo === 'talleres' && !g.es_temporal) return false
-
-      // Situación Filter
-      if (!g.es_temporal) {
-        if (g.estado === 'archivado' && !incluirArchivados) return false
-      } else {
-        if (g.estado === 'archivado' && !incluirArchivadosTalleres) return false
-      }
-
+      if (g.estado === 'archivado' && !incluirArchivados) return false
       return true
     }
 
@@ -169,25 +83,10 @@ export function GruposClientView({
     }
 
     return { dentroFiltro: dentro, fueraFiltro: fuera }
-  }, [grupos, hayBusqueda, cleanQuery, filtroTipo, incluirArchivados, incluirArchivadosTalleres, soloVencidos])
-
-  const visibleGrupos = dentroFiltro.filter((g) => !g.es_temporal).length
-  const visibleTalleres = dentroFiltro.filter((g) => g.es_temporal).length
-
-  const renderContador = () => {
-    if (visibleTalleres === 0) {
-      return `(${visibleGrupos})`
-    }
-    const gruposText = `${visibleGrupos} ${visibleGrupos === 1 ? 'grupo' : 'grupos'}`
-    const talleresText = `${visibleTalleres} ${visibleTalleres === 1 ? 'taller' : 'talleres'}`
-    return `(${gruposText} / ${talleresText})`
-  }
+  }, [grupos, hayBusqueda, cleanQuery, incluirArchivados])
 
   const limpiarTodo = () => {
-    setFiltroTipo('todos')
     setIncluirArchivados(false)
-    setIncluirArchivadosTalleres(false)
-    setSoloVencidos(false)
   }
 
   return (
@@ -216,7 +115,7 @@ export function GruposClientView({
         ) : (
           <div className="flex items-center justify-between w-full gap-3">
             <h1 className="text-xl font-bold tracking-tight text-foreground truncate">
-              Grupos <span className="text-muted-foreground font-medium">{renderContador()}</span>
+              Grupos <span className="text-muted-foreground font-medium">({dentroFiltro.length})</span>
             </h1>
 
             <div className="flex items-center flex-shrink-0">
@@ -248,42 +147,11 @@ export function GruposClientView({
         <div className="sticky top-[112px] z-20 bg-background/95 backdrop-blur-sm border-b border-border px-3 py-1.5 flex items-center justify-between gap-3">
           <div className="flex-1 overflow-hidden flex flex-col gap-1.5">
             <div className="flex items-center gap-1.5 overflow-x-auto hide-scrollbar scroll-smooth pb-0.5">
-              {filtroTipo !== 'todos' && (
-                <ResumenChip
-                  label={filtroTipo === 'grupos' ? 'Solo grupos' : 'Solo talleres'}
-                  color={filtroTipo === 'grupos' ? '#15435a' : '#22887c'}
-                  icon={
-                    filtroTipo === 'grupos' ? (
-                      <Users className="h-3 w-3 text-primary" />
-                    ) : (
-                      <CalendarDays className="h-3 w-3 text-[#22887c]" />
-                    )
-                  }
-                  onRemove={() => setFiltroTipo('todos')}
-                />
-              )}
               {incluirArchivados && (
                 <ResumenChip
                   label="Grupos archivados"
-                  color="#9CA3AF"
                   icon={<Users className="h-3 w-3 text-muted-foreground" />}
                   onRemove={() => setIncluirArchivados(false)}
-                />
-              )}
-              {incluirArchivadosTalleres && (
-                <ResumenChip
-                  label="Talleres archivados"
-                  color="#9CA3AF"
-                  icon={<CalendarDays className="h-3 w-3 text-muted-foreground" />}
-                  onRemove={() => setIncluirArchivadosTalleres(false)}
-                />
-              )}
-              {soloVencidos && (
-                <ResumenChip
-                  label="Talleres vencidos"
-                  color="#F59E0B"
-                  icon={<CalendarDays className="h-3 w-3 text-amber-500" />}
-                  onRemove={() => setSoloVencidos(false)}
                 />
               )}
             </div>
@@ -301,13 +169,9 @@ export function GruposClientView({
       <FiltrosGruposBottomSheet
         open={filtrosOpen}
         onOpenChange={setFiltrosOpen}
-        filtroTipo={filtroTipo}
         incluirArchivados={incluirArchivados}
-        incluirArchivadosTalleres={incluirArchivadosTalleres}
         onApply={(next) => {
-          setFiltroTipo(next.tipo)
           setIncluirArchivados(next.incluirArchivados)
-          setIncluirArchivadosTalleres(next.incluirArchivadosTalleres)
         }}
       />
 
@@ -336,8 +200,8 @@ export function GruposClientView({
           <div className="text-center py-16 px-4 border border-dashed border-border rounded-xl bg-muted/20">
             <p className="text-sm text-muted-foreground">
               {hayBusqueda
-                ? 'No hay grupos o talleres que coincidan con tu búsqueda.'
-                : 'No hay grupos o talleres para mostrar con los filtros aplicados.'}
+                ? 'No hay grupos que coincidan con tu búsqueda.'
+                : 'No hay grupos para mostrar con los filtros aplicados.'}
             </p>
           </div>
         )}
@@ -354,10 +218,7 @@ export function GruposClientView({
         hideTrigger={true}
       />
 
-      <CrearGrupoDrawer
-        planes={planes as any}
-        timezone={timezone}
-      />
+      <CrearGrupoDrawer planes={planes as any} />
     </div>
   )
 }
@@ -371,174 +232,87 @@ function GrupoCard({ grupo }: { grupo: any }) {
   const horaLabel = formatearHorario(grupo.hora_inicio ?? null, grupo.hora_fin ?? null)
   const horarioCard = [diasLabel, horaLabel].filter(Boolean).join(' • ') || null
 
-  const now = useMemo(() => new Date(), [])
-
-  // Classify each member's financial state
-  const memberStates = useMemo(() => {
-    return members.map((m: any) => {
-      const p = m.persona
-      if (!p) return 'al_dia'
-      const cargosPendientes = (p.cargo || []).filter((c: any) =>
-        ['pendiente', 'parcial', 'vencido'].includes(c.estado_financiero),
-      )
-      return clasificarAlumno(cargosPendientes, now)
-    })
-  }, [members, now])
-
-  const alDia = memberStates.filter((s: EstadoFinancieroAlumno) => s === 'al_dia').length
-  const pendientes = memberStates.filter((s: EstadoFinancieroAlumno) => s === 'pendiente').length
-  const atrasados = memberStates.filter((s: EstadoFinancieroAlumno) => s === 'atrasado').length
-  const urgentes = memberStates.filter((s: EstadoFinancieroAlumno) => s === 'urgente').length
-
-  const pctAlDia = totalAlumnos > 0 ? (alDia / totalAlumnos) * 100 : 0
-  const pctPendientes = totalAlumnos > 0 ? (pendientes / totalAlumnos) * 100 : 0
-  const pctAtrasados = totalAlumnos > 0 ? (atrasados / totalAlumnos) * 100 : 0
-  const pctUrgentes = totalAlumnos > 0 ? (urgentes / totalAlumnos) * 100 : 0
-
   const colorGrupo = colorPorSlug(grupo.color)
-  
-  const isFinalizado = useMemo(() => {
-    if (!grupo.fecha_fin) return false
-    const [y, m, d] = String(grupo.fecha_fin).split('-').map(Number)
-    if (!y || !m || !d) return false
-    const finDate = new Date(y, m - 1, d)
-    const hoy = new Date()
-    hoy.setHours(0, 0, 0, 0)
-    return finDate <= hoy
-  }, [grupo.fecha_fin])
 
   return (
     <Link href={`/grupos/${grupo.id}`} className="block">
-      <Card className="relative overflow-hidden bg-card border-border hover:border-primary/50 transition-[transform,border-color,box-shadow,background-color] duration-150 active:scale-[0.985] active:border-[#22887c]/60 active:shadow-[0_0_0_1px_rgba(34,136,124,0.18),0_10px_24px_rgba(34,136,124,0.08)] flex flex-col justify-between">
-        <CardContent className="py-1.5 px-3 flex justify-between items-center min-h-[42px] relative z-10 gap-3">
+      <div className="relative overflow-hidden border rounded-lg hover:border-primary/50 transition-[transform,border-color,box-shadow,background-color] duration-150 active:scale-[0.985] active:border-[#22887c]/60 active:shadow-[0_0_0_1px_rgba(34,136,124,0.18),0_8px_20px_rgba(34,136,124,0.08)] bg-card border-border flex flex-col justify-between">
+        {/* Indicator strip */}
+        <div
+          className="absolute left-0 top-0 bottom-0 w-[6px]"
+          style={{ backgroundColor: colorGrupo.hex }}
+        />
+        <div className="py-3 pr-8 pl-5 flex items-center min-h-[76px] relative z-10 gap-3">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             {/* Círculo con emoji y halo de color */}
-            <div className="relative flex-shrink-0">
-              <div
-                className="h-9 w-9 rounded-full flex items-center justify-center text-base"
-                style={{ border: `3px solid ${colorGrupo.hex}`, backgroundColor: 'transparent' }}
-              >
-                {grupo.emoji || ''}
-              </div>
-              {/* Icono pequeño en el lateral derecho centrado */}
-              <span className="absolute top-1/2 -translate-y-1/2 -right-1 bg-card border border-border rounded-full p-0.5 shadow-sm flex items-center justify-center h-4 w-4 z-10">
-                {grupo.es_temporal ? (
-                  <CalendarDays className="h-2.5 w-2.5 text-[#22887c]" />
-                ) : (
-                  <Users className="h-2.5 w-2.5 text-primary" />
-                )}
-              </span>
+            <div
+              className="h-9 w-9 rounded-full flex items-center justify-center text-base flex-shrink-0"
+              style={{ border: `3px solid ${colorGrupo.hex}`, backgroundColor: 'transparent' }}
+            >
+              {grupo.emoji || ''}
             </div>
 
             <div className="flex-1 min-w-0 flex flex-col justify-center">
-              <div className="flex items-center justify-between gap-1.5 min-w-0 w-full">
+              <div className="flex items-center gap-1.5 min-w-0 w-full">
                 <h3 className="font-bold text-sm text-foreground truncate min-w-0 flex-1">{grupo.nombre}</h3>
-                
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  {/* Solo talleres tienen el badge finaliza */}
-                  {grupo.es_temporal && (
-                    <span className={cn(
-                      "inline-flex items-center text-[10px] font-semibold px-2 py-[3px] rounded-full border border-border bg-card whitespace-nowrap",
-                      isFinalizado ? "text-muted-foreground bg-muted/30" : "text-foreground/85"
-                    )}>
-                      <span>{isFinalizado ? 'finalizó' : 'finaliza'}: {formatTallerDate(grupo.fecha_fin)}</span>
-                    </span>
-                  )}
-
-                  {grupo.estado === 'archivado' && (
-                    <span className="inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-gray-300 bg-gray-100 text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
-                      Archivado
-                    </span>
-                  )}
-                </div>
               </div>
 
               {/* Conteo de alumnos y horario en líneas separadas.
                   La línea de horario se oculta si el grupo aún no tiene días/horario configurados. */}
-              <div className="flex items-end justify-between gap-2 w-full mt-0.5">
-                <div className="flex flex-col text-xs text-muted-foreground min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span>
-                      {totalAlumnos === 0 ? 'Sin alumnos' : `${totalAlumnos} ${totalAlumnos === 1 ? 'alumno' : 'alumnos'}`}
+              <div className="flex flex-col text-xs text-muted-foreground min-w-0 w-full mt-0.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span>
+                    {totalAlumnos === 0 ? 'Sin alumnos' : `${totalAlumnos} ${totalAlumnos === 1 ? 'alumno' : 'alumnos'}`}
+                  </span>
+                  {grupo.cupo_maximo != null && totalAlumnos >= grupo.cupo_maximo && (
+                    <span className="inline-flex items-center text-[9px] font-bold px-1.5 py-[1.5px] rounded-full border border-[#c6bab5] bg-[#ffffff] text-amber-600 dark:text-amber-500 lowercase">
+                      lleno
                     </span>
-                    {grupo.cupo_maximo != null && totalAlumnos >= grupo.cupo_maximo && (
-                      <span className="inline-flex items-center text-[9px] font-bold px-1.5 py-[1.5px] rounded-full border border-[#c6bab5] bg-[#ffffff] text-amber-600 dark:text-amber-500 lowercase">
-                        lleno
-                      </span>
-                    )}
-                  </div>
-                  {horarioCard && (
-                    <div className="text-[11px] text-muted-foreground/75 mt-0.5">
-                      {diasLabel && <span className="text-[10px]">{diasLabel}</span>}
-                      {diasLabel && horaLabel && <span className="text-[11px]"> • </span>}
-                      {horaLabel && <span className="text-[11px]">{horaLabel}</span>}
-                    </div>
                   )}
                 </div>
-
-                {/* Sección de Health Stick (4 Estados de alumno-finanzas.ts) */}
-                {totalAlumnos > 0 && (
-                  <div className="flex-shrink-0 pb-0.5 select-none">
-                    <div className="w-[51px] h-[3.5px] rounded-full flex overflow-hidden bg-muted/40">
-                      {pctAlDia > 0 && (
-                        <div
-                          className="h-full transition-all duration-300"
-                          style={{ width: `${pctAlDia}%`, backgroundColor: '#5C8F78' }}
-                        />
-                      )}
-                      {pctPendientes > 0 && (
-                        <div
-                          className="h-full transition-all duration-300"
-                          style={{ width: `${pctPendientes}%`, backgroundColor: '#D2A45C' }}
-                        />
-                      )}
-                      {pctAtrasados > 0 && (
-                        <div
-                          className="h-full transition-all duration-300"
-                          style={{ width: `${pctAtrasados}%`, backgroundColor: '#B85C50' }}
-                        />
-                      )}
-                      {pctUrgentes > 0 && (
-                        <div
-                          className="h-full transition-all duration-300"
-                          style={{ width: `${pctUrgentes}%`, backgroundColor: '#7A2F38' }}
-                        />
-                      )}
-                    </div>
+                {horarioCard ? (
+                  <div className="text-[11px] text-muted-foreground/75 mt-0.5">
+                    {diasLabel && <span className="text-[10px]">{diasLabel}</span>}
+                    {diasLabel && horaLabel && <span className="text-[11px]"> • </span>}
+                    {horaLabel && <span className="text-[11px]">{horaLabel}</span>}
+                  </div>
+                ) : (
+                  <div className="text-[11px] select-none text-transparent mt-0.5" aria-hidden="true">
+                    &nbsp;
                   </div>
                 )}
               </div>
             </div>
           </div>
 
-          <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-1" />
-        </CardContent>
-      </Card>
+          {/* Badge de archivado en la esquina inferior derecha */}
+          {grupo.estado === 'archivado' && (
+            <div className="absolute right-8 bottom-3 flex items-center gap-1">
+              <span className="inline-flex items-center text-[9px] font-bold px-1.5 py-[1.5px] rounded-full border border-gray-300 bg-gray-100 text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+                Archivado
+              </span>
+            </div>
+          )}
+
+          <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        </div>
+      </div>
     </Link>
   )
 }
 
 function ResumenChip({
   label,
-  color,
   icon,
   onRemove,
 }: {
   label: string
-  color: string
   icon?: React.ReactNode
   onRemove: () => void
 }) {
   return (
     <span className="inline-flex items-center gap-1.5 bg-primary/10 text-primary rounded-full text-[11px] font-semibold pl-2 pr-1.5 py-0.5 border border-primary/20 whitespace-nowrap flex-shrink-0">
-      {icon ? (
-        <span className="flex-shrink-0">{icon}</span>
-      ) : (
-        <span
-          className="inline-block h-2 w-2 rounded-full flex-shrink-0"
-          style={{ backgroundColor: color }}
-        />
-      )}
+      {icon && <span className="flex-shrink-0">{icon}</span>}
       <span className="truncate max-w-[140px]">{label}</span>
       <button
         onClick={onRemove}
@@ -554,26 +328,18 @@ function ResumenChip({
 interface FiltrosProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  filtroTipo: 'todos' | 'grupos' | 'talleres'
   incluirArchivados: boolean
-  incluirArchivadosTalleres: boolean
-  onApply: (next: {
-    tipo: 'todos' | 'grupos' | 'talleres'
-    incluirArchivados: boolean
-    incluirArchivadosTalleres: boolean
-  }) => void
+  onApply: (next: { incluirArchivados: boolean }) => void
 }
 
 function OptionRow({
   label,
   selected,
-  indicator = 'check',
   icon,
   onClick,
 }: {
   label: string
   selected: boolean
-  indicator?: 'check' | 'radio'
   icon?: React.ReactNode
   onClick: () => void
 }) {
@@ -597,136 +363,43 @@ function OptionRow({
           {label}
         </span>
       </span>
-      {selected && indicator === 'check' && (
+      {selected && (
         <span className="text-primary flex-shrink-0 text-sm font-bold">✓</span>
       )}
-      {selected && indicator === 'radio' && (
-        <span
-          className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border border-primary"
-          aria-hidden="true"
-        >
-          <span className="h-2 w-2 rounded-full bg-primary" />
-        </span>
-      )}
     </button>
-  )
-}
-
-function CollapsibleSection({
-  title,
-  summary,
-  expanded,
-  onExpand,
-  children,
-}: {
-  title: string
-  summary: string
-  expanded: boolean
-  onExpand: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <section className="border border-border rounded-lg overflow-hidden bg-card">
-      <button
-        type="button"
-        onClick={onExpand}
-        className={cn(
-          'w-full flex items-center justify-between px-4 py-3 text-left transition-colors',
-          expanded ? 'bg-accent/30' : 'hover:bg-accent/20',
-        )}
-      >
-        <div className="flex flex-col min-w-0">
-          <span className="text-sm font-semibold text-foreground">{title}</span>
-          {!expanded && (
-            <span className="text-xs text-muted-foreground mt-0.5 truncate max-w-[260px]">
-              {summary}
-            </span>
-          )}
-        </div>
-        <ChevronDown
-          className={cn(
-            'h-4 w-4 text-muted-foreground transition-transform flex-shrink-0',
-            expanded && 'rotate-180',
-          )}
-        />
-      </button>
-      {expanded && (
-        <div className="border-t border-border px-2 py-2 space-y-0.5">
-          {children}
-        </div>
-      )}
-    </section>
   )
 }
 
 function FiltrosGruposBottomSheet({
   open,
   onOpenChange,
-  filtroTipo,
   incluirArchivados,
-  incluirArchivadosTalleres,
   onApply,
 }: FiltrosProps) {
-  const [pTipo, setPTipo] = useState<'todos' | 'grupos' | 'talleres'>(filtroTipo)
   const [pArchivados, setPArchivados] = useState(incluirArchivados)
-  const [pArchivadosTalleres, setPArchivadosTalleres] = useState(incluirArchivadosTalleres)
-  const [expanded, setExpanded] = useState<'tipo' | 'situacion' | null>('tipo')
+  const [expanded, setExpanded] = useState(true)
 
   useEffect(() => {
     if (open) {
-      setPTipo(filtroTipo)
       setPArchivados(incluirArchivados)
-      setPArchivadosTalleres(incluirArchivadosTalleres)
-      setExpanded('tipo')
+      setExpanded(true)
     }
-  }, [open, filtroTipo, incluirArchivados, incluirArchivadosTalleres])
+  }, [open, incluirArchivados])
 
-  const hasChanges =
-    pTipo !== filtroTipo ||
-    pArchivados !== incluirArchivados ||
-    pArchivadosTalleres !== incluirArchivadosTalleres
-
-  const handlePTipoChange = (type: 'todos' | 'grupos' | 'talleres') => {
-    setPTipo(type)
-    if (type === 'grupos') {
-      setPArchivadosTalleres(false)
-    } else if (type === 'talleres') {
-      setPArchivados(false)
-    }
-  }
+  const hasChanges = pArchivados !== incluirArchivados
 
   const handleLimpiar = () => {
-    setPTipo('todos')
     setPArchivados(false)
-    setPArchivadosTalleres(false)
   }
 
   const handleAplicar = () => {
-    onApply({
-      tipo: pTipo,
-      incluirArchivados: pArchivados,
-      incluirArchivadosTalleres: pArchivadosTalleres,
-    })
+    onApply({ incluirArchivados: pArchivados })
     onOpenChange(false)
   }
 
-  const resumenTipo = pTipo === 'todos' ? 'Grupos y talleres' : pTipo === 'grupos' ? 'Solo grupos' : 'Solo talleres'
-
-  const resumenSituacion = useMemo(() => {
-    const items: string[] = []
-    if (pTipo === 'todos' || pTipo === 'grupos') {
-      if (pArchivados) items.push('Con archivados')
-    }
-    if (pTipo === 'todos' || pTipo === 'talleres') {
-      if (pArchivadosTalleres) items.push('Con archivados')
-    }
-    if (items.length === 0) return 'Ninguno'
-    return items.join(', ')
-  }, [pTipo, pArchivados, pArchivadosTalleres])
-
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="h-[75vh] pt-2">
+      <DrawerContent className="max-h-[75vh] pt-2">
         <div className="mx-auto w-full max-w-md flex flex-col h-full overflow-hidden">
           <DrawerHeader className="text-left flex flex-row items-center justify-between gap-2">
             <DrawerTitle className="flex items-center gap-2">
@@ -743,67 +416,41 @@ function FiltrosGruposBottomSheet({
 
           {/* Cuerpo scrolleable */}
           <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3">
-            {/* Sección Tipo */}
-            <CollapsibleSection
-              title="Tipo"
-              expanded={expanded === 'tipo'}
-              summary={resumenTipo}
-              onExpand={() => setExpanded(current => current === 'tipo' ? null : 'tipo')}
-            >
-              <OptionRow
-                label="Grupos y talleres"
-                selected={pTipo === 'todos'}
-                indicator="radio"
-                icon={
-                  <div className="relative w-4 h-4 flex-shrink-0">
-                    <Users className="h-3 w-3 absolute -top-0.5 left-0 text-primary/80" />
-                    <CalendarDays className="h-3 w-3 absolute -bottom-0.5 right-0 text-[#22887c]/80" />
-                  </div>
-                }
-                onClick={() => handlePTipoChange('todos')}
-              />
-              <OptionRow
-                label="Solo grupos"
-                selected={pTipo === 'grupos'}
-                indicator="radio"
-                icon={<Users className="h-3.5 w-3.5 text-primary flex-shrink-0" />}
-                onClick={() => handlePTipoChange('grupos')}
-              />
-              <OptionRow
-                label="Solo talleres"
-                selected={pTipo === 'talleres'}
-                indicator="radio"
-                icon={<CalendarDays className="h-3.5 w-3.5 text-[#22887c] flex-shrink-0" />}
-                onClick={() => handlePTipoChange('talleres')}
-              />
-            </CollapsibleSection>
-
-            {/* Sección Situación */}
-            <CollapsibleSection
-              title="Situación"
-              expanded={expanded === 'situacion'}
-              summary={resumenSituacion}
-              onExpand={() => setExpanded(current => current === 'situacion' ? null : 'situacion')}
-            >
-              {(pTipo === 'todos' || pTipo === 'grupos') && (
-                <OptionRow
-                  label="Incluir grupos archivados"
-                  selected={pArchivados}
-                  indicator="check"
-                  icon={<Users className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
-                  onClick={() => setPArchivados(!pArchivados)}
+            <section className="border border-border rounded-lg overflow-hidden bg-card">
+              <button
+                type="button"
+                onClick={() => setExpanded(!expanded)}
+                className={cn(
+                  'w-full flex items-center justify-between px-4 py-3 text-left transition-colors',
+                  expanded ? 'bg-accent/30' : 'hover:bg-accent/20',
+                )}
+              >
+                <div className="flex flex-col min-w-0">
+                  <span className="text-sm font-semibold text-foreground">Situación</span>
+                  {!expanded && (
+                    <span className="text-xs text-muted-foreground mt-0.5 truncate max-w-[260px]">
+                      {pArchivados ? 'Con archivados' : 'Ninguno'}
+                    </span>
+                  )}
+                </div>
+                <ChevronDown
+                  className={cn(
+                    'h-4 w-4 text-muted-foreground transition-transform flex-shrink-0',
+                    expanded && 'rotate-180',
+                  )}
                 />
+              </button>
+              {expanded && (
+                <div className="border-t border-border px-2 py-2 space-y-0.5">
+                  <OptionRow
+                    label="Incluir grupos archivados"
+                    selected={pArchivados}
+                    icon={<Users className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
+                    onClick={() => setPArchivados(!pArchivados)}
+                  />
+                </div>
               )}
-              {(pTipo === 'todos' || pTipo === 'talleres') && (
-                <OptionRow
-                  label="Incluir talleres archivados"
-                  selected={pArchivadosTalleres}
-                  indicator="check"
-                  icon={<CalendarDays className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
-                  onClick={() => setPArchivadosTalleres(!pArchivadosTalleres)}
-                />
-              )}
-            </CollapsibleSection>
+            </section>
           </div>
 
           {/* Footer */}

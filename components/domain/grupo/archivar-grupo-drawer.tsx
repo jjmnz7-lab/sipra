@@ -23,7 +23,7 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from '@/components/ui/drawer'
-import { Archive, Hourglass, Loader2, ArrowRightLeft, Clock, Users, AlertTriangle } from 'lucide-react'
+import { Archive, Loader2, ArrowRightLeft, Clock, Users } from 'lucide-react'
 
 type GrupoLite = { id: string; nombre: string }
 type Modo = 'migrar' | 'pendiente'
@@ -33,40 +33,26 @@ type Props = {
   grupoNombre: string
   alumnosCount: number
   gruposDestino: GrupoLite[]
-  /** Si es taller, los textos/iconos cambian a "Archivar taller". */
-  esTaller?: boolean
-  /** Si es taller con fecha_fin todavía en el futuro, se requiere una confirmación extra para archivarlo. */
-  fechaFinFutura?: boolean
-  fechaFin?: string | null
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
 export function ArchivarGrupoDrawer({
   grupoId, grupoNombre, alumnosCount, gruposDestino,
-  esTaller = false, fechaFinFutura = false, fechaFin = null,
   open, onOpenChange,
 }: Props) {
   const router = useRouter()
   const [modo, setModo] = useState<Modo | null>(null)
   const [destinoId, setDestinoId] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
-  // Confirmación extra requerida solo cuando se intenta finalizar un taller cuya fecha
-  // de fin aún no ha llegado.
-  const [confirmAnticipado, setConfirmAnticipado] = useState(false)
   const [pending, startTransition] = useTransition()
 
-  const reset = () => { setModo(null); setDestinoId(''); setError(null); setConfirmAnticipado(false) }
+  const reset = () => { setModo(null); setDestinoId(''); setError(null) }
   const hayDestinos = gruposDestino.length > 0
-  const requiereConfirmAnticipado = esTaller && fechaFinFutura
-  const confirmAnticipadoListo = !requiereConfirmAnticipado || confirmAnticipado
-  const puedeConfirmar = (modo === 'pendiente' || (modo === 'migrar' && !!destinoId)) && confirmAnticipadoListo
+  const puedeConfirmar = modo === 'pendiente' || (modo === 'migrar' && !!destinoId)
 
-  // Textos según contexto
-  const accion = esTaller ? 'Archivar taller' : 'Archivar grupo'
-  const accionVerbo = esTaller ? 'archivar' : 'archivar'
-  const accionGerundio = esTaller ? 'Archivando...' : 'Archivando...'
-  const CierreIcon = esTaller ? Hourglass : Archive
+  const accion = 'Archivar grupo'
+  const CierreIcon = Archive
 
   const handleConfirm = () => {
     setError(null)
@@ -74,7 +60,7 @@ export function ArchivarGrupoDrawer({
     startTransition(async () => {
       const res = await archivarGrupoAction(grupoId, destino)
       if (!res.success) {
-        setError(res.message ?? `No se pudo ${accionVerbo} el ${esTaller ? 'taller' : 'grupo'}.`)
+        setError(res.message ?? 'No se pudo archivar el grupo.')
         return
       }
       onOpenChange(false)
@@ -82,14 +68,6 @@ export function ArchivarGrupoDrawer({
       router.refresh()
     })
   }
-
-  // Formato corto de fecha para el aviso de cierre anticipado.
-  const fechaFinLegible = (() => {
-    if (!fechaFin) return ''
-    const [y, m, d] = String(fechaFin).split('-').map(Number)
-    if (!y || !m || !d) return fechaFin
-    return new Date(y, m - 1, d).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })
-  })()
 
   return (
     <Drawer open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v) }}>
@@ -105,33 +83,13 @@ export function ArchivarGrupoDrawer({
           </DrawerHeader>
 
           <div className="p-4 pb-0 space-y-3">
-            {/* Aviso si el taller aún no llega a su fecha de fin */}
-            {requiereConfirmAnticipado && (
-              <button
-                type="button"
-                onClick={() => setConfirmAnticipado((v) => !v)}
-                className={cn(
-                  'w-full flex items-start gap-2 rounded-lg border px-3 py-2.5 text-left transition-colors',
-                  confirmAnticipado
-                    ? 'border-amber-400 bg-amber-100/60'
-                    : 'border-amber-300 bg-amber-50 hover:bg-amber-100/50',
-                )}
-              >
-                <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0 text-amber-600" />
-                <span className="text-xs leading-relaxed text-amber-900">
-                  Este taller aún no llega a su fecha de fin{fechaFinLegible ? ` (${fechaFinLegible})` : ''}.
-                  Vas a finalizarlo de forma anticipada. <strong>{confirmAnticipado ? 'Confirmado ✓' : 'Toca para confirmar.'}</strong>
-                </span>
-              </button>
-            )}
-
             {/* Conteo de dependientes */}
             <div className="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2 text-sm text-foreground">
               <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               {alumnosCount === 0 ? (
-                <span>No hay alumnos activos en este {esTaller ? 'taller' : 'grupo'}.</span>
+                <span>No hay alumnos activos en este grupo.</span>
               ) : (
-                <span><strong>{alumnosCount}</strong> {alumnosCount === 1 ? 'alumno activo depende' : 'alumnos activos dependen'} de este {esTaller ? 'taller' : 'grupo'}.</span>
+                <span><strong>{alumnosCount}</strong> {alumnosCount === 1 ? 'alumno activo depende' : 'alumnos activos dependen'} de este grupo.</span>
               )}
             </div>
 
@@ -181,15 +139,11 @@ export function ArchivarGrupoDrawer({
           <DrawerFooter>
             <Button
               onClick={handleConfirm}
-              disabled={
-                pending ||
-                (alumnosCount > 0 && !puedeConfirmar) ||
-                (alumnosCount === 0 && !confirmAnticipadoListo)
-              }
+              disabled={pending || (alumnosCount > 0 && !puedeConfirmar)}
               className="h-11"
             >
               {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CierreIcon className="mr-2 h-4 w-4" />}
-              {pending ? accionGerundio : accion}
+              {pending ? 'Archivando...' : accion}
             </Button>
             <DrawerClose asChild><Button variant="ghost" className="h-11">Cancelar</Button></DrawerClose>
           </DrawerFooter>

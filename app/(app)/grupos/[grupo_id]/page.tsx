@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { GrupoClientView } from './grupo-client-view'
 import { clasificarAlumno, type EstadoFinancieroAlumno } from '@/lib/constants/alumno-finanzas'
 
@@ -17,6 +17,11 @@ export default async function GrupoDetallePage({ params, searchParams }: { param
 
   if (!grupo) {
     notFound()
+  }
+
+  // Si el id corresponde a una actividad, se redirige a su pantalla.
+  if (grupo.es_temporal) {
+    redirect(`/actividades/${grupo_id}`)
   }
 
   // Planes de cobro + modo de prorrateo para el drawer de inscripción
@@ -38,12 +43,14 @@ export default async function GrupoDetallePage({ params, searchParams }: { param
   const cobrarInscripcionDefault = !!academia?.cobrar_inscripcion_default
   const timezone = academia?.timezone || 'America/Mexico_City'
 
-  // Otros grupos activos (destino opcional al archivar este grupo)
+  // Otros grupos regulares activos (destino opcional al archivar este grupo;
+  // las actividades no son destino válido)
   const { data: gruposDestino } = await supabase
     .from('grupo')
     .select('id, nombre')
     .eq('academia_id', grupo.academia_id)
     .eq('estado', 'activo')
+    .eq('es_temporal', false)
     .neq('id', grupo_id)
     .order('nombre', { ascending: true }) as any
 

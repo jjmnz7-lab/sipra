@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -7,10 +7,30 @@
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -173,7 +193,7 @@ export type Database = {
           estado_financiero: string
           fecha_creacion: string
           fecha_promesa: string | null
-          fecha_vencimiento: string
+          fecha_vencimiento: string | null
           grupo_id_origen: string | null
           id: string
           metadata: Json
@@ -193,7 +213,7 @@ export type Database = {
           estado_financiero?: string
           fecha_creacion?: string
           fecha_promesa?: string | null
-          fecha_vencimiento: string
+          fecha_vencimiento?: string | null
           grupo_id_origen?: string | null
           id?: string
           metadata?: Json
@@ -213,7 +233,7 @@ export type Database = {
           estado_financiero?: string
           fecha_creacion?: string
           fecha_promesa?: string | null
-          fecha_vencimiento?: string
+          fecha_vencimiento?: string | null
           grupo_id_origen?: string | null
           id?: string
           metadata?: Json
@@ -326,6 +346,7 @@ export type Database = {
           fecha_evento: string
           id: string
           metadata: Json
+          monto: number | null
           persona_id: string
           tipo: string
           titulo: string
@@ -339,6 +360,7 @@ export type Database = {
           fecha_evento?: string
           id?: string
           metadata?: Json
+          monto?: number | null
           persona_id: string
           tipo: string
           titulo: string
@@ -352,6 +374,7 @@ export type Database = {
           fecha_evento?: string
           id?: string
           metadata?: Json
+          monto?: number | null
           persona_id?: string
           tipo?: string
           titulo?: string
@@ -384,7 +407,7 @@ export type Database = {
         Row: {
           academia_id: string
           color: string | null
-          costo_taller: number | null
+          costo_actividad: number | null
           created_at: string
           created_by: string | null
           cupo_maximo: number | null
@@ -406,7 +429,7 @@ export type Database = {
         Insert: {
           academia_id: string
           color?: string | null
-          costo_taller?: number | null
+          costo_actividad?: number | null
           created_at?: string
           created_by?: string | null
           cupo_maximo?: number | null
@@ -428,7 +451,7 @@ export type Database = {
         Update: {
           academia_id?: string
           color?: string | null
-          costo_taller?: number | null
+          costo_actividad?: number | null
           created_at?: string
           created_by?: string | null
           cupo_maximo?: number | null
@@ -992,7 +1015,6 @@ export type Database = {
           p_academia_id: string
           p_concepto: string
           p_excluded_persona_ids: string[]
-          p_fecha_vencimiento: string
           p_grupo_id: string
           p_idempotency_key: string
           p_monto: number
@@ -1004,7 +1026,6 @@ export type Database = {
         Args: {
           p_academia_id: string
           p_concepto: string
-          p_fecha_vencimiento: string
           p_monto: number
           p_origen?: string
           p_persona_id: string
@@ -1062,6 +1083,16 @@ export type Database = {
         Returns: Json
       }
       get_dashboard_kpis_v1: { Args: { p_academia_id: string }; Returns: Json }
+      inscribir_alumno_a_actividad_v1: {
+        Args: {
+          p_academia_id: string
+          p_fecha_inscripcion?: string
+          p_grupo_id: string
+          p_monto?: number
+          p_persona_id: string
+        }
+        Returns: Json
+      }
       inscribir_alumno_a_grupo_v1: {
         Args: {
           p_academia_id: string
@@ -1265,7 +1296,11 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },
 } as const
+

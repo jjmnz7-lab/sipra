@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { Button } from '@/components/ui/button'
-import { Pencil, Archive, Share2, Hourglass } from 'lucide-react'
+import { Pencil, Archive, Share2 } from 'lucide-react'
 import {
   Drawer,
   DrawerClose,
@@ -17,17 +17,15 @@ type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
   grupoNombre: string
-  /** Si es taller, la opción de cierre dice "Finalizar taller" en lugar de "Archivar". */
-  esTaller?: boolean
   onEditar: () => void
   onArchivar: () => void
   onCompartirResumen?: () => void
 }
 
-export function AccionesGrupoSheet({ open, onOpenChange, grupoNombre, esTaller = false, onEditar, onArchivar, onCompartirResumen }: Props) {
-  const cierreLabel = esTaller ? 'Archivar taller' : 'Archivar grupo'
-  const editarLabel = esTaller ? 'Editar taller' : 'Editar grupo'
-  const CierreIcon = esTaller ? Hourglass : Archive
+export function AccionesGrupoSheet({ open, onOpenChange, grupoNombre, onEditar, onArchivar, onCompartirResumen }: Props) {
+  const cierreLabel = 'Archivar grupo'
+  const editarLabel = 'Editar grupo'
+  const CierreIcon = Archive
   const handle = (cb: () => void) => {
     onOpenChange(false)
     // Pequeño delay para que el sheet termine de cerrar antes de abrir el siguiente drawer.

@@ -14,7 +14,7 @@ type Props = {
 }
 
 /**
- * Bloque homogéneo para capturar días de la semana y horario del grupo/taller.
+ * Bloque homogéneo para capturar días de la semana y horario del grupo o la actividad.
  *
  * - Días: cuadrícula horizontal multi-selección. Botones cuadrados redondeados
  *   con 1 letra. El día se persiste como entero (0=Dom..6=Sáb).

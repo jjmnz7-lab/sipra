@@ -5,7 +5,7 @@ import { useAcademia } from '@/lib/contexts/academia-context'
 import { AlertCenter } from '@/components/layout/alert-center'
 import { AcademiaMenu } from '@/components/layout/academia-menu'
 import type { AlertasOperativas } from '@/lib/alertas/operativas'
-import logoSipra from '@/logo sipra.png'
+import isotipoSipra from '@/public/logos/isotipo-sipra.png'
 
 export function GlobalHeader({ alertas }: { alertas: AlertasOperativas }) {
   const { academiaNombre } = useAcademia()
@@ -16,7 +16,7 @@ export function GlobalHeader({ alertas }: { alertas: AlertasOperativas }) {
         <div className="flex items-center space-x-3 min-w-0">
           <AcademiaMenu />
           <h1
-            className="text-lg font-extrabold tracking-tight truncate text-transparent bg-clip-text bg-gradient-to-br from-foreground to-foreground/70"
+            className="text-lg font-extrabold tracking-tight truncate text-foreground"
             style={{ fontFamily: 'var(--font-sans), sans-serif', letterSpacing: '-0.02em' }}
           >
             {academiaNombre}
@@ -29,7 +29,7 @@ export function GlobalHeader({ alertas }: { alertas: AlertasOperativas }) {
 
           <div className="flex items-center border-l border-[#E0E0E0]/70 pl-3 lg:hidden">
             <Image
-              src={logoSipra}
+              src={isotipoSipra}
               alt="SIPRA"
               className="h-7 w-auto"
               priority

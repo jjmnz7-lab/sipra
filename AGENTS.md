@@ -41,7 +41,7 @@ Las siguientes tecnologías están **explícitamente prohibidas**:
 ## 3. Estructura de Carpetas
 
 ```
-sipra2/
+sipra/
 ├── AGENTS.md                          ← Este archivo
 ├── app/                               ← Next.js App Router
 │   ├── (auth)/

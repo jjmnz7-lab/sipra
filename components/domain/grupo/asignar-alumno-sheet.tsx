@@ -35,10 +35,8 @@ type PlanLite = { id: string; nombre: string; monto: number; frecuencia: string 
 type Props = {
   grupoId: string
   grupoNombre: string
-  noun: 'grupo' | 'taller'
   alumnos: AlumnoLite[]
   planSugerido: PlanLite | null
-  costoTaller: number | null
   cobrarInscripcionDefault: boolean
   montoInscripcionDefault: number
   open: boolean
@@ -66,10 +64,8 @@ function normalizar(s: string | null | undefined) {
 export function AsignarAlumnoSheet({
   grupoId,
   grupoNombre,
-  noun,
   alumnos,
   planSugerido,
-  costoTaller,
   cobrarInscripcionDefault,
   montoInscripcionDefault,
   open,
@@ -81,16 +77,10 @@ export function AsignarAlumnoSheet({
   const [query, setQuery] = useState('')
   const [alumnoSel, setAlumnoSel] = useState<AlumnoLite | null>(null)
 
-  // Para talleres el "cargo de inscripción" se interpreta como el costo del taller.
-  // Para grupos regulares, depende de cobrar_inscripcion_default.
-  const esTaller = noun === 'taller'
-  // Si es taller, el "cargo inicial" es el costo del taller (siempre que > 0).
-  // Si es grupo regular, depende del ajuste de academia (cobrar_inscripcion_default).
-  const aplicaCargoInicial = esTaller
-    ? (costoTaller ?? 0) > 0
-    : cobrarInscripcionDefault && montoInscripcionDefault > 0
+  // El cargo de inscripción depende del ajuste de academia (cobrar_inscripcion_default).
+  const aplicaCargoInicial = cobrarInscripcionDefault && montoInscripcionDefault > 0
 
-  const montoSugerido = esTaller ? (costoTaller ?? 0) : montoInscripcionDefault
+  const montoSugerido = montoInscripcionDefault
   const [monto, setMonto] = useState<string>(String(montoSugerido))
 
   const cleanQuery = useMemo(() => normalizar(query.trim()), [query])
@@ -129,7 +119,7 @@ export function AsignarAlumnoSheet({
               <UserPlus className="mr-2 h-5 w-5 text-[#22887c]" /> Asignar alumno
             </DrawerTitle>
             <p className="text-xs text-muted-foreground">
-              {noun === 'taller' ? 'Inscribir a este taller' : 'Inscribir a este grupo'}:{' '}
+              Inscribir a este grupo:{' '}
               <strong className="text-foreground">{grupoNombre}</strong>
             </p>
           </DrawerHeader>
@@ -223,11 +213,11 @@ export function AsignarAlumnoSheet({
                 </div>
               )}
 
-              {/* Cargo de inscripción / costo del taller (editable) */}
+              {/* Cargo de inscripción (editable) */}
               {alumnoSel && aplicaCargoInicial && (
                 <div className="space-y-2">
                   <Label htmlFor="monto_inscripcion_input" className="text-xs font-semibold text-muted-foreground tracking-wider">
-                    {esTaller ? 'Costo del taller (editable)' : 'Cargo de inscripción (editable)'}
+                    Cargo de inscripción (editable)
                   </Label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>

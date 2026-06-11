@@ -1,5 +1,5 @@
 /**
- * Catálogo y helpers para días de la semana del grupo/taller.
+ * Catálogo y helpers para días de la semana del grupo o la actividad.
  * Convención: 0=Domingo, 1=Lunes, ..., 6=Sábado.
  *
  * El orden visual del selector (cuadrícula horizontal) empieza en Lunes para

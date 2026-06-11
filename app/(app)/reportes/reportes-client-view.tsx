@@ -3,7 +3,6 @@
 import { useRouter } from 'next/navigation'
 import { PageSubheader } from '@/components/layout/page-subheader'
 import { Card, CardContent } from '@/components/ui/card'
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils/currency'
 import { cn } from '@/lib/utils'
 
@@ -18,22 +17,20 @@ export function ReportesClientView({
   esperadoMes,
   cobradoMes,
   pendienteMes,
-  ingresosMesActual,
-  ingresosMesAnterior,
-  deudaPendiente,
-  deudaAtrasada,
-  deudaUrgente,
-  deudaTotal,
+  countAlDia,
+  countPendiente,
+  countAtrasado,
+  countUrgente,
+  totalAlumnos,
 }: {
   esperadoMes: number
   cobradoMes: number
   pendienteMes: number
-  ingresosMesActual: number
-  ingresosMesAnterior: number
-  deudaPendiente: number
-  deudaAtrasada: number
-  deudaUrgente: number
-  deudaTotal: number
+  countAlDia: number
+  countPendiente: number
+  countAtrasado: number
+  countUrgente: number
+  totalAlumnos: number
 }) {
   const router = useRouter()
 
@@ -44,16 +41,11 @@ export function ReportesClientView({
 
   const pctCobrado = esperadoMes > 0 ? Math.round((cobradoMes / esperadoMes) * 100) : 0
 
-  // Delta de ingresos vs mes anterior
-  const delta = ingresosMesActual - ingresosMesAnterior
-  const deltaPct = ingresosMesAnterior > 0
-    ? Math.round((delta / ingresosMesAnterior) * 100)
-    : null
-
-  const segmentos = [
-    { label: 'Pendiente', monto: deudaPendiente, hex: HEX.pendiente },
-    { label: 'Atrasada', monto: deudaAtrasada, hex: HEX.atrasado },
-    { label: 'Urgente', monto: deudaUrgente, hex: HEX.urgente },
+  const segmentsAlumnos = [
+    { label: 'al día', slug: 'al_dia', count: countAlDia, hex: HEX.cobrado },
+    { label: 'pendiente', slug: 'pendiente', count: countPendiente, hex: HEX.pendiente },
+    { label: 'atrasado', slug: 'atrasado', count: countAtrasado, hex: HEX.atrasado },
+    { label: 'urgente', slug: 'urgente', count: countUrgente, hex: HEX.urgente },
   ]
 
   return (
@@ -103,82 +95,57 @@ export function ReportesClientView({
           </Card>
         </section>
 
-        {/* Ingresos mes actual vs anterior */}
+        {/* Estado financiero de alumnos */}
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-foreground">Ingresos recibidos</h2>
-          <div className="grid grid-cols-2 gap-3">
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground capitalize">{mesActualLabel}</p>
-                <p className="text-xl font-bold text-foreground mt-1">{formatCurrency(ingresosMesActual)}</p>
-                <div className={cn(
-                  'flex items-center gap-1 mt-2 text-xs font-semibold',
-                  delta > 0 ? 'text-[#5C8F78]' : delta < 0 ? 'text-[#B85C50]' : 'text-muted-foreground',
-                )}>
-                  {delta > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : delta < 0 ? <TrendingDown className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
-                  <span>
-                    {deltaPct !== null
-                      ? `${delta >= 0 ? '+' : ''}${deltaPct}% vs mes anterior`
-                      : delta > 0 ? 'Nuevo ingreso' : 'Sin cambios'}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground capitalize">{mesAnteriorLabel}</p>
-                <p className="text-xl font-bold text-muted-foreground mt-1">{formatCurrency(ingresosMesAnterior)}</p>
-                <p className="text-xs text-muted-foreground mt-2">Mes anterior</p>
-              </CardContent>
-            </Card>
-          </div>
-        </section>
-
-        {/* Deuda acumulada */}
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-foreground">Deuda acumulada</h2>
+          <h2 className="text-sm font-semibold text-foreground">Estado financiero de alumnos</h2>
           <Card>
-            <CardContent className="p-4 space-y-3">
+            <CardContent className="p-4 space-y-4">
               <div>
-                <p className="text-xs text-muted-foreground">Total que te deben los alumnos</p>
-                <p className="text-2xl font-bold text-foreground mt-0.5">{formatCurrency(deudaTotal)}</p>
+                <p className="text-xs text-muted-foreground">Distribución de estados de cobro</p>
+                <p className="text-2xl font-bold text-foreground mt-0.5">
+                  {totalAlumnos} {totalAlumnos === 1 ? 'alumno' : 'alumnos'}
+                </p>
               </div>
 
-              {/* Barra segmentada sutil */}
+              {/* Barra segmentada */}
               <div className="w-full h-2 rounded-full flex overflow-hidden bg-muted">
-                {deudaTotal > 0 && segmentos.map((s) =>
-                  s.monto > 0 ? (
+                {totalAlumnos > 0 && segmentsAlumnos.map((s) =>
+                  s.count > 0 ? (
                     <div
                       key={s.label}
                       className="h-full"
-                      style={{ width: `${(s.monto / deudaTotal) * 100}%`, backgroundColor: s.hex }}
+                      style={{ width: `${(s.count / totalAlumnos) * 100}%`, backgroundColor: s.hex }}
                     />
                   ) : null,
                 )}
               </div>
 
-              {/* Desglose */}
-              <div className="space-y-1.5 pt-1">
-                {segmentos.map((s) => (
-                  <div key={s.label} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: s.hex }} />
-                      <span className="text-muted-foreground">{s.label}</span>
+              {/* KPI Cards */}
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                {segmentsAlumnos.map((s) => {
+                  const pct = totalAlumnos > 0 ? Math.round((s.count / totalAlumnos) * 100) : 0
+                  return (
+                    <div 
+                      key={s.slug}
+                      onClick={() => router.push(`/alumnos?estado=${s.slug}`)}
+                      className="p-3 rounded-lg border border-border bg-card flex flex-col justify-between min-h-[72px] cursor-pointer hover:bg-accent/50 active:scale-95 transition-all"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: s.hex }} />
+                        <span className="text-xs font-medium text-muted-foreground capitalize">{s.label}</span>
+                      </div>
+                      <div className="mt-1 flex items-baseline gap-1.5">
+                        <span className="text-lg font-normal text-foreground">{s.count} {s.count === 1 ? 'alumno' : 'alumnos'}</span>
+                        <span className="text-xs text-muted-foreground">({pct}%)</span>
+                      </div>
                     </div>
-                    <span className="font-semibold text-foreground">{formatCurrency(s.monto)}</span>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
-
-              {deudaTotal === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-2">
-                  Sin deuda pendiente. ✅
-                </p>
-              )}
             </CardContent>
           </Card>
         </section>
+
       </div>
     </div>
   )

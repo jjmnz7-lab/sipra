@@ -40,7 +40,7 @@ export function PageSubheader({ title, actions, backHref, onBack, badge, classNa
             )
           )}
           
-          <div className="text-xl font-bold tracking-tight text-foreground truncate flex items-center gap-2">
+          <div className="text-xl font-bold tracking-tight text-foreground truncate flex items-center gap-2 flex-1 min-w-0">
             {title}
           </div>
           

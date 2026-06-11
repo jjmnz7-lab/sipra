@@ -10,7 +10,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Loader2 } from 'lucide-react'
 import { useFormStatus } from 'react-dom'
-import logoSipra from '@/logo sipra.png'
+import logoSipra from '@/public/logos/imagotipo-sipra.png'
 
 const initialState: LoginState = {}
 

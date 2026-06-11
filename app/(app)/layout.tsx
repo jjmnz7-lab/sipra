@@ -5,6 +5,35 @@ import { AcademiaProvider } from '@/lib/contexts/academia-context'
 import { computeAlertasOperativas } from '@/lib/alertas/operativas'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import type { Metadata } from 'next'
+
+export async function generateMetadata(): Promise<Metadata> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  let academiaNombre = ''
+  const academiaId = user?.app_metadata?.academia_id
+  if (academiaId) {
+    const { data } = await supabase
+      .from('academia')
+      .select('nombre')
+      .eq('id', academiaId)
+      .single() as any
+      
+    if (data?.nombre) {
+      academiaNombre = data.nombre
+    }
+  }
+
+  const titleSuffix = academiaNombre ? ` · ${academiaNombre}` : ''
+
+  return {
+    title: {
+      default: `SIPRA${titleSuffix}`,
+      template: `%s | SIPRA${titleSuffix}`,
+    },
+  }
+}
 
 export default async function AppLayout({
   children,

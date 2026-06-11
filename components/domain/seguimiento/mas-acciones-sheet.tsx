@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { Button } from '@/components/ui/button'
-import { Plus, CalendarClock, XCircle, Zap, Ticket } from 'lucide-react'
+import { CalendarClock, XCircle, Zap, Ticket, Receipt } from 'lucide-react'
 import {
   Drawer,
   DrawerClose,
@@ -16,7 +16,6 @@ type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
   onAgregarCargo: () => void
-  onCargoUnico: () => void
   onRegistrarPromesa: () => void
   onAnularCargo: () => void
   onRegistrarVisita: () => void
@@ -24,7 +23,7 @@ type Props = {
   suspendido?: boolean
 }
 
-export function MasAccionesSheet({ open, onOpenChange, onAgregarCargo, onCargoUnico, onRegistrarPromesa, onAnularCargo, onRegistrarVisita, suspendido = false }: Props) {
+export function MasAccionesSheet({ open, onOpenChange, onAgregarCargo, onRegistrarPromesa, onAnularCargo, onRegistrarVisita, suspendido = false }: Props) {
   const handle = (cb: () => void) => {
     onOpenChange(false)
     setTimeout(cb, 200)
@@ -46,7 +45,7 @@ export function MasAccionesSheet({ open, onOpenChange, onAgregarCargo, onCargoUn
               </p>
             )}
           </DrawerHeader>
-
+ 
           <div className="px-4 pb-2 space-y-1.5">
             <button
               onClick={() => handle(onRegistrarVisita)}
@@ -56,25 +55,16 @@ export function MasAccionesSheet({ open, onOpenChange, onAgregarCargo, onCargoUn
               <Ticket className="h-5 w-5 text-[#15435a] flex-shrink-0" />
               <span className="text-sm font-medium text-foreground">Registrar visita</span>
             </button>
-
+ 
             <button
               onClick={() => handle(onAgregarCargo)}
               disabled={suspendido}
               className={cargoBtnClass}
             >
-              <Plus className="h-5 w-5 text-primary flex-shrink-0" />
+              <Receipt className="h-5 w-5 text-[#22887c] flex-shrink-0" />
               <span className="text-sm font-medium text-foreground">Agregar cargo extra</span>
             </button>
-
-            <button
-              onClick={() => handle(onCargoUnico)}
-              disabled={suspendido}
-              className={cargoBtnClass}
-            >
-              <Zap className="h-5 w-5 text-amber-500 flex-shrink-0" />
-              <span className="text-sm font-medium text-foreground">Cargo único (taller, uniforme…)</span>
-            </button>
-
+ 
             <button
               onClick={() => handle(onRegistrarPromesa)}
               className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-accent transition-colors text-left"

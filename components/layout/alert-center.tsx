@@ -24,7 +24,7 @@ type Fila = {
   href: string | ((alertas: AlertasOperativas) => string)
 }
 
-const DEF_FILAS: Omit<Fila & { key: Exclude<keyof AlertasOperativas, 'talleresVencidosIds'> }, 'count'>[] = [
+const DEF_FILAS: Omit<Fila & { key: Exclude<keyof AlertasOperativas, 'actividadesVencidasIds'> }, 'count'>[] = [
   {
     key: 'sinGrupo',
     tipo: 'warning',
@@ -50,15 +50,15 @@ const DEF_FILAS: Omit<Fila & { key: Exclude<keyof AlertasOperativas, 'talleresVe
     href: '/alumnos',
   },
   {
-    key: 'talleresVencidos',
+    key: 'actividadesVencidas',
     tipo: 'warning',
-    texto: (n) => `${n} ${n === 1 ? 'Taller Temporal ha superado' : 'Talleres Temporales han superado'} su fecha de fin y ${n === 1 ? 'sigue' : 'siguen'} ${n === 1 ? 'activo' : 'activos'}`,
+    texto: (n) => `${n} ${n === 1 ? 'Actividad ha superado' : 'Actividades han superado'} su fecha de fin y ${n === 1 ? 'sigue activa' : 'siguen activas'}`,
     href: (alertas) => {
-      const ids = alertas.talleresVencidosIds ?? []
+      const ids = alertas.actividadesVencidasIds ?? []
       if (ids.length === 1) {
-        return `/grupos/${ids[0]}?abrir_archiva=true`
+        return `/actividades/${ids[0]}?abrir_archiva=true`
       }
-      return '/grupos?filtro=vencidos'
+      return '/actividades?filtro=vencidas'
     },
   },
   {

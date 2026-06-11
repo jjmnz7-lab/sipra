@@ -10,16 +10,16 @@
 export type AlertasOperativas = {
   /** Alumnos activos sin grupo asignado (excluye alumnos con plan por_visita). */
   sinGrupo: number
-  /** Alumnos activos sin ningún plan de cobro activo. */
+  /** Alumnos activos sin ningún plan de cobro activo (excluye a quienes solo participan en actividades). */
   sinPlan: number
   /** Alumnos con adeudo sin teléfono/WhatsApp registrado. */
   adeudoSinTelefono: number
   /** Alumnos activos con algún plan asignado que está inactivo/archivado. */
   planInactivo: number
-  /** Talleres temporales cuya fecha de fin ya pasó pero siguen activos. */
-  talleresVencidos: number
-  /** IDs de talleres vencidos (para navegación especial cuando hay solo 1). */
-  talleresVencidosIds?: string[]
+  /** Actividades cuya fecha de fin ya pasó pero siguen activas. */
+  actividadesVencidas: number
+  /** IDs de actividades vencidas (para navegación especial cuando hay solo 1). */
+  actividadesVencidasIds?: string[]
   /** [info] Alumnos sin adeudo que no tienen teléfono/WhatsApp registrado. */
   sinAdeudoSinTelefono: number
   /** [info] Alumnos suspendidos con saldo en $0. */
@@ -33,8 +33,8 @@ const VACIO: AlertasOperativas = {
   sinPlan: 0,
   adeudoSinTelefono: 0,
   planInactivo: 0,
-  talleresVencidos: 0,
-  talleresVencidosIds: [],
+  actividadesVencidas: 0,
+  actividadesVencidasIds: [],
   sinAdeudoSinTelefono: 0,
   suspendidosSaldoCero: 0,
   total: 0,
@@ -52,7 +52,7 @@ export async function computeAlertasOperativas(supabase: any, academiaId?: strin
     apRes,
     planesRes,
     cargosRes,
-    talleresRes,
+    actividadesRes,
   ] = await Promise.all([
     supabase
       .from('persona')
@@ -61,7 +61,7 @@ export async function computeAlertasOperativas(supabase: any, academiaId?: strin
       .eq('etiqueta', 'alumno'),
     supabase
       .from('persona_grupo')
-      .select('persona_id')
+      .select('persona_id, grupo:grupo_id (es_temporal)')
       .eq('academia_id', academiaId)
       .eq('estado', 'activo'),
     supabase
@@ -91,7 +91,16 @@ export async function computeAlertasOperativas(supabase: any, academiaId?: strin
   const inactivos = personas.filter((p) => p.estado_registro !== 'activo')
   const telById = new Map<string, string | null>(personas.map((p) => [p.id, p.telefono_whatsapp]))
 
-  const conGrupo = new Set<string>((pgRes.data ?? []).map((r: { persona_id: string }) => r.persona_id))
+  // Membresías activas: cualquier vínculo cuenta como "con grupo"; además se
+  // distingue quién tiene al menos un grupo REGULAR (no actividad).
+  const conGrupo = new Set<string>()
+  const conGrupoRegular = new Set<string>()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const r of (pgRes.data ?? []) as any[]) {
+    if (!r.persona_id) continue
+    conGrupo.add(r.persona_id)
+    if (r.grupo && r.grupo.es_temporal === false) conGrupoRegular.add(r.persona_id)
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const planes: any[] = planesRes.data ?? []
@@ -121,11 +130,14 @@ export async function computeAlertasOperativas(supabase: any, academiaId?: strin
 
   // REGLA ESTRICTA: un alumno con plan por_visita no necesita grupo → no es falso positivo.
   const sinGrupo = activos.filter((p) => !conGrupo.has(p.id) && !tienePorVisitaActivo(p.id)).length
-  const sinPlan = activos.filter((p) => !tienePlanActivo(p.id)).length
+  // Un alumno cuyo único vínculo activo son actividades no requiere plan
+  // (las actividades cobran por cargo único, no por esquema).
+  const soloActividades = (id: string) => conGrupo.has(id) && !conGrupoRegular.has(id)
+  const sinPlan = activos.filter((p) => !tienePlanActivo(p.id) && !soloActividades(p.id)).length
   const adeudoSinTelefono = personas.filter((p) => conAdeudo.has(p.id) && !tieneTelefono(p.id)).length
   const planInactivo = activos.filter((p) => tienePlanInactivo(p.id)).length
-  const talleresVencidosIds = (talleresRes.data ?? []).map((t: { id: string }) => t.id)
-  const talleresVencidos = talleresVencidosIds.length
+  const actividadesVencidasIds = (actividadesRes.data ?? []).map((t: { id: string }) => t.id)
+  const actividadesVencidas = actividadesVencidasIds.length
   const sinAdeudoSinTelefono = personas.filter((p) => !conAdeudo.has(p.id) && !tieneTelefono(p.id)).length
   const suspendidosSaldoCero = inactivos.filter((p) => !conAdeudo.has(p.id)).length
 
@@ -135,7 +147,7 @@ export async function computeAlertasOperativas(supabase: any, academiaId?: strin
     sinPlan,
     adeudoSinTelefono,
     planInactivo,
-    talleresVencidos,
+    actividadesVencidas,
     sinAdeudoSinTelefono,
     suspendidosSaldoCero,
   ].filter((c) => c > 0).length
@@ -145,8 +157,8 @@ export async function computeAlertasOperativas(supabase: any, academiaId?: strin
     sinPlan,
     adeudoSinTelefono,
     planInactivo,
-    talleresVencidos,
-    talleresVencidosIds,
+    actividadesVencidas,
+    actividadesVencidasIds,
     sinAdeudoSinTelefono,
     suspendidosSaldoCero,
     total,

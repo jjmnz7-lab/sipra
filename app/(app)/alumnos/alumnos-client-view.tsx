@@ -181,16 +181,6 @@ export function AlumnosClientView({ alumnos, grupos, planes, modoProrrateo, mult
   // Total visible (para el contador del subheader).
   const totalVisible = dentroFiltro.length + fueraFiltro.length
 
-  // Health strip — global (no filtrado). Hide cuando hay búsqueda o cualquier filtro
-  const totalGlobal = alumnos.length
-  const segmentos = useMemo(() => {
-    return ESTADOS_FINANCIEROS.map(e => {
-      const count = alumnos.filter(a => a.estadoFinanciero === e.slug).length
-      const pct = totalGlobal > 0 ? (count / totalGlobal) * 100 : 0
-      return { ...e, count, pct }
-    })
-  }, [alumnos, totalGlobal])
-
   // Helpers
   const limpiarTodo = () => {
     setFiltroEstado(new Set())
@@ -250,10 +240,6 @@ export function AlumnosClientView({ alumnos, grupos, planes, modoProrrateo, mult
             <h1 className="text-xl font-bold tracking-tight text-foreground truncate">
               Alumnos <span className="text-muted-foreground font-medium">({totalVisible})</span>
             </h1>
-
-            {!hayCambios && (
-              <HealthStripGlobal segmentos={segmentos} totalGlobal={totalGlobal} />
-            )}
 
             <div className="flex items-center flex-shrink-0">
               <button
@@ -446,56 +432,79 @@ function AlumnoCard({ a, multiPlanEnabled }: { a: AlumnoListItem; multiPlanEnabl
   return (
     <Link href={`/seguimiento/${a.id}?from=alumnos`} className="block">
       <div
-        className={`relative overflow-hidden border rounded-xl py-2.5 pr-3 pl-5 flex items-center gap-3 transition-[transform,border-color,box-shadow,background-color] duration-150 hover:border-primary/50 active:scale-[0.985] active:border-[#22887c]/60 active:shadow-[0_0_0_1px_rgba(34,136,124,0.18),0_10px_24px_rgba(34,136,124,0.08)] ${
+        className={`relative overflow-hidden border rounded-lg py-2 pr-3 pl-5 flex flex-col sm:flex-row sm:items-center items-start gap-2 sm:gap-3 transition-[transform,border-color,box-shadow,background-color] duration-150 hover:border-primary/50 active:scale-[0.985] active:border-[#22887c]/60 active:shadow-[0_0_0_1px_rgba(34,136,124,0.18),0_8px_20px_rgba(34,136,124,0.08)] min-h-[62px] sm:min-h-[38px] ${
           suspendido ? 'bg-card/65 border-border/65' : 'bg-card border-border'
         }`}
       >
-        {/* Indicator strip (8px, color del semáforo financiero) */}
+        {/* Indicator strip (6px, color del semáforo financiero) */}
         <div
-          className="absolute left-0 top-0 bottom-0 w-[8px]"
+          className="absolute left-0 top-0 bottom-0 w-[6px]"
           style={{ backgroundColor: estado.hex }}
         />
-        <div className="flex-1 min-w-0 flex flex-col justify-center">
+        <div className="flex-1 min-w-0 flex flex-col justify-center w-full">
           <div className="flex items-center gap-2 min-w-0">
             <p
               className={`text-sm font-semibold truncate ${
                 suspendido ? 'text-muted-foreground/65' : 'text-foreground'
               }`}
             >
-              {suspendido && <span className="inline-block w-1.5 h-1.5 rounded-full bg-gray-400 mr-1.5 align-middle" />}
               {a.nombre} {a.apellido}
             </p>
-            {/* Badge de plan: peligro si está sin plan; si no, en modo multi-plan */}
-            {a.sinPlan ? (
-              <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold border border-amber-300 bg-amber-50 text-amber-700 rounded-full px-1.5 py-0.5 flex-shrink-0">
-                ⚠️ Sin plan
-              </span>
-            ) : multiPlanEnabled && planPrincipal ? (
-              <span
-                className="inline-flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full border border-primary/30 bg-primary/10 text-primary max-w-[110px] truncate flex-shrink-0"
-                title={a.planes.map((p) => p.nombre).join(', ')}
-              >
-                {planPrincipal.nombre}{planesExtra > 0 ? ` +${planesExtra}` : ''}
-              </span>
-            ) : null}
           </div>
         </div>
-        <div className="flex flex-col items-end flex-shrink-0 max-w-[120px]">
-          {a.grupo && grupoColor ? (
+        <div className="flex items-center justify-start sm:justify-end gap-1.5 flex-shrink-0 w-full sm:w-auto">
+          {/* Badge de grupo */}
+          {a.grupos && a.grupos.length > 1 ? (
+             <span
+               className="inline-flex items-center gap-1.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full border bg-white border-gray-200 dark:bg-card dark:border-border dark:text-foreground flex-shrink-0 whitespace-nowrap"
+               style={{ color: '#333a4a' }}
+               title={a.grupos.map((g) => g.nombre).join(', ')}
+             >
+               <div className="flex items-center -space-x-0.5">
+                 {a.grupos.slice(0, 3).map((g, idx) => {
+                   const gColor = colorPorSlug(g.color)
+                   return (
+                     <div
+                       key={g.id}
+                       className="w-2 h-2 rounded-full border border-white dark:border-card"
+                       style={{ backgroundColor: gColor.hex, zIndex: 10 - idx }}
+                     />
+                   )
+                 })}
+               </div>
+               <span>{a.grupos[0].nombre}</span>
+               <span className="flex-shrink-0">, +{a.grupos.length - 1}</span>
+             </span>
+          ) : a.grupo && grupoColor ? (
             <span
-              className="inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full border max-w-full truncate"
+              className="inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full border-2 whitespace-nowrap"
               style={{ borderColor: `${grupoColor.hex}66`, color: grupoColor.hex, backgroundColor: `${grupoColor.hex}14` }}
               title={a.grupo.nombre}
             >
               {a.grupo.nombre}
             </span>
           ) : (
-            <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold border border-amber-300 bg-amber-50 text-amber-700 rounded-full px-1.5 py-0.5 max-w-full truncate">
-              ⚠️ Sin grupo
+            <span className="inline-flex items-center text-[9px] font-semibold border border-amber-200 bg-amber-50 text-amber-600 rounded-full px-1.5 py-0.5 whitespace-nowrap">
+              Sin grupo
             </span>
           )}
+
+          {/* Badge de plan */}
+          {a.sinPlan ? (
+             <span className="inline-flex items-center text-[9px] font-semibold border border-amber-200 bg-amber-50 text-amber-600 rounded-full px-1.5 py-0.5 flex-shrink-0 whitespace-nowrap">
+               Sin plan
+             </span>
+          ) : multiPlanEnabled && planPrincipal ? (
+             <span
+               className="inline-flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full border bg-white border-gray-200 dark:bg-card dark:border-border dark:text-foreground flex-shrink-0 whitespace-nowrap"
+               style={{ color: '#333a4a' }}
+               title={a.planes.map((p) => p.nombre).join(', ')}
+             >
+               <span>{planPrincipal.nombre}</span>
+               {planesExtra > 0 && <span className="flex-shrink-0">, +{planesExtra}</span>}
+             </span>
+          ) : null}
         </div>
-        <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
       </div>
     </Link>
   )
@@ -541,31 +550,3 @@ function ResumenChip({
   )
 }
 
-function HealthStripGlobal({
-  segmentos,
-  totalGlobal,
-}: {
-  segmentos: { slug: EstadoFinancieroAlumno; hex: string; pct: number; count: number; label: string }[]
-  totalGlobal: number
-}) {
-  if (totalGlobal === 0) {
-    return <div className="w-[150px] sm:w-[200px] h-[3px] rounded-full bg-muted/40" aria-hidden="true" />
-  }
-  return (
-    <div
-      className="w-[150px] sm:w-[200px] h-[3px] rounded-full flex overflow-hidden bg-muted/40"
-      aria-label="Distribución financiera global"
-      title={segmentos.map(s => `${s.label}: ${s.count}`).join(' · ')}
-    >
-      {segmentos.map(s =>
-        s.pct > 0 ? (
-          <div
-            key={s.slug}
-            className="h-full transition-all duration-300"
-            style={{ width: `${s.pct}%`, backgroundColor: s.hex }}
-          />
-        ) : null,
-      )}
-    </div>
-  )
-}

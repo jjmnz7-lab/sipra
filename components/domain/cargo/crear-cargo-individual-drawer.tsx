@@ -45,10 +45,7 @@ function SubmitButton() {
   )
 }
 
-function endOfMonthIso(): string {
-  const d = new Date()
-  return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10)
-}
+
 
 export function CrearCargoIndividualDrawer({
   personaId,
@@ -100,7 +97,7 @@ export function CrearCargoIndividualDrawer({
                   defaultValue={conceptoDefault}
                   required
                   className="h-11"
-                  placeholder="Ej. Examen, Reposición, Material..."
+                  placeholder="Ej. Examen, Uniforme, Material..."
                 />
                 {state?.errors?.concepto && <p className="text-sm text-red-600">{state.errors.concepto[0]}</p>}
               </div>
@@ -121,19 +118,6 @@ export function CrearCargoIndividualDrawer({
                   />
                 </div>
                 {state?.errors?.monto && <p className="text-sm text-red-600">{state.errors.monto[0]}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="fecha_vencimiento">Fecha de vencimiento *</Label>
-                <Input
-                  id="fecha_vencimiento"
-                  name="fecha_vencimiento"
-                  type="date"
-                  defaultValue={endOfMonthIso()}
-                  required
-                  className="h-11"
-                />
-                {state?.errors?.fecha_vencimiento && <p className="text-sm text-red-600">{state.errors.fecha_vencimiento[0]}</p>}
               </div>
 
               {state?.message && !state.success && (

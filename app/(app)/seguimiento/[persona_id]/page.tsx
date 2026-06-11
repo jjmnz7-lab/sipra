@@ -68,16 +68,20 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
   const allowPartial = academia?.allow_partial_payments ?? true
   const multiPlanEnabled = !!academia?.multi_plan_enabled
 
-  // 1b. Fetch grupo al que pertenece el alumno
-  const { data: grupoData } = await supabase
+  // 1b. Fetch grupos a los que pertenece el alumno.
+  // El badge y el drawer de edición trabajan solo con grupos regulares; las
+  // actividades del alumno viven en su pantalla y en el historial.
+  const { data: personaGrupos } = await supabase
     .from('persona_grupo')
-    .select('grupo_id, grupo (id, nombre)')
+    .select('grupo_id, grupo (id, nombre, es_temporal)')
     .eq('persona_id', persona_id)
-    .eq('estado', 'activo')
-    .maybeSingle() as any
+    .eq('estado', 'activo') as any
 
-  const grupoNombre: string | null = grupoData?.grupo?.nombre ?? null
-  const currentGrupoId: string | null = grupoData?.grupo_id ?? null
+  const gruposAlumno = (personaGrupos ?? [])
+    .map((pg: any) => pg.grupo)
+    .filter((g: any) => g && !g.es_temporal)
+    .map((g: any) => ({ id: g.id, nombre: g.nombre })) as { id: string; nombre: string }[]
+  const currentGrupoId: string | null = gruposAlumno[0]?.id ?? null
 
   // 1c. Planes por visita (catálogo de "clases" para el modal de Visita Express)
   const { data: planesPorVisita } = await supabase
@@ -88,7 +92,7 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
     .eq('frecuencia', 'por_visita')
     .order('nombre') as any
 
-  // 1d. Catálogo completo de grupos activos
+  // 1d. Catálogo completo de grupos regulares activos (sin actividades)
   const { data: grupos } = await supabase
     .from('grupo')
     .select(`
@@ -97,6 +101,7 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
     `)
     .eq('academia_id', persona.academia_id)
     .eq('estado', 'activo')
+    .eq('es_temporal', false)
     .order('nombre') as any
 
   // 1e. Catálogo completo de planes activos
@@ -110,9 +115,13 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
   // 1f. Planes actuales del alumno
   const { data: currentPlanesRel } = await supabase
     .from('alumno_planes')
-    .select('plan_cobro_id')
+    .select('plan_cobro_id, planes_cobro (id, nombre)')
     .eq('alumno_id', persona_id) as any
-  const currentPlanIds = (currentPlanesRel ?? []).map((cp: any) => cp.plan_cobro_id) as string[]
+
+  const planesAlumno = (currentPlanesRel ?? [])
+    .map((cp: any) => cp.planes_cobro)
+    .filter(Boolean) as { id: string; nombre: string }[]
+  const currentPlanIds = planesAlumno.map(p => p.id)
 
   // Cargos activos (para desglose en snapshot)
   const cargosActivos = persona.cargo?.filter((c: any) =>
@@ -134,17 +143,20 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
     .eq('persona_id', persona_id) as { data: { monto_disponible: number | null }[] | null; error: unknown }
   const saldoAFavor = (movsCredito ?? []).reduce((acc, m) => acc + Number(m.monto_disponible ?? 0), 0)
 
-  // 2. Fetch timeline
+  // 2. Fetch timeline (sólo el preview de "Historial reciente"; el historial
+  //    completo vive en /seguimiento/[persona_id]/historial con paginación).
   const { data: timeline } = await supabase
     .from('evento_timeline')
     .select('*')
     .eq('persona_id', persona_id)
-    .order('fecha_evento', { ascending: false }) as { data: EventoRow[] | null; error: unknown }
+    .order('fecha_evento', { ascending: false })
+    .limit(4) as { data: EventoRow[] | null; error: unknown }
 
   return (
     <SeguimientoClientView
       persona={persona}
-      grupoNombre={grupoNombre}
+      gruposAlumno={gruposAlumno}
+      planesAlumno={planesAlumno}
       cargosActivos={cargosActivos}
       deudaTotal={deudaTotal}
       saldoAFavor={saldoAFavor}

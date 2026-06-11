@@ -2,13 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { ListTodo, Users, User } from 'lucide-react'
+import { ListTodo, Users, User, CalendarDays } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { key: 'inicio', name: 'Inicio', href: '/inicio', icon: ListTodo },
   { key: 'alumnos', name: 'Alumnos', href: '/alumnos', icon: User },
   { key: 'grupos', name: 'Grupos', href: '/grupos', icon: Users },
+  { key: 'actividades', name: 'Actividades', href: '/actividades', icon: CalendarDays },
 ] as const
 
 export function BottomTabBar() {
@@ -16,9 +17,10 @@ export function BottomTabBar() {
   const searchParams = useSearchParams()
 
   // En la ficha de un alumno (/seguimiento/...) se resalta el ícono del menú
-  // desde donde se llegó: ?from=inicio | ?from=alumnos (default: alumnos).
+  // desde donde se llegó: ?from=inicio | grupos | actividades (default: alumnos).
   const enSeguimiento = pathname.startsWith('/seguimiento')
-  const origen = searchParams.get('from') === 'inicio' ? 'inicio' : 'alumnos'
+  const from = searchParams.get('from')
+  const origen = from === 'inicio' || from === 'grupos' || from === 'actividades' ? from : 'alumnos'
 
   const esActivo = (key: string, href: string) =>
     enSeguimiento ? key === origen : pathname === href || pathname.startsWith(href + '/')

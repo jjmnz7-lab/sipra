@@ -115,37 +115,21 @@ export function MassCargoDrawer({ grupoId, inscripciones, open: controlledOpen, 
                 )}
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="monto">Monto ($)</Label>
-                  <Input
-                    id="monto"
-                    name="monto"
-                    type="number"
-                    step="0.01"
-                    min="1"
-                    placeholder="0.00"
-                    required
-                    className="h-11"
-                  />
-                  {state?.errors?.monto && (
-                    <p className="text-sm text-red-600">{state.errors.monto[0]}</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="fecha_vencimiento">Vencimiento</Label>
-                  <Input
-                    id="fecha_vencimiento"
-                    name="fecha_vencimiento"
-                    type="date"
-                    required
-                    className="h-11"
-                    defaultValue={new Date().toISOString().split('T')[0]}
-                  />
-                  {state?.errors?.fecha_vencimiento && (
-                    <p className="text-sm text-red-600">{state.errors.fecha_vencimiento[0]}</p>
-                  )}
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="monto">Monto ($)</Label>
+                <Input
+                  id="monto"
+                  name="monto"
+                  type="number"
+                  step="0.01"
+                  min="1"
+                  placeholder="0.00"
+                  required
+                  className="h-11"
+                />
+                {state?.errors?.monto && (
+                  <p className="text-sm text-red-600">{state.errors.monto[0]}</p>
+                )}
               </div>
 
               <div className="mt-4 border-t pt-4">

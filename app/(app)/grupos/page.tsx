@@ -22,11 +22,12 @@ export default async function GruposPage() {
 
   const timezone = academia?.timezone || 'America/Mexico_City'
 
-  // Fetch grupos con el estado de sus miembros (tanto activos como archivados/finalizados)
+  // Fetch grupos regulares (las actividades viven en su propia pantalla)
+  // con el estado de sus miembros (tanto activos como archivados)
   const { data: grupos } = await supabase
     .from('grupo')
     .select(`
-      id, nombre, descripcion, estado, color, emoji, plan_sugerido_id, es_temporal, fecha_inicio, fecha_fin, costo_taller, dias_semana, hora_inicio, hora_fin, cupo_maximo,
+      id, nombre, descripcion, estado, color, emoji, plan_sugerido_id, dias_semana, hora_inicio, hora_fin, cupo_maximo,
       persona_grupo (
         estado,
         persona (
@@ -41,6 +42,7 @@ export default async function GruposPage() {
         )
       )
     `)
+    .eq('es_temporal', false)
     .order('nombre', { ascending: true }) as any
 
   // Planes de cobro de la academia (catálogo para el selector de inscripción)

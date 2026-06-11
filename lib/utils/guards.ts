@@ -5,7 +5,7 @@
 /**
  * Devuelve true si el alumno NO está activo (suspendido / dado de baja).
  * Se usa para impedir la generación de cargos $ a alumnos suspendidos
- * (cargos manuales, individuales, masivos, visitas, inscripciones de taller).
+ * (cargos manuales, individuales, masivos, visitas, inscripciones a actividades).
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function alumnoSuspendido(supabase: any, academiaId: string, personaId: string): Promise<boolean> {

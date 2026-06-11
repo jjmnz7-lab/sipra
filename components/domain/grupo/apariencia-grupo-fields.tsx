@@ -1,6 +1,6 @@
 'use client'
 
-import { Check, CalendarDays, Users } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { Label } from '@/components/ui/label'
 import { COLORES_GRUPO, EMOJIS_GRUPO, colorPorSlug } from '@/lib/constants/grupo-apariencia'
 
@@ -12,11 +12,10 @@ type Props = {
   onEmojiChange: (emoji: string) => void
   /** Etiqueta opcional para el placeholder cuando el nombre está vacío. */
   placeholderNombre?: string
-  esTaller?: boolean
 }
 
 /**
- * Bloque homogéneo de "apariencia" para Nuevo grupo, Editar grupo y Nuevo taller.
+ * Bloque homogéneo de "apariencia" para Nuevo grupo y Editar grupo.
  * Render en este orden: Color → Emoji → Vista previa.
  *
  * - Paleta de color: círculos con halo (borde) del color elegido, sin fondo.
@@ -31,7 +30,6 @@ export function AparienciaGrupoFields({
   onColorChange,
   onEmojiChange,
   placeholderNombre = 'Nombre del grupo',
-  esTaller = false,
 }: Props) {
   const previewColor = colorPorSlug(colorSlug)
 
@@ -100,21 +98,12 @@ export function AparienciaGrupoFields({
       <div className="space-y-2">
         <Label>Vista previa</Label>
         <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-muted/40 border border-border">
-          <div className="relative flex-shrink-0">
-            <div
-              className="h-10 w-10 rounded-full flex items-center justify-center text-lg bg-transparent"
-              style={{ border: `3px solid ${previewColor.hex}` }}
-              aria-hidden="true"
-            >
-              {emoji}
-            </div>
-            <span className="absolute top-1/2 -translate-y-1/2 -right-1 bg-card border border-border rounded-full p-0.5 shadow-sm flex items-center justify-center h-4 w-4 z-10">
-              {esTaller ? (
-                <CalendarDays className="h-2.5 w-2.5 text-[#22887c]" />
-              ) : (
-                <Users className="h-2.5 w-2.5 text-primary" />
-              )}
-            </span>
+          <div
+            className="h-10 w-10 rounded-full flex items-center justify-center text-lg bg-transparent flex-shrink-0"
+            style={{ border: `3px solid ${previewColor.hex}` }}
+            aria-hidden="true"
+          >
+            {emoji}
           </div>
           <p className="text-sm font-bold text-foreground truncate">
             {nombre || placeholderNombre}

@@ -338,7 +338,7 @@ export function OnboardingWizard() {
                   icon={<Sparkles className="h-6 w-6" />}
                   accent="indigo"
                   titulo="Múltiples tarifas"
-                  descripcion="Manejo varios precios, clases por visita, horarios o talleres temporales."
+                  descripcion="Manejo varios precios, clases por visita, horarios o actividades temporales."
                 />
 
                 {modelo === 'avanzado' && (

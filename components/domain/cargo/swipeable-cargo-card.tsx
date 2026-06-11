@@ -145,7 +145,7 @@ export function SwipeableCargoCard({
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         >
-          <Card className={`relative overflow-hidden hover:border-primary/50 transition-[transform,border-color,box-shadow,background-color] duration-150 active:scale-[0.985] active:border-[#22887c]/60 active:shadow-[0_0_0_1px_rgba(34,136,124,0.18),0_10px_24px_rgba(34,136,124,0.08)] ${
+          <Card className={`relative overflow-hidden border hover:border-primary/50 transition-[transform,border-color,box-shadow,background-color] duration-150 active:scale-[0.985] active:border-[#22887c]/60 active:shadow-[0_0_0_1px_rgba(34,136,124,0.18),0_8px_20px_rgba(34,136,124,0.08)] ${
             suspendido ? 'bg-card/65 border-border/65' : 'bg-card border-border'
           }`}>
             {/* Indicator strip (8px, color del semáforo financiero) */}

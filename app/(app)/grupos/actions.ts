@@ -14,10 +14,6 @@ const grupoSchema = z.object({
   color: z.string().optional(),
   emoji: z.string().optional(),
   plan_sugerido_id: z.string().uuid().optional().or(z.literal('').transform(() => undefined)),
-  es_temporal: z.coerce.boolean().default(false),
-  fecha_inicio: z.string().optional(),
-  fecha_fin: z.string().optional(),
-  costo_taller: z.coerce.number().optional(),
   /** Días de la semana 0..6 (0=Dom). Vacío permitido. */
   dias_semana: z.array(z.number().int().min(0).max(6)).default([]),
   /** HH:MM (opcional). */
@@ -27,14 +23,6 @@ const grupoSchema = z.object({
 }).refine((data) => !data.hora_fin || (data.hora_inicio && data.hora_fin > data.hora_inicio), {
   message: 'La hora de fin debe ser mayor que la de inicio.',
   path: ['hora_fin'],
-}).refine(data => {
-  if (data.es_temporal) {
-    return !!data.fecha_inicio && !!data.fecha_fin && data.costo_taller !== undefined && data.costo_taller >= 0
-  }
-  return true
-}, {
-  message: 'Para un taller, debes capturar las fechas de inicio/fin y un costo válido.',
-  path: ['costo_taller']
 })
 
 const editarGrupoSchema = z.object({
@@ -47,10 +35,6 @@ const editarGrupoSchema = z.object({
   hora_inicio: z.string().regex(HHMM_REGEX).optional().or(z.literal('').transform(() => undefined)),
   hora_fin: z.string().regex(HHMM_REGEX).optional().or(z.literal('').transform(() => undefined)),
   cupo_maximo: z.number().int().min(1).max(999).optional().nullable(),
-  es_temporal: z.coerce.boolean().default(false),
-  fecha_inicio: z.string().optional(),
-  fecha_fin: z.string().optional(),
-  costo_taller: z.coerce.number().optional(),
 }).refine((data) => !data.hora_fin || (data.hora_inicio && data.hora_fin > data.hora_inicio), {
   message: 'La hora de fin debe ser mayor que la de inicio.',
   path: ['hora_fin'],
@@ -107,10 +91,6 @@ export async function crearGrupoAction(prevState: FormState, formData: FormData)
     color: (formData.get('color') as string) || undefined,
     emoji: (formData.get('emoji') as string) || undefined,
     plan_sugerido_id: (formData.get('plan_sugerido_id') as string) || '',
-    es_temporal: formData.get('es_temporal') === 'true',
-    fecha_inicio: (formData.get('fecha_inicio') as string) || undefined,
-    fecha_fin: (formData.get('fecha_fin') as string) || undefined,
-    costo_taller: formData.get('costo_taller') != null && formData.get('costo_taller') !== '' ? Number(formData.get('costo_taller')) : undefined,
     dias_semana: parseDiasSemana(formData.get('dias_semana')),
     hora_inicio: (formData.get('hora_inicio') as string) || '',
     hora_fin: (formData.get('hora_fin') as string) || '',
@@ -122,7 +102,7 @@ export async function crearGrupoAction(prevState: FormState, formData: FormData)
   if (!validatedFields.success) {
     return {
       errors: validatedFields.error.flatten().fieldErrors,
-      message: 'Faltan campos por completar o son inválidos para un taller.',
+      message: 'Faltan campos por completar o son inválidos.',
       success: false
     }
   }
@@ -133,88 +113,16 @@ export async function crearGrupoAction(prevState: FormState, formData: FormData)
 
   if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
 
-  const { data: academia } = await supabase
-    .from('academia')
-    .select('timezone')
-    .eq('id', academiaId)
-    .single() as any
-
-  const timezone = academia?.timezone || 'America/Mexico_City'
-  const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: timezone })
-
-  // Validaciones lógicas de fechas para taller (Crear)
-  if (validatedFields.data.es_temporal) {
-    const fInicio = validatedFields.data.fecha_inicio
-    const fFin = validatedFields.data.fecha_fin
-
-    if (!fInicio || !fFin) {
-      return {
-        message: 'Las fechas de inicio y fin son requeridas para un taller.',
-        success: false
-      }
-    }
-
-    if (fInicio < todayStr) {
-      return {
-        errors: { fecha_inicio: ['La fecha de inicio no debe ser anterior al día actual.'] },
-        message: 'La fecha de inicio no debe ser anterior al día actual.',
-        success: false
-      }
-    }
-
-    if (fFin <= todayStr) {
-      return {
-        errors: { fecha_fin: ['La fecha de fin debe ser mayor al día actual.'] },
-        message: 'La fecha de fin debe ser mayor al día actual.',
-        success: false
-      }
-    }
-
-    if (fFin <= fInicio) {
-      return {
-        errors: { fecha_fin: ['La fecha de fin debe ser posterior a la fecha de inicio.'] },
-        message: 'La fecha de fin debe ser posterior a la fecha de inicio.',
-        success: false
-      }
-    }
-  }
-
-  let planSugeridoId = validatedFields.data.plan_sugerido_id
-
-  // Si es un taller, crear plan sugerido automático de pago único
-  if (validatedFields.data.es_temporal) {
-    const { data: nuevoPlan, error: planError } = await supabase
-      .from('planes_cobro')
-      .insert({
-        academia_id: academiaId,
-        nombre: `Taller: ${validatedFields.data.nombre}`,
-        monto: validatedFields.data.costo_taller,
-        frecuencia: 'pago_unico',
-        activo: true,
-        requiere_inscripcion: false,
-      } as any)
-      .select('id')
-      .single() as any
-
-    if (planError) {
-      return { message: 'Fallo al crear plan sugerido automático: ' + translateRpcError(planError), success: false }
-    }
-    planSugeridoId = nuevoPlan.id
-  }
-
   const { error } = await supabase.from('grupo').insert({
     academia_id: academiaId,
     nombre: validatedFields.data.nombre,
     color: validatedFields.data.color || null,
     emoji: validatedFields.data.emoji || null,
-    plan_sugerido_id: planSugeridoId ?? null,
-    es_temporal: validatedFields.data.es_temporal,
-    fecha_inicio: validatedFields.data.fecha_inicio || null,
-    fecha_fin: validatedFields.data.fecha_fin || null,
+    plan_sugerido_id: validatedFields.data.plan_sugerido_id ?? null,
+    es_temporal: false,
     dias_semana: validatedFields.data.dias_semana.length > 0 ? validatedFields.data.dias_semana : null,
     hora_inicio: validatedFields.data.hora_inicio ?? null,
     hora_fin: validatedFields.data.hora_fin ?? null,
-    costo_taller: validatedFields.data.costo_taller ?? null,
     cupo_maximo: validatedFields.data.cupo_maximo ?? null,
   } as any)
 
@@ -223,7 +131,7 @@ export async function crearGrupoAction(prevState: FormState, formData: FormData)
   }
 
   revalidatePath('/grupos')
-  return { success: true, message: 'Grupo/Taller creado con éxito.' }
+  return { success: true, message: 'Grupo creado con éxito.' }
 }
 
 export async function editarGrupoAction(prevState: FormState, formData: FormData): Promise<FormState> {
@@ -239,10 +147,6 @@ export async function editarGrupoAction(prevState: FormState, formData: FormData
     hora_inicio: (formData.get('hora_inicio') as string) || '',
     hora_fin: (formData.get('hora_fin') as string) || '',
     cupo_maximo: cupoIlimitado ? null : (cupoMaximoRaw ? Number(cupoMaximoRaw) : null),
-    es_temporal: formData.get('es_temporal') === 'true',
-    fecha_inicio: (formData.get('fecha_inicio') as string) || undefined,
-    fecha_fin: (formData.get('fecha_fin') as string) || undefined,
-    costo_taller: formData.get('costo_taller') != null && formData.get('costo_taller') !== '' ? Number(formData.get('costo_taller')) : undefined,
   }
 
   const validated = editarGrupoSchema.safeParse(payload)
@@ -261,51 +165,12 @@ export async function editarGrupoAction(prevState: FormState, formData: FormData
 
   const { data: grupoExistente } = await supabase
     .from('grupo')
-    .select('es_temporal, fecha_inicio')
+    .select('id')
     .eq('id', validated.data.grupo_id)
     .eq('academia_id', academiaId)
     .single() as any
 
   if (!grupoExistente) return { message: 'El grupo no existe.', success: false }
-
-  const { data: academia } = await supabase
-    .from('academia')
-    .select('timezone')
-    .eq('id', academiaId)
-    .single() as any
-
-  const timezone = academia?.timezone || 'America/Mexico_City'
-  const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: timezone })
-
-  const esTemporal = grupoExistente.es_temporal || validated.data.es_temporal
-  const fechaInicio = validated.data.fecha_inicio || grupoExistente.fecha_inicio
-  const fechaFin = validated.data.fecha_fin
-
-  // Validaciones lógicas de fechas para taller (Editar)
-  if (esTemporal) {
-    if (!fechaFin) {
-      return {
-        message: 'La fecha de fin es requerida para un taller.',
-        success: false
-      }
-    }
-
-    if (fechaFin <= todayStr) {
-      return {
-        errors: { fecha_fin: ['La fecha de fin debe ser mayor al día actual.'] },
-        message: 'La fecha de fin debe ser mayor al día actual.',
-        success: false
-      }
-    }
-
-    if (fechaInicio && fechaFin <= fechaInicio) {
-      return {
-        errors: { fecha_fin: ['La fecha de fin debe ser posterior a la fecha de inicio.'] },
-        message: 'La fecha de fin debe ser posterior a la fecha de inicio.',
-        success: false
-      }
-    }
-  }
 
   const { error } = await (supabase as any)
     .from('grupo')
@@ -318,9 +183,6 @@ export async function editarGrupoAction(prevState: FormState, formData: FormData
       hora_inicio: validated.data.hora_inicio ?? null,
       hora_fin: validated.data.hora_fin ?? null,
       cupo_maximo: validated.data.cupo_maximo ?? null,
-      fecha_inicio: validated.data.fecha_inicio ?? null,
-      fecha_fin: validated.data.fecha_fin ?? null,
-      costo_taller: validated.data.costo_taller ?? null,
     })
     .eq('id', validated.data.grupo_id)
     .eq('academia_id', academiaId)
@@ -408,6 +270,19 @@ export async function crearPersonaAction(prevState: FormState, formData: FormDat
   const personaId = personaData.id
   const anchorGrupo = grupo_ids[0]
 
+  // 1.b Evento OPERATIVO: alta inicial del alumno.
+  await (supabase as any)
+    .from('evento_timeline')
+    .insert({
+      academia_id: academiaId,
+      persona_id: personaId,
+      categoria: 'OPERATIVO',
+      tipo: 'REGISTRO',
+      titulo: 'Alumno registrado',
+      descripcion: 'Alta inicial del alumno',
+      actor_id: user.id,
+    })
+
   // 2. Montos por plan: en modo simple (1 plan) se respeta el monto editado;
   //    en avanzado (varios planes) se cobra el monto de cada plan.
   let montoPorPlan: Record<string, number> = {}
@@ -485,7 +360,6 @@ const cargoGrupalSchema = z.object({
   grupo_id: z.string().uuid(),
   concepto: z.string().min(2, { message: 'El concepto es muy corto' }),
   monto: z.coerce.number().positive({ message: 'El monto debe ser mayor a 0' }),
-  fecha_vencimiento: z.string().refine((val) => !isNaN(Date.parse(val)), { message: 'Fecha inválida' }),
   excluded_persona_ids: z.array(z.string().uuid()).default([]),
   idempotency_key: z.string().uuid(),
 })
@@ -495,7 +369,6 @@ export async function crearCargoGrupalAction(prevState: FormState, formData: For
     grupo_id: formData.get('grupo_id') as string,
     concepto: formData.get('concepto') as string,
     monto: formData.get('monto'),
-    fecha_vencimiento: formData.get('fecha_vencimiento') as string,
     excluded_persona_ids: JSON.parse((formData.get('excluded_persona_ids') as string) || '[]'),
     idempotency_key: formData.get('idempotency_key') as string,
   }
@@ -538,7 +411,6 @@ export async function crearCargoGrupalAction(prevState: FormState, formData: For
       p_grupo_id: string
       p_concepto: string
       p_monto: number
-      p_fecha_vencimiento: string
       p_excluded_persona_ids: string[]
       p_idempotency_key: string
     }
@@ -553,7 +425,6 @@ export async function crearCargoGrupalAction(prevState: FormState, formData: For
     p_grupo_id: validatedFields.data.grupo_id,
     p_concepto: validatedFields.data.concepto,
     p_monto: validatedFields.data.monto,
-    p_fecha_vencimiento: validatedFields.data.fecha_vencimiento,
     p_excluded_persona_ids: excluidosFinal,
     p_idempotency_key: validatedFields.data.idempotency_key,
   })
@@ -562,9 +433,12 @@ export async function crearCargoGrupalAction(prevState: FormState, formData: For
     return { message: translateRpcError(error), success: false }
   }
 
+  // El drawer de cargo grupal se comparte entre Grupos y Actividades.
   revalidatePath('/grupos')
   revalidatePath(`/grupos/${validatedFields.data.grupo_id}`)
-  
+  revalidatePath('/actividades')
+  revalidatePath(`/actividades/${validatedFields.data.grupo_id}`)
+
   if (data?.idempotent_hit) {
      return { success: true, message: 'El cargo ya había sido procesado (Idempotencia).' }
   }
@@ -709,6 +583,24 @@ export async function asignarAlumnoAGrupoAction(prevState: FormState, formData: 
       if (errPlan) {
         return { message: 'Inscrito al grupo, pero falló al agregar el plan: ' + translateRpcError(errPlan), success: false }
       }
+
+      // Evento OPERATIVO: esquema de cobro asignado.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: planInfo } = await (supabase as any)
+        .from('planes_cobro')
+        .select('nombre')
+        .eq('id', validated.data.plan_id)
+        .single()
+      await (supabase as any).from('evento_timeline').insert({
+        academia_id: academiaId,
+        persona_id: validated.data.persona_id,
+        categoria: 'OPERATIVO',
+        tipo: 'ESQUEMA_MUTACION',
+        titulo: 'Esquema asignado',
+        descripcion: planInfo?.nombre ?? null,
+        metadata: { plan_id: validated.data.plan_id },
+        actor_id: user.id,
+      })
     }
   }
 

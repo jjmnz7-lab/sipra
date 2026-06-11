@@ -28,6 +28,8 @@ interface WhatsappSummaryDrawerProps {
   /** Si se proveen, el drawer es controlado por el padre y no renderiza su trigger. */
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  /** Sustantivo para el encabezado del mensaje ("grupo" por defecto). */
+  noun?: 'grupo' | 'actividad'
 }
 
 export function WhatsappSummaryDrawer({
@@ -36,6 +38,7 @@ export function WhatsappSummaryDrawer({
   mapEstadoMiembro = {},
   open: controlledOpen,
   onOpenChange,
+  noun = 'grupo',
 }: WhatsappSummaryDrawerProps) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
   const isControlled = controlledOpen !== undefined
@@ -62,7 +65,7 @@ export function WhatsappSummaryDrawer({
     }
 
     // Armado del texto. Sin emojis. Solo se incluyen las secciones con miembros.
-    const partes: string[] = [`Estado del grupo: ${nombreGrupo}`]
+    const partes: string[] = [`Estado ${noun === 'actividad' ? 'de la actividad' : 'del grupo'}: ${nombreGrupo}`]
     for (const def of ESTADOS_FINANCIEROS) {
       const lista = grupos[def.slug]
       if (lista.length === 0) continue
@@ -73,7 +76,7 @@ export function WhatsappSummaryDrawer({
     partes.push('\n_Si ya realizaste tu pago, ignora este mensaje. ¡Gracias!_')
 
     setMessage(partes.join('\n'))
-  }, [open, nombreGrupo, inscripciones, mapEstadoMiembro])
+  }, [open, nombreGrupo, inscripciones, mapEstadoMiembro, noun])
 
   const handleSend = () => {
     const encoded = encodeURIComponent(message)

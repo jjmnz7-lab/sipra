@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { translateRpcError } from '@/lib/utils/rpc-errors'
 
-// Motor B/C: Cargo manual único (inscripción, taller, uniforme, ensayo extra...).
+// Motor B/C: Cargo manual único (inscripción, actividad, uniforme, ensayo extra...).
 // Si el operador modificó el precio estándar (ej. descuento 2x1), `nota_modificacion`
 // queda concatenada al concepto del cargo y guardada en metadata para auditoría.
 const payloadSchema = z.object({

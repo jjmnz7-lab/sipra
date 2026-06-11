@@ -94,15 +94,7 @@ export function AccionesAlumnoSheet({ open, onOpenChange, persona, tieneHistoria
                 </button>
               )}
 
-              {tieneHistorial ? (
-                <button
-                  onClick={() => handleClick('baja')}
-                  className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-destructive/10 transition-colors text-left"
-                >
-                  <Trash2 className="h-5 w-5 text-destructive flex-shrink-0" />
-                  <span className="text-sm font-medium text-destructive">Dar de baja definitiva</span>
-                </button>
-              ) : (
+              {!tieneHistorial && (
                 <button
                   onClick={() => handleClick('eliminar')}
                   className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-destructive/10 transition-colors text-left"
@@ -164,7 +156,7 @@ const CONFIG: Record<Accion, {
   suspender: {
     action: suspenderAlumnoAction,
     titulo: 'Suspender alumno',
-    descripcion: 'Quedará marcado como inactivo. No aparecerá en listas operativas pero su historial se conserva.',
+    descripcion: 'Quedará marcado como inactivo. No aparecerá en listas operativas ni se le podrán generar cargos manuales ni automáticos, pero su historial se conserva.',
     cta: 'Suspender',
     destructiva: false,
   },

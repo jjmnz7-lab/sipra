@@ -53,18 +53,13 @@ type Props = {
     hora_inicio?: string | null
     hora_fin?: string | null
     cupo_maximo?: number | null
-    es_temporal?: boolean | null
-    fecha_inicio?: string | null
-    fecha_fin?: string | null
-    costo_taller?: number | null
   }
   planes?: PlanLite[]
   open: boolean
   onOpenChange: (open: boolean) => void
-  timezone?: string
 }
 
-export function EditarGrupoDrawer({ grupo, planes = [], open, onOpenChange, timezone = 'America/Mexico_City' }: Props) {
+export function EditarGrupoDrawer({ grupo, planes = [], open, onOpenChange }: Props) {
   const [state, formAction] = useActionState(editarGrupoAction, initialState)
   const [colorSlug, setColorSlug] = useState<string>(grupo.color ?? COLORES_GRUPO[0].slug)
   const [emoji, setEmoji] = useState<string>(grupo.emoji ?? '')
@@ -78,13 +73,6 @@ export function EditarGrupoDrawer({ grupo, planes = [], open, onOpenChange, time
   const [cupoIlimitado, setCupoIlimitado] = useState(grupo.cupo_maximo === null || grupo.cupo_maximo === undefined)
   const [cupoMaximo, setCupoMaximo] = useState<number>(grupo.cupo_maximo ?? 10)
 
-  // Fechas taller
-  const [fechaInicio, setFechaInicio] = useState(grupo.fecha_inicio ?? '')
-  const [fechaFin, setFechaFin] = useState(grupo.fecha_fin ?? '')
-  const [costoTaller, setCostoTaller] = useState<string>(grupo.costo_taller != null ? String(grupo.costo_taller) : '')
-
-  const esTaller = !!grupo.es_temporal
-
   // Resync cuando se abre el drawer (por si cambió el grupo entre aperturas).
   useEffect(() => {
     if (open) {
@@ -97,9 +85,6 @@ export function EditarGrupoDrawer({ grupo, planes = [], open, onOpenChange, time
       setHoraFin((grupo.hora_fin ?? '').slice(0, 5))
       setCupoIlimitado(grupo.cupo_maximo === null || grupo.cupo_maximo === undefined)
       setCupoMaximo(grupo.cupo_maximo ?? 10)
-      setFechaInicio(grupo.fecha_inicio ?? '')
-      setFechaFin(grupo.fecha_fin ?? '')
-      setCostoTaller(grupo.costo_taller != null ? String(grupo.costo_taller) : '')
     }
   }, [open, grupo])
 
@@ -110,23 +95,16 @@ export function EditarGrupoDrawer({ grupo, planes = [], open, onOpenChange, time
     }
   }, [state.success, onOpenChange])
 
-  const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: timezone })
-  const tomorrowStr = (() => {
-    const d = new Date()
-    d.setDate(d.getDate() + 1)
-    return d.toLocaleDateString('sv-SE', { timeZone: timezone })
-  })()
-
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent>
         <div className="mx-auto w-full max-w-sm max-h-[90vh] overflow-y-auto">
           <DrawerHeader className="text-left">
             <DrawerTitle className="flex items-center text-foreground">
-              <Pencil className="mr-2 h-5 w-5 text-primary" /> Editar {esTaller ? 'taller' : 'grupo'}
+              <Pencil className="mr-2 h-5 w-5 text-primary" /> Editar grupo
             </DrawerTitle>
             <DrawerDescription>
-              Personaliza los detalles de este {esTaller ? 'taller' : 'grupo'}.
+              Personaliza los detalles de este grupo.
             </DrawerDescription>
           </DrawerHeader>
 
@@ -135,12 +113,11 @@ export function EditarGrupoDrawer({ grupo, planes = [], open, onOpenChange, time
             <input type="hidden" name="color" value={colorSlug} />
             <input type="hidden" name="emoji" value={emoji} />
             <input type="hidden" name="plan_sugerido_id" value={planSugerido === NONE ? '' : planSugerido} />
-            <input type="hidden" name="es_temporal" value={esTaller ? 'true' : 'false'} />
 
             <div className="p-4 pb-0 space-y-5">
               {/* 1. Nombre */}
               <div className="space-y-2">
-                <Label htmlFor="nombre">Nombre del {esTaller ? 'taller' : 'grupo'} *</Label>
+                <Label htmlFor="nombre">Nombre del grupo *</Label>
                 <Input
                   id="nombre"
                   name="nombre"
@@ -152,92 +129,26 @@ export function EditarGrupoDrawer({ grupo, planes = [], open, onOpenChange, time
                 {state?.errors?.nombre && <p className="text-sm text-red-600">{state.errors.nombre[0]}</p>}
               </div>
 
-              {/* Campos específicos de Taller */}
-              {esTaller ? (
-                <>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="fecha_inicio" className="text-xs font-semibold text-muted-foreground tracking-wider">Fecha de inicio *</Label>
-                      <Input
-                        id="fecha_inicio"
-                        name="fecha_inicio"
-                        type="date"
-                        required
-                        value={fechaInicio}
-                        onChange={(e) => {
-                          setFechaInicio(e.target.value)
-                          if (fechaFin && e.target.value && fechaFin <= e.target.value) {
-                            const nextDay = new Date(e.target.value)
-                            nextDay.setDate(nextDay.getDate() + 1)
-                            setFechaFin(nextDay.toLocaleDateString('sv-SE'))
-                          }
-                        }}
-                        className="h-11 text-sm"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="fecha_fin" className="text-xs font-semibold text-muted-foreground tracking-wider">Fecha de fin *</Label>
-                      <Input
-                        id="fecha_fin"
-                        name="fecha_fin"
-                        type="date"
-                        required
-                        value={fechaFin}
-                        onChange={(e) => setFechaFin(e.target.value)}
-                        min={fechaInicio ? (() => {
-                          const [y, m, d] = fechaInicio.split('-').map(Number)
-                          const next = new Date(y!, m! - 1, d! + 1)
-                          return next.toLocaleDateString('sv-SE')
-                        })() : tomorrowStr}
-                        className="h-11 text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="costo_taller" className="text-xs font-semibold text-muted-foreground tracking-wider">Costo del taller *</Label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
-                      <Input
-                        id="costo_taller"
-                        name="costo_taller"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        required
-                        value={costoTaller}
-                        onChange={(e) => setCostoTaller(e.target.value)}
-                        className="h-11 pl-7"
-                        placeholder="0.00"
-                      />
-                    </div>
-                    {state?.errors?.costo_taller && (
-                      <p className="text-sm text-red-600">{state.errors.costo_taller[0]}</p>
-                    )}
-                  </div>
-                </>
-              ) : (
-                /* 2. Plan */
-                planes.length > 0 && (
-                  <div className="space-y-2">
-                    <Label>Plan sugerido (opcional)</Label>
-                    <Select value={planSugerido} onValueChange={setPlanSugerido}>
-                      <SelectTrigger className="h-11"><SelectValue placeholder="Sin plan sugerido" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={NONE}>Sin plan sugerido</SelectItem>
-                        {planes.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.nombre} — ${Number(p.monto).toFixed(2)} {FRECUENCIA_SUFIJO[p.frecuencia] ?? ''}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-[11px] text-muted-foreground">Se autoselecciona al inscribir alumnos a este grupo (editable).</p>
-                  </div>
-                )
+              {/* 2. Plan */}
+              {planes.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Plan sugerido (opcional)</Label>
+                  <Select value={planSugerido} onValueChange={setPlanSugerido}>
+                    <SelectTrigger className="h-11"><SelectValue placeholder="Sin plan sugerido" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NONE}>Sin plan sugerido</SelectItem>
+                      {planes.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.nombre} — ${Number(p.monto).toFixed(2)} {FRECUENCIA_SUFIJO[p.frecuencia] ?? ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-muted-foreground">Se autoselecciona al inscribir alumnos a este grupo (editable).</p>
+                </div>
               )}
 
-              {/* Campo Cupo máximo */}
+              {/* 3. Cupo máximo */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="cupo_maximo" className="text-xs font-semibold text-muted-foreground tracking-wider">Cupo máximo</Label>
@@ -303,7 +214,7 @@ export function EditarGrupoDrawer({ grupo, planes = [], open, onOpenChange, time
                 )}
               </div>
 
-              {/* 3-4. Días + horario (opcionales) */}
+              {/* 4-5. Días + horario (opcionales) */}
               <LogisticaGrupoFields
                 diasSeleccionados={dias}
                 horaInicio={horaInicio}
@@ -313,15 +224,14 @@ export function EditarGrupoDrawer({ grupo, planes = [], open, onOpenChange, time
                 onHoraFinChange={setHoraFin}
               />
 
-              {/* 5-7. Color → Emoji → Vista previa */}
+              {/* 6-8. Color → Emoji → Vista previa */}
               <AparienciaGrupoFields
                 colorSlug={colorSlug}
                 emoji={emoji}
                 nombre={nombre}
                 onColorChange={setColorSlug}
                 onEmojiChange={setEmoji}
-                placeholderNombre={esTaller ? "Nombre del taller" : "Nombre del grupo"}
-                esTaller={esTaller}
+                placeholderNombre="Nombre del grupo"
               />
 
               {state?.message && !state.success && (

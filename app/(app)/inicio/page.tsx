@@ -34,11 +34,13 @@ export default async function InicioPage() {
     .eq('frecuencia', 'por_visita')
     .order('nombre') as any
 
-  // 1c. Grupos activos + miembros (para el FAB: cargo masivo)
+  // 1c. Grupos regulares activos + miembros (para el FAB: cargo masivo).
+  // Las actividades se gestionan desde su propia pantalla.
   const { data: gruposRaw } = await supabase
     .from('grupo')
     .select('id, nombre, color, plan_sugerido_id')
     .eq('estado', 'activo')
+    .eq('es_temporal', false)
     .order('nombre') as any
 
   // 1d. Catálogo completo de planes activos (para el drawer de edición de alumno)

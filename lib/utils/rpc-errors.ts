@@ -5,6 +5,10 @@ const RPC_ERROR_MAP: Record<string, string> = {
   'PAGO_PARCIAL_NO_PERMITIDO':'Esta academia no permite abonos parciales. Debes liquidar el total del adeudo.',
   'CONCEPTO_REQUERIDO':      'El concepto del cargo es obligatorio.',
   'FECHA_VENCIMIENTO_PASADA':'La fecha de vencimiento no puede ser en el pasado.',
+  'ACTIVIDAD_NO_ENCONTRADA': 'La actividad no existe o fue eliminada.',
+  'ACTIVIDAD_ARCHIVADA':     'Esta actividad ya fue archivada; no admite nuevas inscripciones.',
+  'PERSONA_SUSPENDIDA':      'El alumno está suspendido; no se le pueden generar cargos.',
+  'YA_INSCRITO':             'El alumno ya está inscrito en esta actividad.',
   '23505':                   'Esta operación ya fue procesada anteriormente.',
 }
 

@@ -12,6 +12,7 @@ export type AlumnoListItem = {
   estado_registro: string
   created_at: string
   grupo: { id: string; nombre: string; color: string | null } | null
+  grupos: { id: string; nombre: string; color: string | null }[]
   planes: { id: string; nombre: string }[]
   sinGrupo: boolean
   sinPlan: boolean
@@ -52,6 +53,7 @@ export default async function AlumnosPage() {
   const montoInscripcionDefault = Number(academia?.monto_inscripcion_default ?? 0)
   const cobrarInscripcionDefault = !!academia?.cobrar_inscripcion_default
 
+  // Solo grupos regulares: a las actividades se inscribe desde su propia pantalla.
   const { data: grupos } = await supabase
     .from('grupo')
     .select(`
@@ -59,6 +61,7 @@ export default async function AlumnosPage() {
       persona_grupo (estado)
     `)
     .eq('estado', 'activo')
+    .eq('es_temporal', false)
     .order('nombre', { ascending: true }) as any
 
   // Planes de cobro (catálogo para el selector de inscripción)
@@ -76,7 +79,7 @@ export default async function AlumnosPage() {
       id, nombre, apellido, telefono_whatsapp, estado_registro, created_at,
       persona_grupo (
         estado,
-        grupo ( id, nombre, color )
+        grupo ( id, nombre, color, es_temporal )
       ),
       alumno_planes (
         planes_cobro ( id, nombre, activo, frecuencia )
@@ -89,10 +92,18 @@ export default async function AlumnosPage() {
     .order('nombre', { ascending: true }) as any
 
   const alumnos: AlumnoListItem[] = (personas ?? []).map((p: any) => {
-    const pgActivo = (p.persona_grupo ?? []).find((pg: any) => pg.estado === 'activo')
-    const grupo = pgActivo?.grupo
-      ? { id: pgActivo.grupo.id, nombre: pgActivo.grupo.nombre, color: pgActivo.grupo.color ?? null }
-      : null
+    const pgActivos = (p.persona_grupo ?? []).filter((pg: any) => pg.estado === 'activo')
+    // El badge y los filtros de esta pantalla trabajan con grupos REGULARES;
+    // las actividades del alumno viven en su propia pantalla.
+    const grupos = pgActivos
+      .filter((pg: any) => pg.grupo && !pg.grupo.es_temporal)
+      .map((pg: any) => ({
+        id: pg.grupo.id,
+        nombre: pg.grupo.nombre,
+        color: pg.grupo.color ?? null
+      }))
+    const grupo = grupos.length > 0 ? grupos[0] : null
+    const tieneActividad = pgActivos.some((pg: any) => pg.grupo?.es_temporal)
 
     const cargosPendientes = (p.cargo ?? []).filter((c: any) =>
       ['pendiente', 'parcial', 'vencido'].includes(c.estado_financiero),
@@ -115,7 +126,9 @@ export default async function AlumnosPage() {
     )
 
     const sinGrupo = !grupo
-    const sinPlan = planes.length === 0
+    // Quien solo participa en actividades no requiere plan: las actividades
+    // cobran por cargo único, no por esquema (misma regla que las alertas).
+    const sinPlan = planes.length === 0 && !(tieneActividad && sinGrupo)
 
     return {
       id: p.id,
@@ -125,6 +138,7 @@ export default async function AlumnosPage() {
       estado_registro: p.estado_registro,
       created_at: p.created_at,
       grupo,
+      grupos,
       planes,
       sinGrupo,
       sinPlan,

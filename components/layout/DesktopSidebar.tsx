@@ -3,16 +3,18 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { ListTodo, Users, User, LogOut } from 'lucide-react'
+import { ListTodo, Users, User, CalendarDays, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import logoSipra from '@/logo sipra.png'
+import isotipoSipra from '@/public/logos/isotipo-sipra.png'
+import logotipoSipra from '@/public/logos/logotipo-sipra.png'
 
 const navItems = [
   { key: 'inicio', name: 'Inicio', href: '/inicio', icon: ListTodo },
   { key: 'alumnos', name: 'Alumnos', href: '/alumnos', icon: User },
   { key: 'grupos', name: 'Grupos', href: '/grupos', icon: Users },
+  { key: 'actividades', name: 'Actividades', href: '/actividades', icon: CalendarDays },
 ] as const
 
 export function DesktopSidebar() {
@@ -21,9 +23,10 @@ export function DesktopSidebar() {
   const router = useRouter()
   const supabase = createClient()
 
-  // En la ficha de un alumno se resalta el origen (?from=inicio|alumnos, default alumnos).
+  // En la ficha de un alumno se resalta el origen (?from=inicio|grupos|actividades, default alumnos).
   const enSeguimiento = pathname.startsWith('/seguimiento')
-  const origen = searchParams.get('from') === 'inicio' ? 'inicio' : 'alumnos'
+  const from = searchParams.get('from')
+  const origen = from === 'inicio' || from === 'grupos' || from === 'actividades' ? from : 'alumnos'
   const esActivo = (key: string, href: string) =>
     enSeguimiento ? key === origen : pathname.startsWith(href)
 
@@ -38,13 +41,18 @@ export function DesktopSidebar() {
       <div className="p-6 flex items-center space-x-3 text-foreground">
         <div className="h-10 w-10 rounded-lg bg-primary/10 border border-primary/15 flex items-center justify-center">
           <Image
-            src={logoSipra}
+            src={isotipoSipra}
             alt="SIPRA"
             className="h-6 w-auto"
             priority
           />
         </div>
-        <span className="text-xl font-bold tracking-tight">SIPRA</span>
+        <Image
+          src={logotipoSipra}
+          alt="SIPRA"
+          className="h-6 w-auto"
+          priority
+        />
       </div>
 
       <nav className="flex-1 px-4 space-y-2 mt-4">

@@ -26,7 +26,6 @@ const cargoIndividualSchema = z.object({
   persona_id: z.string().uuid({ message: 'Persona inválida' }),
   concepto: z.string().min(2, { message: 'El concepto es requerido' }),
   monto: z.coerce.number().positive({ message: 'El monto debe ser mayor a 0' }),
-  fecha_vencimiento: z.string().refine(val => !isNaN(Date.parse(val)), { message: 'Fecha inválida' }),
   origen: z.string().default('manual'),
 })
 
@@ -51,7 +50,18 @@ const timelinePageSchema = z.object({
   persona_id: z.string().uuid(),
   offset: z.coerce.number().int().nonnegative().default(0),
   limit: z.coerce.number().int().positive().max(50).default(20),
+  categoria: z.enum(['FINANZAS', 'OPERATIVO', 'COMUNICACION']).nullable().optional(),
 })
+
+/** Nombre legible del usuario autenticado para evento_timeline.actor_nombre. */
+async function obtenerActorNombre(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<string> {
+  const { data: userData } = await supabase
+    .from('usuario')
+    .select('nombre, apellido')
+    .eq('id', userId)
+    .single() as { data: { nombre: string; apellido: string | null } | null }
+  return userData ? `${userData.nombre} ${userData.apellido ?? ''}`.trim() : 'Operador'
+}
 
 export type FormState = {
   errors?: Record<string, string[]>
@@ -120,22 +130,15 @@ export async function crearNotaAction(prevState: FormState, formData: FormData):
 
   if (!academiaId) return { message: 'Academia no encontrada', success: false }
 
-  // Obtener nombre del usuario para el actor_nombre
-  const { data: userData } = await supabase
-    .from('usuario')
-    .select('nombre, apellido')
-    .eq('id', user.id)
-    .single()
-
-  const actorNombre = userData ? `${(userData as { nombre: string; apellido: string | null }).nombre} ${(userData as { nombre: string; apellido: string | null }).apellido ?? ''}` : 'Operador'
+  const actorNombre = await obtenerActorNombre(supabase, user.id)
 
   const { error } = await (supabase as any)
     .from('evento_timeline')
     .insert({
       academia_id: academiaId,
       persona_id: validatedFields.data.persona_id,
-      categoria: 'operativo',
-      tipo: 'nota',
+      categoria: 'OPERATIVO',
+      tipo: 'NOTA',
       titulo: 'Nota de seguimiento',
       descripcion: validatedFields.data.contenido,
       actor_id: user.id,
@@ -156,7 +159,6 @@ export async function crearCargoIndividualAction(prevState: FormState, formData:
     persona_id: formData.get('persona_id') as string,
     concepto: formData.get('concepto') as string,
     monto: formData.get('monto'),
-    fecha_vencimiento: formData.get('fecha_vencimiento') as string,
     origen: (formData.get('origen') as string) || 'manual',
   }
 
@@ -183,7 +185,6 @@ export async function crearCargoIndividualAction(prevState: FormState, formData:
     p_persona_id: validatedFields.data.persona_id,
     p_concepto: validatedFields.data.concepto,
     p_monto: validatedFields.data.monto,
-    p_fecha_vencimiento: validatedFields.data.fecha_vencimiento,
     p_origen: validatedFields.data.origen,
   })
 
@@ -194,43 +195,6 @@ export async function crearCargoIndividualAction(prevState: FormState, formData:
   revalidatePath('/seguimiento/[persona_id]', 'page')
   revalidatePath('/inicio')
   return { success: true, message: 'Cargo generado con éxito.' }
-}
-
-/**
- * Helper para inyectar un cargo único inmediato (taller temporal, uniforme,
- * ensayo extra, etc.) directamente al saldo del alumno SIN alterar sus planes
- * recurrentes. Vence hoy y el saldo_acumulado se ajusta vía trigger.
- */
-export async function crearCargoManual(
-  alumno_id: string,
-  monto: number,
-  concepto: string,
-): Promise<FormState> {
-  if (!alumno_id) return { message: 'Alumno inválido.', success: false }
-  if (!Number.isFinite(monto) || monto <= 0) return { message: 'El monto debe ser mayor a 0.', success: false }
-  if (!concepto || concepto.trim().length === 0) return { message: 'El concepto es obligatorio.', success: false }
-
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  const academiaId = user?.app_metadata?.academia_id
-  if (!academiaId) return { message: 'Academia no encontrada', success: false }
-
-  if (await alumnoSuspendido(supabase, academiaId, alumno_id)) {
-    return { message: MSG_ALUMNO_SUSPENDIDO, success: false }
-  }
-
-  const { error } = await (supabase as any).rpc('crear_cargo_manual_v1', {
-    p_academia_id: academiaId,
-    p_alumno_id: alumno_id,
-    p_monto: monto,
-    p_concepto: concepto.trim(),
-  })
-
-  if (error) return { message: translateRpcError(error), success: false }
-
-  revalidatePath('/seguimiento/[persona_id]', 'page')
-  revalidatePath('/inicio')
-  return { success: true, message: 'Cargo manual generado con éxito.' }
 }
 
 export async function crearPromesaAction(prevState: FormState, formData: FormData): Promise<FormState> {
@@ -256,23 +220,19 @@ export async function crearPromesaAction(prevState: FormState, formData: FormDat
 
   if (!academiaId) return { message: 'Academia no encontrada', success: false }
 
-  const { data: userData } = await supabase
-    .from('usuario')
-    .select('nombre, apellido')
-    .eq('id', user.id)
-    .single()
+  const actorNombre = await obtenerActorNombre(supabase, user.id)
 
-  const actorNombre = userData ? `${(userData as { nombre: string; apellido: string | null }).nombre} ${(userData as { nombre: string; apellido: string | null }).apellido ?? ''}` : 'Operador'
+  const fechaPactada = new Date(validatedFields.data.fecha_promesa).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })
 
   const { error } = await (supabase as any)
     .from('evento_timeline')
     .insert({
       academia_id: academiaId,
       persona_id: validatedFields.data.persona_id,
-      categoria: 'financiero',
-      tipo: 'promesa_pago',
+      categoria: 'FINANZAS',
+      tipo: 'PROMESA',
       titulo: 'Promesa de pago',
-      descripcion: `Prometió pagar el ${new Date(validatedFields.data.fecha_promesa).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })}. ${validatedFields.data.comentario}`,
+      descripcion: `Compromiso para el: ${fechaPactada} · ${validatedFields.data.comentario}`,
       metadata: {
         fecha_promesa: validatedFields.data.fecha_promesa,
         comentario: validatedFields.data.comentario
@@ -340,13 +300,17 @@ export async function editarAlumnoAction(prevState: FormState, formData: FormDat
   const grupoIds = parseIdArray(formData.get('grupo_ids'))
   const planIds = parseIdArray(formData.get('plan_ids'))
 
-  // 1. Update groups
+  // 1. Update groups.
+  // La sincronización solo considera grupos REGULARES: las inscripciones a
+  // actividades (es_temporal) no se tocan desde la edición del alumno.
   const { data: activeGps } = await supabase
     .from('persona_grupo')
-    .select('grupo_id')
+    .select('grupo_id, grupo:grupo_id (es_temporal)')
     .eq('persona_id', validated.data.persona_id)
     .eq('estado', 'activo') as any
-  const currentGps = (activeGps ?? []).map((g: any) => g.grupo_id)
+  const currentGps = (activeGps ?? [])
+    .filter((g: any) => g.grupo && g.grupo.es_temporal === false)
+    .map((g: any) => g.grupo_id)
 
   const gpsToRemove = currentGps.filter((id: string) => !grupoIds.includes(id))
   const gpsToAdd = grupoIds.filter((id: string) => !currentGps.includes(id))
@@ -399,6 +363,60 @@ export async function editarAlumnoAction(prevState: FormState, formData: FormDat
       } as any)
   }
 
+  // 3. Eventos OPERATIVO: mutaciones de grupos y esquemas de cobro.
+  const grupoIdsAfectados = [...gpsToAdd, ...gpsToRemove]
+  const planIdsAfectados = [...plsToAdd, ...plsToRemove]
+  if (grupoIdsAfectados.length > 0 || planIdsAfectados.length > 0) {
+    const actorNombre = await obtenerActorNombre(supabase, user!.id)
+
+    const nombreGrupo: Record<string, string> = {}
+    if (grupoIdsAfectados.length > 0) {
+      const { data: gruposData } = await supabase
+        .from('grupo')
+        .select('id, nombre')
+        .in('id', grupoIdsAfectados) as any
+      for (const g of gruposData ?? []) nombreGrupo[g.id] = g.nombre
+    }
+
+    const nombrePlan: Record<string, string> = {}
+    if (planIdsAfectados.length > 0) {
+      const { data: planesData } = await supabase
+        .from('planes_cobro')
+        .select('id, nombre')
+        .in('id', planIdsAfectados) as any
+      for (const p of planesData ?? []) nombrePlan[p.id] = p.nombre
+    }
+
+    const base = {
+      academia_id: academiaId,
+      persona_id: validated.data.persona_id,
+      categoria: 'OPERATIVO',
+      actor_id: user!.id,
+      actor_nombre: actorNombre,
+    }
+    const eventos = [
+      ...gpsToAdd.map((id: string) => ({
+        ...base, tipo: 'GRUPO_MUTACION', titulo: 'Grupo asignado',
+        descripcion: nombreGrupo[id] ?? null, metadata: { grupo_id: id },
+      })),
+      ...gpsToRemove.map((id: string) => ({
+        ...base, tipo: 'GRUPO_MUTACION', titulo: 'Grupo removido',
+        descripcion: nombreGrupo[id] ?? null, metadata: { grupo_id: id },
+      })),
+      ...plsToAdd.map((id: string) => ({
+        ...base, tipo: 'ESQUEMA_MUTACION', titulo: 'Esquema asignado',
+        descripcion: nombrePlan[id] ?? null, metadata: { plan_id: id },
+      })),
+      ...plsToRemove.map((id: string) => ({
+        ...base, tipo: 'ESQUEMA_MUTACION', titulo: 'Esquema removido',
+        descripcion: nombrePlan[id] ?? null, metadata: { plan_id: id },
+      })),
+    ]
+    if (eventos.length > 0) {
+      await (supabase as any).from('evento_timeline').insert(eventos)
+    }
+  }
+
   revalidatePath('/seguimiento/[persona_id]', 'page')
   revalidatePath('/inicio')
   return { success: true, message: 'Alumno actualizado.' }
@@ -422,6 +440,27 @@ async function _cambiarEstadoRegistro(persona_id: string, nuevoEstado: 'activo' 
     .eq('academia_id', academiaId)
 
   if (error) return { message: translateRpcError(error), success: false }
+
+  // Evento OPERATIVO: cambio de estatus de la cuenta.
+  const tituloEstatus =
+    nuevoEstado === 'inactivo' ? 'Cuenta suspendida'
+    : nuevoEstado === 'activo' ? 'Cuenta reactivada'
+    : 'Baja definitiva'
+
+  const actorNombre = await obtenerActorNombre(supabase, user!.id)
+  await (supabase as any)
+    .from('evento_timeline')
+    .insert({
+      academia_id: academiaId,
+      persona_id,
+      categoria: 'OPERATIVO',
+      tipo: 'ESTATUS_CAMBIO',
+      titulo: tituloEstatus,
+      descripcion: null,
+      metadata: { estado_registro: nuevoEstado },
+      actor_id: user!.id,
+      actor_nombre: actorNombre,
+    })
 
   revalidatePath('/seguimiento/[persona_id]', 'page')
   revalidatePath('/inicio')
@@ -548,24 +587,18 @@ export async function anularCargoAction(prevState: FormState, formData: FormData
 
   if (updErr) return { message: translateRpcError(updErr), success: false }
 
-  // Obtener nombre del usuario
-  const { data: userData } = await supabase
-    .from('usuario')
-    .select('nombre, apellido')
-    .eq('id', user!.id)
-    .single() as any
-
-  const actorNombre = userData ? `${userData.nombre} ${userData.apellido ?? ''}`.trim() : 'Operador'
+  const actorNombre = await obtenerActorNombre(supabase, user!.id)
 
   await (supabase as any)
     .from('evento_timeline')
     .insert({
       academia_id: academiaId,
       persona_id: cargo.persona_id,
-      categoria: 'financiero',
-      tipo: 'cargo_anulado',
+      categoria: 'FINANZAS',
+      tipo: 'ANULACION_CARGO',
       titulo: 'Cargo anulado',
-      descripcion: `Se anuló el cargo "${cargo.concepto}" por $${Number(cargo.monto_original).toFixed(2)}. Motivo: ${validated.data.motivo}`,
+      descripcion: `${cargo.concepto} · ${validated.data.motivo}`,
+      monto: Number(cargo.saldo_pendiente),
       metadata: {
         cargo_id: cargo.id,
         monto_original: cargo.monto_original,
@@ -585,8 +618,13 @@ export async function anularCargoAction(prevState: FormState, formData: FormData
 // Paginación del timeline (para el modal "Ver todo")
 // ============================================================================
 
-export async function listarTimelineAction(persona_id: string, offset: number, limit: number) {
-  const validated = timelinePageSchema.safeParse({ persona_id, offset, limit })
+export async function listarTimelineAction(
+  persona_id: string,
+  offset: number,
+  limit: number,
+  categoria?: 'FINANZAS' | 'OPERATIVO' | 'COMUNICACION' | null,
+) {
+  const validated = timelinePageSchema.safeParse({ persona_id, offset, limit, categoria: categoria ?? null })
   if (!validated.success) return { eventos: [], hasMore: false }
 
   const supabase = await createClient()
@@ -594,11 +632,17 @@ export async function listarTimelineAction(persona_id: string, offset: number, l
   const academiaId = user?.app_metadata?.academia_id
   if (!academiaId) return { eventos: [], hasMore: false }
 
-  const { data } = await supabase
+  let query = supabase
     .from('evento_timeline')
     .select('*')
     .eq('persona_id', validated.data.persona_id)
     .eq('academia_id', academiaId)
+
+  if (validated.data.categoria) {
+    query = query.eq('categoria', validated.data.categoria)
+  }
+
+  const { data } = await query
     .order('fecha_evento', { ascending: false })
     .range(validated.data.offset, validated.data.offset + validated.data.limit) as any
 

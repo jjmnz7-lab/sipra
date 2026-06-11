@@ -4,14 +4,6 @@ import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { translateRpcError } from '@/lib/utils/rpc-errors'
-import { alumnoSuspendido, MSG_ALUMNO_SUSPENDIDO } from '@/lib/utils/guards'
-
-const cargoSchema = z.object({
-  persona_id: z.string().uuid({ message: 'Alumno inválido' }),
-  concepto: z.string().min(2, { message: 'El concepto debe tener al menos 2 caracteres' }),
-  monto_original: z.number().min(1, { message: 'El monto debe ser mayor a 0' }),
-  fecha_vencimiento: z.string().min(10, { message: 'Fecha inválida' }),
-})
 
 const pagoSchema = z.object({
   // Puede ir vacío: un cobro a un alumno al corriente se registra como saldo a favor.
@@ -40,51 +32,6 @@ export type FormState = {
   errors?: Record<string, string[]>
   message?: string | null
   success?: boolean
-}
-
-export async function crearCargoAction(prevState: FormState, formData: FormData): Promise<FormState> {
-  const payload = {
-    persona_id: formData.get('persona_id') as string,
-    concepto: formData.get('concepto') as string,
-    monto_original: parseFloat(formData.get('monto_original') as string),
-    fecha_vencimiento: formData.get('fecha_vencimiento') as string,
-  }
-
-  const validatedFields = cargoSchema.safeParse(payload)
-
-  if (!validatedFields.success) {
-    return {
-      errors: validatedFields.error.flatten().fieldErrors,
-      message: 'Revisa los campos del cargo.',
-      success: false
-    }
-  }
-
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  const academiaId = user?.app_metadata?.academia_id
-
-  if (!academiaId) return { message: 'Academia no encontrada', success: false }
-
-  if (await alumnoSuspendido(supabase, academiaId, validatedFields.data.persona_id)) {
-    return { message: MSG_ALUMNO_SUSPENDIDO, success: false }
-  }
-
-  const { error } = await (supabase as any).rpc('crear_cargo_v1', {
-    p_academia_id: academiaId,
-    p_persona_id: validatedFields.data.persona_id,
-    p_concepto: validatedFields.data.concepto,
-    p_monto_original: validatedFields.data.monto_original,
-    p_fecha_vencimiento: validatedFields.data.fecha_vencimiento
-  })
-
-  if (error) {
-    return { message: translateRpcError(error), success: false }
-  }
-
-  revalidatePath('/inicio')
-  revalidatePath(`/seguimiento/${validatedFields.data.persona_id}`)
-  return { success: true, message: 'Cargo registrado exitosamente.' }
 }
 
 export async function registrarPagoAction(prevState: FormState, formData: FormData): Promise<FormState> {
