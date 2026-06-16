@@ -68,9 +68,15 @@ export function AlumnosClientView({ alumnos, grupos, planes, modoProrrateo, mult
   const [soloHuerfanos, setSoloHuerfanos] = useState(false)                          // control de huérfanos
 
   // Activa el filtro de huérfanos si se llega con ?filtro=huerfanos (desde Pendientes).
+  // Precarga el filtro de estado si se llega con ?estado=al_dia|pendiente|atrasado|urgente
+  // (desde las KPI cards de Reportes).
   const searchParams = useSearchParams()
   useEffect(() => {
     if (searchParams.get('filtro') === 'huerfanos') setSoloHuerfanos(true)
+    const estado = searchParams.get('estado')
+    if (estado && ESTADOS_FINANCIEROS.some((e) => e.slug === estado)) {
+      setFiltroEstado(new Set([estado]))
+    }
   }, [searchParams])
 
   // Bottom sheet de filtros

@@ -15,12 +15,13 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from '@/components/ui/drawer'
+import { formatCurrencyCompact } from '@/lib/utils/currency'
 
 const FRECUENCIA_LABEL: Record<string, string> = {
   mensual: '/mes',
   semanal: '/semana',
   por_visita: '/visita',
-  pago_unico: 'único',
+  pago_unico: '/visita',
 }
 
 export type AlumnoLite = {
@@ -58,7 +59,7 @@ function SubmitButton({ disabled }: { disabled?: boolean }) {
 }
 
 function normalizar(s: string | null | undefined) {
-  return (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+  return (s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 }
 
 export function AsignarAlumnoSheet({
@@ -192,7 +193,7 @@ export function AsignarAlumnoSheet({
                       <Info className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
                       <div>
                         <span className="font-bold">Capacidad máxima alcanzada: </span>
-                        El grupo "{grupoNombre}" está lleno ({alumnosCount} de {cupoMaximo} alumnos).
+                        El grupo «{grupoNombre}» está lleno ({alumnosCount} de {cupoMaximo} alumnos).
                       </div>
                     </div>
                   )}
@@ -204,7 +205,7 @@ export function AsignarAlumnoSheet({
                 <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs">
                   <p className="font-semibold text-primary mb-0.5">Plan que se asignará</p>
                   <p className="text-foreground">
-                    {planSugerido.nombre} — ${Number(planSugerido.monto).toFixed(2)}
+                    {planSugerido.nombre} — {formatCurrencyCompact(planSugerido.monto)}
                     {' '}{FRECUENCIA_LABEL[planSugerido.frecuencia] ?? ''}
                   </p>
                   <p className="text-muted-foreground mt-1">
@@ -224,17 +225,17 @@ export function AsignarAlumnoSheet({
                     <Input
                       id="monto_inscripcion_input"
                       type="number"
-                      step="0.01"
+                      step="1"
                       min="0"
                       value={monto}
                       onChange={(e) => setMonto(e.target.value)}
-                      inputMode="decimal"
+                      inputMode="numeric"
                       className="h-11 pl-7"
                     />
                   </div>
                   <p className="text-[11px] text-muted-foreground">
                     {montoNum > 0
-                      ? `Se generará un cargo inmediato por $${montoNum.toFixed(2)}.`
+                      ? `Se generará un cargo inmediato por $${Math.round(montoNum)}.`
                       : 'No se generará ningún cargo al inscribir.'}
                   </p>
                 </div>
@@ -257,3 +258,6 @@ export function AsignarAlumnoSheet({
     </Drawer>
   )
 }
+
+
+

@@ -16,7 +16,7 @@ import {
 import {
   Search, UserPlus, Loader2, FileText, CreditCard, X, Ticket, ArrowLeft,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { normalizeWholeMoneyInput, preventMoneyWheel } from '@/lib/utils/money-input'
 import {
   Select,
   SelectContent,
@@ -82,7 +82,7 @@ export function VisitaExpressDrawer({ open, onOpenChange, alumnos, planesPorVisi
   const elegirPlan = (id: string) => {
     setPlanId(id)
     const p = planesPorVisita.find((x) => x.id === id)
-    if (p) setMontoCargo(Number(p.monto).toFixed(2))
+    if (p) setMontoCargo(normalizeWholeMoneyInput(String(Math.round(Number(p.monto)))))
   }
 
   const montoNum = Number(montoCargo) || 0
@@ -238,7 +238,7 @@ export function VisitaExpressDrawer({ open, onOpenChange, alumnos, planesPorVisi
                       <SelectContent>
                         {planesPorVisita.map((p) => (
                           <SelectItem key={p.id} value={p.id}>
-                            {p.nombre} — ${Number(p.monto).toFixed(2)}
+                            {p.nombre} — ${Math.round(Number(p.monto))}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -255,12 +255,13 @@ export function VisitaExpressDrawer({ open, onOpenChange, alumnos, planesPorVisi
                     <Input
                       id="monto_cargo"
                       type="number"
-                      step="0.01"
+                      step="1"
                       min="0"
-                      inputMode="decimal"
+                      inputMode="numeric"
+                      onWheel={preventMoneyWheel}
                       value={montoCargo}
-                      onChange={(e) => setMontoCargo(e.target.value)}
-                      placeholder="0.00"
+                      onChange={(e) => setMontoCargo(normalizeWholeMoneyInput(e.target.value))}
+                      placeholder="0"
                       className="h-11 pl-7"
                     />
                   </div>

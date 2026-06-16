@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/drawer'
 import { Plus, Archive, Loader2, Layers, ArrowRightLeft, Clock, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { normalizeWholeMoneyInput, preventMoneyWheel } from '@/lib/utils/money-input'
 import { Switch } from '@/components/ui/switch'
 import {
   crearPlanCobroAction,
@@ -49,12 +50,14 @@ const FRECUENCIAS: { value: PlanCobro['frecuencia']; label: string; sufijo: stri
   { value: 'mensual', label: 'Mensual', sufijo: '/mes' },
   { value: 'semanal', label: 'Semanal', sufijo: '/semana' },
   { value: 'por_visita', label: 'Por visita', sufijo: '/visita' },
-  { value: 'pago_unico', label: 'Pago único', sufijo: 'único' },
 ]
 
-const SUFIJO_POR_FRECUENCIA = Object.fromEntries(
-  FRECUENCIAS.map((f) => [f.value, f.sufijo])
-) as Record<PlanCobro['frecuencia'], string>
+const SUFIJO_POR_FRECUENCIA: Record<PlanCobro['frecuencia'], string> = {
+  mensual: '/mes',
+  semanal: '/semana',
+  por_visita: '/visita',
+  pago_unico: '/visita',
+}
 
 const initialState: FormState = {}
 
@@ -188,7 +191,7 @@ export function PlanesCobroSection({
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-foreground truncate">{p.nombre}</p>
                 <p className="text-xs text-muted-foreground">
-                  ${Number(p.monto).toFixed(2)} {SUFIJO_POR_FRECUENCIA[p.frecuencia]}
+                  ${Math.round(Number(p.monto))} {SUFIJO_POR_FRECUENCIA[p.frecuencia]}
                 </p>
               </div>
               <Button
@@ -239,7 +242,20 @@ export function PlanesCobroSection({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="plan_monto" className="text-xs font-semibold text-muted-foreground tracking-wider">Monto ($)</Label>
-              <Input id="plan_monto" name="monto" type="number" step="0.01" min="0" inputMode="decimal" placeholder="0.00" className="h-10" />
+              <Input
+                id="plan_monto"
+                name="monto"
+                type="number"
+                step="1"
+                min="0"
+                inputMode="numeric"
+                placeholder="0"
+                onWheel={preventMoneyWheel}
+                onChange={(e) => {
+                  e.currentTarget.value = normalizeWholeMoneyInput(e.currentTarget.value)
+                }}
+                className="h-10"
+              />
               {state?.errors?.monto && <p className="text-sm text-red-600">{state.errors.monto[0]}</p>}
             </div>
             <div className="space-y-1.5">
@@ -300,7 +316,7 @@ export function PlanesCobroSection({
                         <SelectTrigger className="h-11"><SelectValue placeholder="Selecciona el plan" /></SelectTrigger>
                         <SelectContent>
                           {otrosPlanes.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>{p.nombre} — ${Number(p.monto).toFixed(2)} {SUFIJO_POR_FRECUENCIA[p.frecuencia]}</SelectItem>
+                            <SelectItem key={p.id} value={p.id}>{p.nombre} — ${Math.round(Number(p.monto))} {SUFIJO_POR_FRECUENCIA[p.frecuencia]}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -353,7 +369,7 @@ export function PlanesCobroSection({
                   <SelectTrigger className="h-11"><SelectValue placeholder="Selecciona el plan único" /></SelectTrigger>
                   <SelectContent>
                     {planes.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.nombre} — ${Number(p.monto).toFixed(2)} {SUFIJO_POR_FRECUENCIA[p.frecuencia]}</SelectItem>
+                      <SelectItem key={p.id} value={p.id}>{p.nombre} — ${Math.round(Number(p.monto))} {SUFIJO_POR_FRECUENCIA[p.frecuencia]}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

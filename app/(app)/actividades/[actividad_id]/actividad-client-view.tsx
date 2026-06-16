@@ -1,20 +1,21 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { PageSubheader } from '@/components/layout/page-subheader'
-import { ChevronRight, ChevronDown, MoreVertical, CalendarDays, Clock, Plus, UserPlus, Receipt, User } from 'lucide-react'
+import { ChevronRight, ChevronDown, MoreVertical, CalendarDays, Clock, Plus, UserPlus, Receipt, User, Info } from 'lucide-react'
 import { ESTADOS_FINANCIEROS, type EstadoFinancieroAlumno } from '@/lib/constants/alumno-finanzas'
 import { formatearDiasSemanaCorto, formatearHorario } from '@/lib/constants/dias-semana'
 import { cn } from '@/lib/utils'
 import { formatFechaCorta } from '@/lib/utils/format-fecha'
+import { calcularEstadoActividad, parseFechaLocal } from '@/lib/utils/actividad-estado'
 import { MassCargoDrawer } from '@/components/domain/grupo/mass-cargo-drawer'
-import { WhatsappSummaryDrawer } from '@/components/domain/grupo/whatsapp-summary-drawer'
 import { AsignarAlumnoActividadSheet, type AlumnoLite } from '@/components/domain/actividad/asignar-alumno-actividad-sheet'
 import { AccionesActividadSheet } from '@/components/domain/actividad/acciones-actividad-sheet'
 import { EditarActividadDrawer } from '@/components/domain/actividad/editar-actividad-drawer'
 import { ArchivarActividadDrawer } from '@/components/domain/actividad/archivar-actividad-drawer'
+import { FinalizarActividadDrawer } from '@/components/domain/actividad/finalizar-actividad-drawer'
 import {
   Drawer,
   DrawerContent,
@@ -34,6 +35,7 @@ export function ActividadClientView({
   mapEstadoMiembro,
   alumnosDisponibles = [],
   abrirArchivar = false,
+  timezone = 'America/Mexico_City',
 }: {
   actividad: any
   inscripciones: any[]
@@ -43,6 +45,7 @@ export function ActividadClientView({
   alumnosDisponibles?: AlumnoLite[]
   /** Si true, abre automáticamente el drawer de archivación. */
   abrirArchivar?: boolean
+  timezone?: string
 }) {
   const [suspendedExpanded, setSuspendedExpanded] = useState(false)
 
@@ -51,7 +54,7 @@ export function ActividadClientView({
   const [isKebabOpen, setIsKebabOpen] = useState(false)
   const [isEditarOpen, setIsEditarOpen] = useState(false)
   const [isArchivarOpen, setIsArchivarOpen] = useState(abrirArchivar || false)
-  const [isResumenOpen, setIsResumenOpen] = useState(false)
+  const [isFinalizarOpen, setIsFinalizarOpen] = useState(false)
   const [isCargoOpen, setIsCargoOpen] = useState(false)
   const [isAsignarOpen, setIsAsignarOpen] = useState(false)
   const [isFabSheetOpen, setIsFabSheetOpen] = useState(false)
@@ -75,28 +78,29 @@ export function ActividadClientView({
   const horaLabel = formatearHorario(actividad.hora_inicio ?? null, actividad.hora_fin ?? null)
   const horarioLabel = [diasLabel, horaLabel].filter(Boolean).join(' • ') || null
 
-  // Estado temporal de la actividad (inició / finalizó) para los badges.
-  const hoy = useMemo(() => {
-    const d = new Date()
-    d.setHours(0, 0, 0, 0)
-    return d
-  }, [])
-  const parseFecha = (s: string | null) => {
-    if (!s) return null
-    const [y, m, d] = String(s).split('-').map(Number)
-    if (!y || !m || !d) return null
-    return new Date(y, m - 1, d)
-  }
-  const inicio = parseFecha(actividad.fecha_inicio)
-  const fin = parseFecha(actividad.fecha_fin)
-  const yaInicio = !!inicio && inicio <= hoy
-  const yaFinalizo = !!fin && fin < hoy
-  const fechaFinFutura = !!fin && fin >= hoy
+  // Estado temporal de la actividad (inició / finalizó / archivada) para badges y gating.
+  const { yaInicio, yaFinalizo, archivada, activa } = calcularEstadoActividad(
+    actividad.fecha_inicio, actividad.fecha_fin, actividad.estado,
+  )
   const esUnDia = !!actividad.fecha_inicio && actividad.fecha_inicio === actividad.fecha_fin
 
-  // Sheet del FAB (Asignar alumno / Cargo grupal)
+  // Aviso informativo: finaliza hoy o mañana (solo mientras está vigente).
+  const { finalizaHoy, finalizaManana } = useMemo(() => {
+    const fin = parseFechaLocal(actividad.fecha_fin)
+    if (!fin || !activa) return { finalizaHoy: false, finalizaManana: false }
+    const hoy = new Date()
+    hoy.setHours(0, 0, 0, 0)
+    const manana = new Date(hoy)
+    manana.setDate(manana.getDate() + 1)
+    return {
+      finalizaHoy: fin.getTime() === hoy.getTime(),
+      finalizaManana: fin.getTime() === manana.getTime(),
+    }
+  }, [actividad.fecha_fin, activa])
+
+  // Sheet del FAB (Asignar alumno / Cargo grupal). "Asignar alumno" solo si está vigente.
   const opcionesFab = [
-    {
+    activa && {
       key: 'asignar',
       icon: <UserPlus className="h-5 w-5" />,
       color: '#22887c',
@@ -112,7 +116,7 @@ export function ActividadClientView({
       desc: 'Aplica un cobro extra a los inscritos de esta actividad (con opción de excluir).',
       onClick: () => { setIsFabSheetOpen(false); setIsCargoOpen(true) },
     },
-  ]
+  ].filter(Boolean) as { key: string; icon: ReactNode; color: string; titulo: string; desc: string; onClick: () => void }[]
 
   return (
     <div
@@ -124,7 +128,7 @@ export function ActividadClientView({
         title={
           <div className="flex items-center gap-2.5 min-w-0">
             <div
-              className="h-9 w-9 rounded-full flex items-center justify-center text-base bg-transparent border-[3px] border-border flex-shrink-0"
+              className="h-9 w-9 rounded-full flex items-center justify-center text-base bg-transparent border border-border flex-shrink-0"
               aria-hidden="true"
             >
               {actividad.emoji ?? ''}
@@ -134,13 +138,15 @@ export function ActividadClientView({
         }
         onBack={handleBack}
         actions={
-          <button
-            onClick={() => setIsKebabOpen(true)}
-            className="p-2 -mr-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-full transition-colors"
-            aria-label="Acciones de la actividad"
-          >
-            <MoreVertical className="h-5 w-5" />
-          </button>
+          archivada ? undefined : (
+            <button
+              onClick={() => setIsKebabOpen(true)}
+              className="p-2 -mr-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-full transition-colors"
+              aria-label="Acciones de la actividad"
+            >
+              <MoreVertical className="h-5 w-5" />
+            </button>
+          )
         }
       />
 
@@ -153,10 +159,10 @@ export function ActividadClientView({
           >
             {totalAlumnos} {totalAlumnos === 1 ? 'alumno' : 'alumnos'}
             {actividad.cupo_maximo != null ? (
-              ` · máx ${actividad.cupo_maximo}`
+              ` • máx ${actividad.cupo_maximo}`
             ) : (
               <>
-                {' · '}
+                {' • '}
                 <span className="text-[10px] font-normal align-middle">∞</span>
               </>
             )}
@@ -182,7 +188,7 @@ export function ActividadClientView({
               {actividad.fecha_inicio && (
                 <ListonBadge
                   icon={<CalendarDays className="h-3 w-3" />}
-                  className={yaFinalizo ? 'text-muted-foreground bg-muted/30' : ''}
+                  className={yaInicio ? 'text-muted-foreground bg-muted/30' : ''}
                 >
                   {yaInicio ? 'inició' : 'inicia'}: {formatFechaCorta(actividad.fecha_inicio)}
                 </ListonBadge>
@@ -205,6 +211,17 @@ export function ActividadClientView({
           )}
         </div>
       </div>
+
+      {(finalizaHoy || finalizaManana) && (
+        <div className="px-4 pt-3">
+          <div className="flex items-start gap-2.5 rounded-lg border border-blue-200 bg-blue-50/60 px-3 py-2.5 text-blue-900">
+            <Info className="h-4 w-4 mt-0.5 flex-shrink-0 text-blue-500" />
+            <span className="text-xs leading-relaxed">
+              {finalizaHoy ? 'Esta actividad finaliza hoy.' : 'Esta actividad finaliza mañana.'}
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="p-4 space-y-2">
         {alumnosActivos?.map(({ persona }: any) => {
@@ -324,14 +341,6 @@ export function ActividadClientView({
       </Drawer>
 
       {/* Drawers / sheets */}
-      <WhatsappSummaryDrawer
-        nombreGrupo={actividad.nombre}
-        inscripciones={inscripciones || []}
-        mapEstadoMiembro={mapEstadoMiembro}
-        open={isResumenOpen}
-        onOpenChange={setIsResumenOpen}
-        noun="actividad"
-      />
       <MassCargoDrawer
         grupoId={actividad.id}
         inscripciones={inscripciones || []}
@@ -353,21 +362,30 @@ export function ActividadClientView({
         open={isKebabOpen}
         onOpenChange={setIsKebabOpen}
         actividadNombre={actividad.nombre}
+        puedeEditar={activa}
+        puedeFinalizar={activa}
+        puedeArchivar={!activa && !archivada}
         onEditar={() => setIsEditarOpen(true)}
+        onFinalizar={() => setIsFinalizarOpen(true)}
         onArchivar={() => setIsArchivarOpen(true)}
-        onCompartirResumen={() => setIsResumenOpen(true)}
       />
 
       <ArchivarActividadDrawer
         actividadId={actividad.id}
         actividadNombre={actividad.nombre}
         alumnosCount={totalAlumnos}
-        fechaFinFutura={fechaFinFutura}
-        fechaFin={actividad.fecha_fin ?? null}
         open={isArchivarOpen}
         onOpenChange={setIsArchivarOpen}
       />
+      <FinalizarActividadDrawer
+        actividadId={actividad.id}
+        actividadNombre={actividad.nombre}
+        alumnosCount={totalAlumnos}
+        open={isFinalizarOpen}
+        onOpenChange={setIsFinalizarOpen}
+      />
       <EditarActividadDrawer
+        timezone={timezone}
         actividad={{
           id: actividad.id,
           nombre: actividad.nombre,

@@ -82,3 +82,53 @@ export async function registrarPagoAction(prevState: FormState, formData: FormDa
   revalidatePath(`/seguimiento/${validatedFields.data.persona_id}`)
   return { success: true, message: 'Pago liquidado con éxito.' }
 }
+
+export type DatosCompartir = {
+  telefono: string | null
+  share_token: string
+  nombre: string
+  apellido: string | null
+  bloqueado: boolean
+  suspendido: boolean
+}
+
+/**
+ * Datos mínimos para construir el enlace de historial y notificar por WhatsApp
+ * desde cualquier superficie (perfil, lista de pendientes, FAB). Evita propagar
+ * teléfono/token por props en cada caller del RegistrarPagoDrawer.
+ */
+export async function obtenerDatosCompartir(persona_id: string): Promise<DatosCompartir | null> {
+  if (!z.string().uuid().safeParse(persona_id).success) return null
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const academiaId = user?.app_metadata?.academia_id
+  if (!academiaId) return null
+
+  const { data } = await supabase
+    .from('persona')
+    .select('nombre, apellido, telefono_whatsapp, share_token, share_link_bloqueado, estado_registro')
+    .eq('id', persona_id)
+    .eq('academia_id', academiaId)
+    .single() as {
+      data: {
+        nombre: string
+        apellido: string | null
+        telefono_whatsapp: string | null
+        share_token: string
+        share_link_bloqueado: boolean
+        estado_registro: string
+      } | null
+    }
+
+  if (!data) return null
+
+  return {
+    telefono: data.telefono_whatsapp,
+    share_token: data.share_token,
+    nombre: data.nombre,
+    apellido: data.apellido,
+    bloqueado: data.share_link_bloqueado,
+    suspendido: data.estado_registro !== 'activo',
+  }
+}

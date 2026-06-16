@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2, UsersRound, CheckCircle2, Plus } from 'lucide-react'
 import { COLORES_GRUPO } from '@/lib/constants/grupo-apariencia'
+import { formatCurrencyCompact } from '@/lib/utils/currency'
 import { AparienciaGrupoFields } from './apariencia-grupo-fields'
 import { LogisticaGrupoFields } from './logistica-grupo-fields'
 import {
@@ -26,7 +27,7 @@ export type PlanLite = { id: string; nombre: string; monto: number; frecuencia: 
 const NONE = '__none__'
 
 const FRECUENCIA_SUFIJO: Record<string, string> = {
-  mensual: '/mes', semanal: '/semana', por_visita: '/visita', pago_unico: 'único',
+  mensual: '/mes', semanal: '/semana', por_visita: '/visita', pago_unico: '/visita',
 }
 
 const initialState: FormState = {}
@@ -143,7 +144,7 @@ export function CrearGrupoDrawer({ planes = [] }: CrearGrupoDrawerProps) {
                         <SelectItem value={NONE}>Sin plan sugerido</SelectItem>
                         {planes.map((p) => (
                           <SelectItem key={p.id} value={p.id}>
-                            {p.nombre} — ${Number(p.monto).toFixed(2)} {FRECUENCIA_SUFIJO[p.frecuencia] ?? ''}
+                            {p.nombre} — {formatCurrencyCompact(p.monto)} {FRECUENCIA_SUFIJO[p.frecuencia] ?? ''}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -258,3 +259,5 @@ export function CrearGrupoDrawer({ planes = [] }: CrearGrupoDrawerProps) {
     </>
   )
 }
+
+

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
-import { MessageCircle, Send, Smile, Briefcase, AlertTriangle } from 'lucide-react'
+import { MessageCircle, Send, Smile, Briefcase, AlertTriangle, Link2 } from 'lucide-react'
 import {
   Drawer,
   DrawerClose,
@@ -17,9 +17,9 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from '@/components/ui/drawer'
-import { buildRecordatorioConTono, buildWhatsAppUrl, formatDesgloseCargos, type TonoRecordatorio, type CargoRecordatorio } from '@/lib/utils/whatsapp'
-import { formatCurrency } from '@/lib/utils/currency'
+import { buildRecordatorioConTono, buildWhatsAppUrl, formatDesgloseCargos, buildShareLink, appendEnlaceHistorial, type TonoRecordatorio, type CargoRecordatorio } from '@/lib/utils/whatsapp'
 import { useAcademia } from '@/lib/contexts/academia-context'
+import { obtenerDatosCompartir } from '@/app/(app)/inicio/actions'
 import { cn } from '@/lib/utils'
 
 interface RecordatorioMensajeDrawerProps {
@@ -28,6 +28,8 @@ interface RecordatorioMensajeDrawerProps {
   monto: number
   concepto: string
   cargosActivos?: CargoRecordatorio[]
+  /** Habilita el toggle "Incluir enlace a historial" (requiere el id del alumno). */
+  personaId?: string
   children?: React.ReactNode
   open?: boolean
   onOpenChange?: (open: boolean) => void
@@ -57,6 +59,7 @@ export function RecordatorioMensajeDrawer({
   monto,
   concepto,
   cargosActivos,
+  personaId,
   children,
   open: controlledOpen,
   onOpenChange,
@@ -73,19 +76,32 @@ export function RecordatorioMensajeDrawer({
   const [mensaje, setMensaje] = useState('')
   const [editado, setEditado] = useState(false)
   const [incluirDesglose, setIncluirDesglose] = useState(true)
+  const [incluirEnlace, setIncluirEnlace] = useState(false)
+  const [shareToken, setShareToken] = useState<string | null>(null)
 
-  // Generar mensaje cuando cambia el tono, desglose o al abrir (salvo si fue editado manualmente)
+  // Carga perezosa del token al abrir (sólo si hay alumno asociado).
+  useEffect(() => {
+    if (open && personaId && !shareToken) {
+      obtenerDatosCompartir(personaId).then((d) => {
+        if (d) setShareToken(d.share_token)
+      })
+    }
+  }, [open, personaId, shareToken])
+
+  // Generar mensaje cuando cambia el tono, desglose, enlace o al abrir (salvo si fue editado manualmente)
   useEffect(() => {
     if (open && !editado) {
       const desgloseText = incluirDesglose && cargosActivos ? formatDesgloseCargos(cargosActivos) : undefined
-      setMensaje(
-        buildRecordatorioConTono(
-          { nombre, academia: academiaNombre, monto, concepto, desglose: desgloseText },
-          tono
-        )
+      let msg = buildRecordatorioConTono(
+        { nombre, academia: academiaNombre, monto, concepto, desglose: desgloseText },
+        tono
       )
+      if (incluirEnlace && shareToken) {
+        msg = appendEnlaceHistorial(msg, buildShareLink(shareToken, window.location.origin))
+      }
+      setMensaje(msg)
     }
-  }, [open, tono, nombre, academiaNombre, monto, concepto, editado, incluirDesglose, cargosActivos])
+  }, [open, tono, nombre, academiaNombre, monto, concepto, editado, incluirDesglose, cargosActivos, incluirEnlace, shareToken])
 
   const handleTonoChange = (nuevoTono: TonoRecordatorio) => {
     setTono(nuevoTono)
@@ -95,6 +111,11 @@ export function RecordatorioMensajeDrawer({
   const handleDesgloseToggle = (val: boolean) => {
     setIncluirDesglose(val)
     setEditado(false) // Regenerar al cambiar desglose
+  }
+
+  const handleEnlaceToggle = (val: boolean) => {
+    setIncluirEnlace(val)
+    setEditado(false) // Regenerar al cambiar el enlace
   }
 
   const handleMensajeChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -117,6 +138,7 @@ export function RecordatorioMensajeDrawer({
       setEditado(false)
       setTono(esCritico(cargosActivos) ? 'urgente' : 'amigable')
       setIncluirDesglose(true)
+      setIncluirEnlace(false)
     }
   }
 
@@ -179,6 +201,27 @@ export function RecordatorioMensajeDrawer({
                 <div className="flex flex-col gap-0.5 pointer-events-none">
                   <Label htmlFor="desglose-toggle" className="text-xs font-bold text-muted-foreground">
                     Incluir desglose detallado de saldo
+                  </Label>
+                </div>
+              </div>
+            )}
+
+            {/* Toggle: incluir el enlace seguro al historial */}
+            {personaId && (
+              <div
+                className="flex items-center space-x-3 p-3 bg-secondary/35 rounded-xl border border-border/60 hover:bg-secondary/50 transition-colors select-none cursor-pointer"
+                onClick={() => handleEnlaceToggle(!incluirEnlace)}
+              >
+                <Switch
+                  id="enlace-toggle"
+                  checked={incluirEnlace}
+                  onCheckedChange={(checked) => handleEnlaceToggle(!!checked)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="data-checked:!bg-[#22887c]"
+                />
+                <div className="flex flex-col gap-0.5 pointer-events-none">
+                  <Label htmlFor="enlace-toggle" className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
+                    <Link2 className="h-3.5 w-3.5" /> Incluir enlace a historial
                   </Label>
                 </div>
               </div>

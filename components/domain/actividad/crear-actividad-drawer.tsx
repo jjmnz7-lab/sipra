@@ -11,6 +11,7 @@ import { Loader2, CalendarDays, CheckCircle2, Plus } from 'lucide-react'
 import { EMOJI_ACTIVIDAD_DEFAULT } from '@/lib/constants/actividad-apariencia'
 import { AparienciaActividadFields } from './apariencia-actividad-fields'
 import { LogisticaGrupoFields } from '@/components/domain/grupo/logistica-grupo-fields'
+import { normalizeWholeMoneyInput, preventMoneyWheel } from '@/lib/utils/money-input'
 import {
   Drawer,
   DrawerClose,
@@ -207,11 +208,16 @@ export function CrearActividadDrawer({ timezone = 'America/Mexico_City' }: Crear
                       id="costo_actividad"
                       name="costo_actividad"
                       type="number"
-                      step="0.01"
+                      step="1"
                       min="0"
                       required
+                      onChange={(e) => {
+                        e.currentTarget.value = normalizeWholeMoneyInput(e.currentTarget.value)
+                      }}
+                      onWheel={preventMoneyWheel}
+                      inputMode="numeric"
+                      placeholder="0"
                       className="h-11 pl-7"
-                      placeholder="0.00"
                     />
                   </div>
                   <p className="text-[11px] text-muted-foreground">

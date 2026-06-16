@@ -46,8 +46,8 @@ type EventoUI = {
   montoClass: string
 }
 
-// Paleta: cargos = azul principal · pagos/abonos = verde secundario ·
-// anulaciones = gris neutro · operativo = azul/slate informativo.
+// Paleta: cargos = azul principal • pagos/abonos = verde secundario •
+// anulaciones = gris neutro • operativo = azul/slate informativo.
 const CARGO: Omit<EventoUI, 'Icon'> = {
   iconClass: 'text-primary',
   borderClass: 'border-primary',

@@ -37,6 +37,7 @@ import { CrearCargoIndividualDrawer } from '@/components/domain/cargo/crear-carg
 import { AnularCargoDrawer } from '@/components/domain/cargo/anular-cargo-drawer'
 import { VisitaExpressDrawer, type PlanVisita } from '@/components/domain/cargo/visita-express-drawer'
 import { AccionesAlumnoSheet } from '@/components/domain/persona/acciones-alumno-sheet'
+import { EnviarEnlaceHistorialSheet } from '@/components/domain/envio/enviar-enlace-historial-sheet'
 import { EditarAlumnoDrawer } from '@/components/domain/persona/editar-alumno-drawer'
 import { FaltaTelefonoAlert } from '@/components/domain/persona/falta-telefono-alert'
 import { MasAccionesSheet } from '@/components/domain/seguimiento/mas-acciones-sheet'
@@ -94,6 +95,7 @@ export function SeguimientoClientView({
   const [isMasAccionesOpen, setIsMasAccionesOpen] = useState(false)
   const [isVisitaOpen, setIsVisitaOpen] = useState(false)
   const [isKebabOpen, setIsKebabOpen] = useState(false)
+  const [isEnviarEnlaceOpen, setIsEnviarEnlaceOpen] = useState(false)
   const [isEditarOpen, setIsEditarOpen] = useState(false)
   const [isAlertOpen, setIsAlertOpen] = useState(false)
   const [editFocus, setEditFocus] = useState<'telefono' | null>(null)
@@ -122,6 +124,7 @@ export function SeguimientoClientView({
   const tieneHistorial = (timeline?.length ?? 0) > 0
   const iniciales = getIniciales(persona.nombre, persona.apellido)
   const eventosPreview = timeline.slice(0, TIMELINE_PREVIEW)
+  const nombreCompleto = `${persona.nombre} ${persona.apellido ?? ''}`.trim()
 
   return (
     <div
@@ -281,6 +284,7 @@ export function SeguimientoClientView({
           monto={deudaTotal}
           concepto={cargosActivos.length === 1 ? cargosActivos[0].concepto : 'adeudo pendiente'}
           cargosActivos={cargosActivos}
+          personaId={persona.id}
           open={isRecordatorioOpen}
           onOpenChange={setIsRecordatorioOpen}
         />
@@ -308,6 +312,7 @@ export function SeguimientoClientView({
           onRegistrarPromesa={() => setIsPromesaOpen(true)}
           onAnularCargo={() => setIsAnularCargoOpen(true)}
           onRegistrarVisita={() => setIsVisitaOpen(true)}
+          onEnviarEnlace={() => setIsEnviarEnlaceOpen(true)}
           suspendido={suspendido}
         />
 
@@ -330,6 +335,17 @@ export function SeguimientoClientView({
           }}
           tieneHistorial={tieneHistorial}
           onEditar={() => setIsEditarOpen(true)}
+          shareToken={persona.share_token}
+          linkBloqueado={!!persona.share_link_bloqueado}
+          onToast={showToast}
+        />
+
+        <EnviarEnlaceHistorialSheet
+          open={isEnviarEnlaceOpen}
+          onOpenChange={setIsEnviarEnlaceOpen}
+          alumnoNombre={nombreCompleto}
+          telefono={persona.telefono_whatsapp}
+          shareToken={persona.share_token}
         />
 
         <EditarAlumnoDrawer

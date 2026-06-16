@@ -15,6 +15,8 @@ import {
 } from '@/components/domain/timeline/evento-config'
 import { Clock, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { WhatsappLinkIcon } from '@/components/ui/whatsapp-link-icon'
+import { EnviarEnlaceHistorialSheet } from '@/components/domain/envio/enviar-enlace-historial-sheet'
 
 type Categoria = 'FINANZAS' | 'OPERATIVO' | 'COMUNICACION' | null
 
@@ -54,13 +56,14 @@ export function HistorialClientView({
   hasMoreInicial,
   pageSize,
 }: {
-  persona: { id: string; nombre: string; apellido: string | null; estado_registro: string }
+  persona: { id: string; nombre: string; apellido: string | null; estado_registro: string; share_token: string; telefono_whatsapp: string | null }
   eventosIniciales: EventoTimeline[]
   hasMoreInicial: boolean
   pageSize: number
 }) {
   const router = useRouter()
   const [isExiting, setIsExiting] = useState(false)
+  const [isEnviarEnlaceOpen, setIsEnviarEnlaceOpen] = useState(false)
   const [filtro, setFiltro] = useState<Categoria>(null)
   const [eventos, setEventos] = useState<EventoTimeline[]>(eventosIniciales)
   const [hasMore, setHasMore] = useState(hasMoreInicial)
@@ -160,6 +163,21 @@ export function HistorialClientView({
           </div>
         }
         onBack={handleBack}
+        actions={
+          !isSuspendido ? (
+            <button
+              type="button"
+              onClick={() => setIsEnviarEnlaceOpen(true)}
+              className="flex items-center gap-2 text-[11px] font-semibold text-[#22887c] hover:underline leading-tight text-left"
+            >
+              <WhatsappLinkIcon className="flex-shrink-0" />
+              <span className="flex flex-col">
+                <span>Enviar enlace</span>
+                <span>a historial</span>
+              </span>
+            </button>
+          ) : undefined
+        }
       />
 
       {/* Barra de chips de filtro (mismo estilo que Inicio, sin contador, centrados) */}
@@ -235,6 +253,14 @@ export function HistorialClientView({
         onOpenChange={setIsAnularOpen}
         target={anularTarget}
         onSuccess={handleAnularSuccess}
+      />
+
+      <EnviarEnlaceHistorialSheet
+        open={isEnviarEnlaceOpen}
+        onOpenChange={setIsEnviarEnlaceOpen}
+        alumnoNombre={nombreCompleto}
+        telefono={persona.telefono_whatsapp}
+        shareToken={persona.share_token}
       />
     </div>
   )

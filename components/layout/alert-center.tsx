@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, Info, ChevronRight } from 'lucide-react'
 import {
@@ -24,7 +24,9 @@ type Fila = {
   href: string | ((alertas: AlertasOperativas) => string)
 }
 
-const DEF_FILAS: Omit<Fila & { key: Exclude<keyof AlertasOperativas, 'actividadesVencidasIds'> }, 'count'>[] = [
+type ClaveContador = Exclude<keyof AlertasOperativas, 'actividadesVencidasIds' | 'actividadesFinalizanHoyIds' | 'actividadesPorFinalizarIds'>
+
+const DEF_FILAS: Omit<Fila & { key: ClaveContador }, 'count'>[] = [
   {
     key: 'sinGrupo',
     tipo: 'warning',
@@ -62,6 +64,24 @@ const DEF_FILAS: Omit<Fila & { key: Exclude<keyof AlertasOperativas, 'actividade
     },
   },
   {
+    key: 'actividadesFinalizanHoy',
+    tipo: 'info',
+    texto: (n) => `${n} ${n === 1 ? 'Actividad finaliza' : 'Actividades finalizan'} hoy`,
+    href: (alertas) => {
+      const ids = alertas.actividadesFinalizanHoyIds ?? []
+      return ids.length === 1 ? `/actividades/${ids[0]}` : '/actividades'
+    },
+  },
+  {
+    key: 'actividadesPorFinalizar',
+    tipo: 'info',
+    texto: (n) => `${n} ${n === 1 ? 'Actividad finaliza' : 'Actividades finalizan'} mañana`,
+    href: (alertas) => {
+      const ids = alertas.actividadesPorFinalizarIds ?? []
+      return ids.length === 1 ? `/actividades/${ids[0]}` : '/actividades'
+    },
+  },
+  {
     key: 'sinAdeudoSinTelefono',
     tipo: 'info',
     texto: (n) => `${n} ${n === 1 ? 'alumno' : 'alumnos'} sin adeudo no ${n === 1 ? 'tiene' : 'tienen'} Teléfono/WhatsApp registrado`,
@@ -79,6 +99,7 @@ export function AlertCenter({ alertas }: { alertas: AlertasOperativas }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [animate, setAnimate] = useState(false)
+  const animationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const filas = useMemo<Fila[]>(
     () => DEF_FILAS.map((f) => ({ ...f, count: alertas[f.key] })).filter((f) => f.count > 0),
@@ -105,8 +126,14 @@ export function AlertCenter({ alertas }: { alertas: AlertasOperativas }) {
     if (debeAnimar) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- disparo único de la animación de atención
       setAnimate(true)
-      const t = setTimeout(() => setAnimate(false), 2600)
-      return () => clearTimeout(t)
+      animationTimeoutRef.current = setTimeout(() => {
+        setAnimate(false)
+        animationTimeoutRef.current = null
+      }, 2600)
+      return () => {
+        if (animationTimeoutRef.current) clearTimeout(animationTimeoutRef.current)
+        animationTimeoutRef.current = null
+      }
     }
   }, [hayWarnings])
 
@@ -118,8 +145,12 @@ export function AlertCenter({ alertas }: { alertas: AlertasOperativas }) {
         const now = Date.now()
         const last = Number(localStorage.getItem(SEEN_KEY) || 0)
         if (now - last > AUSENCIA_MS) {
+          if (animationTimeoutRef.current) clearTimeout(animationTimeoutRef.current)
           setAnimate(true)
-          setTimeout(() => setAnimate(false), 2600)
+          animationTimeoutRef.current = setTimeout(() => {
+            setAnimate(false)
+            animationTimeoutRef.current = null
+          }, 2600)
         }
         localStorage.setItem(SEEN_KEY, String(now))
       } catch { /* noop */ }
@@ -127,6 +158,15 @@ export function AlertCenter({ alertas }: { alertas: AlertasOperativas }) {
     document.addEventListener('visibilitychange', onVis)
     return () => document.removeEventListener('visibilitychange', onVis)
   }, [hayWarnings])
+
+  const handleOpen = () => {
+    if (animationTimeoutRef.current) {
+      clearTimeout(animationTimeoutRef.current)
+      animationTimeoutRef.current = null
+    }
+    setAnimate(false)
+    setOpen(true)
+  }
 
   const irA = (href: string | ((alertas: AlertasOperativas) => string)) => {
     const destino = typeof href === 'function' ? href(alertas) : href
@@ -138,7 +178,7 @@ export function AlertCenter({ alertas }: { alertas: AlertasOperativas }) {
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={handleOpen}
         aria-label={hayAlertas ? `Alertas operativas: ${total}` : 'Alertas operativas'}
         className={cn(
           'relative p-2 rounded-full transition-colors hover:bg-accent',

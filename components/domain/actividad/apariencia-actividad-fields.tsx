@@ -51,7 +51,7 @@ export function AparienciaActividadFields({
         <Label>Vista previa</Label>
         <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-muted/40 border border-border">
           <div
-            className="h-10 w-10 rounded-full flex items-center justify-center text-lg bg-card border-[3px] border-border flex-shrink-0"
+            className="h-10 w-10 rounded-full flex items-center justify-center text-lg bg-card border border-border flex-shrink-0"
             aria-hidden="true"
           >
             {emoji}

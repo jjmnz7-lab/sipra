@@ -7,6 +7,7 @@ import { Search, X, Filter, ChevronRight, CalendarDays, ChevronDown } from 'luci
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { formatearDiasSemanaCorto, formatearHorario } from '@/lib/constants/dias-semana'
+import { calcularEstadoActividad } from '@/lib/utils/actividad-estado'
 import { CrearActividadDrawer } from '@/components/domain/actividad/crear-actividad-drawer'
 import {
   Drawer,
@@ -258,16 +259,7 @@ function ActividadCard({ actividad }: { actividad: any }) {
   const horaLabel = formatearHorario(actividad.hora_inicio ?? null, actividad.hora_fin ?? null)
   const horarioCard = [diasLabel, horaLabel].filter(Boolean).join(' • ') || null
 
-  const hoy = useMemo(() => {
-    const d = new Date()
-    d.setHours(0, 0, 0, 0)
-    return d
-  }, [])
-
-  const inicio = parseFecha(actividad.fecha_inicio)
-  const fin = parseFecha(actividad.fecha_fin)
-  const yaInicio = !!inicio && inicio <= hoy
-  const yaFinalizo = !!fin && fin < hoy
+  const { yaInicio, yaFinalizo } = calcularEstadoActividad(actividad.fecha_inicio, actividad.fecha_fin, actividad.estado)
   const esUnDia = !!actividad.fecha_inicio && actividad.fecha_inicio === actividad.fecha_fin
 
   return (
@@ -277,7 +269,7 @@ function ActividadCard({ actividad }: { actividad: any }) {
           <div className="flex items-center gap-3 min-w-0 flex-1">
             {/* Círculo con emoji y borde neutro (las actividades no llevan color) */}
             <div
-              className="h-9 w-9 rounded-full flex items-center justify-center text-base border-[3px] border-border bg-transparent flex-shrink-0"
+              className="h-9 w-9 rounded-full flex items-center justify-center text-base border border-border bg-transparent flex-shrink-0"
               aria-hidden="true"
             >
               {actividad.emoji || ''}
@@ -328,7 +320,7 @@ function ActividadCard({ actividad }: { actividad: any }) {
                 {actividad.fecha_inicio && (
                   <span className={cn(
                     "inline-flex items-center text-[9px] font-semibold px-1.5 py-[1.5px] rounded-full border border-border bg-card whitespace-nowrap",
-                    yaFinalizo ? "text-muted-foreground bg-muted/30" : "text-foreground/85"
+                    yaInicio ? "text-muted-foreground bg-muted/30" : "text-foreground/85"
                   )}>
                     <span>{yaInicio ? 'inició' : 'inicia'}: {formatFechaCorta(actividad.fecha_inicio)}</span>
                   </span>

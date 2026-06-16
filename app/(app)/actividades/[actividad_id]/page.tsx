@@ -24,6 +24,13 @@ export default async function ActividadDetallePage({ params, searchParams }: { p
     redirect(`/grupos/${actividad_id}`)
   }
 
+  const { data: academia } = await supabase
+    .from('academia')
+    .select('timezone')
+    .eq('id', actividad.academia_id)
+    .single() as any
+  const timezone = academia?.timezone || 'America/Mexico_City'
+
   // Fetch alumnos inscritos
   const { data: inscripciones } = await supabase
     .from('persona_grupo')
@@ -90,6 +97,7 @@ export default async function ActividadDetallePage({ params, searchParams }: { p
       mapEstadoMiembro={mapEstadoMiembro}
       alumnosDisponibles={alumnosDisponibles}
       abrirArchivar={abrir_archiva === 'true'}
+      timezone={timezone}
     />
   )
 }

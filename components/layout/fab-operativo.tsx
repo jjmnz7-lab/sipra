@@ -244,7 +244,7 @@ export function FabOperativo({
           open={cargoOpen}
           onOpenChange={setCargoOpen}
           personaId={cargoSel.id}
-          tituloDrawer={`Nuevo cargo · ${cargoSel.nombre} ${cargoSel.apellido ?? ''}`.trim()}
+          tituloDrawer={`Nuevo cargo • ${cargoSel.nombre} ${cargoSel.apellido ?? ''}`.trim()}
         />
       )}
 

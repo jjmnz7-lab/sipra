@@ -48,7 +48,7 @@ function SubmitButton({ disabled }: { disabled?: boolean }) {
 }
 
 function normalizar(s: string | null | undefined) {
-  return (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+  return (s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 }
 
 export function AsignarAlumnoActividadSheet({
@@ -172,7 +172,7 @@ export function AsignarAlumnoActividadSheet({
                       <Info className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
                       <div>
                         <span className="font-bold">Capacidad máxima alcanzada: </span>
-                        La actividad "{actividadNombre}" está llena ({alumnosCount} de {cupoMaximo} alumnos).
+                        La actividad «{actividadNombre}» está llena ({alumnosCount} de {cupoMaximo} alumnos).
                       </div>
                     </div>
                   )}
@@ -190,17 +190,17 @@ export function AsignarAlumnoActividadSheet({
                     <Input
                       id="monto_actividad_input"
                       type="number"
-                      step="0.01"
+                      step="1"
                       min="0"
                       value={monto}
                       onChange={(e) => setMonto(e.target.value)}
-                      inputMode="decimal"
+                      inputMode="numeric"
                       className="h-11 pl-7"
                     />
                   </div>
                   <p className="text-[11px] text-muted-foreground">
                     {montoNum > 0
-                      ? `Se generará un cargo único inmediato por $${montoNum.toFixed(2)}.`
+                      ? `Se generará un cargo único inmediato por $${Math.round(montoNum)}.`
                       : 'No se generará ningún cargo al inscribir.'}
                   </p>
                 </div>
@@ -223,3 +223,4 @@ export function AsignarAlumnoActividadSheet({
     </Drawer>
   )
 }
+

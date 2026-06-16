@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/drawer'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import { formatCurrencyCompact } from '@/lib/utils/currency'
 
 const initialState: FormState = {}
 
@@ -25,7 +26,7 @@ const FRECUENCIA_LABEL: Record<string, string> = {
   mensual: '/mes',
   semanal: '/semana',
   por_visita: '/visita',
-  pago_unico: 'único',
+  pago_unico: '/visita',
 }
 
 function SubmitButton() {
@@ -99,6 +100,11 @@ export function EditarAlumnoDrawer({
   const [nombre, setNombre] = useState(persona.nombre)
   const [apellido, setApellido] = useState(persona.apellido ?? '')
   const [telefono, setTelefono] = useState(persona.telefono_whatsapp ?? '')
+
+  const handleTelefonoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/[^0-9]/g, '')
+    setTelefono(value.slice(0, 10))
+  }
 
   // Modo SIMPLE
   const [grupoId, setGrupoId] = useState<string>(currentGrupoId ?? '')
@@ -188,6 +194,10 @@ export function EditarAlumnoDrawer({
       setLocalError('El nombre es requerido.')
       return
     }
+    if (telefono && telefono.length !== 10) {
+      setLocalError('El teléfono debe tener exactamente 10 dígitos.')
+      return
+    }
 
     let gruposSel: string[]
     let planesSel: string[]
@@ -248,9 +258,11 @@ export function EditarAlumnoDrawer({
                 <Input
                   id="edit-telefono"
                   type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
                   ref={telefonoRef}
                   value={telefono}
-                  onChange={(e) => setTelefono(e.target.value)}
+                  onChange={handleTelefonoChange}
                   className="h-11"
                   placeholder="10 dígitos"
                 />
@@ -276,7 +288,7 @@ export function EditarAlumnoDrawer({
                         <Info className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
                         <div>
                           <span className="font-bold">Capacidad máxima alcanzada: </span>
-                          El grupo "{selectedGrupoSimple?.nombre}" está lleno ({activeAlumnosSimple} de {cupoMaximoSimple} alumnos).
+                          El grupo «{selectedGrupoSimple?.nombre}» está lleno ({activeAlumnosSimple} de {cupoMaximoSimple} alumnos).
                         </div>
                       </div>
                     )}
@@ -292,7 +304,7 @@ export function EditarAlumnoDrawer({
                         <SelectItem value="">Sin plan de cobro</SelectItem>
                         {planes.map((p) => (
                           <SelectItem key={p.id} value={p.id}>
-                            {p.nombre} — ${Number(p.monto).toFixed(2)} {FRECUENCIA_LABEL[p.frecuencia] ?? ''}
+                            {p.nombre} — {formatCurrencyCompact(p.monto)} {FRECUENCIA_LABEL[p.frecuencia] ?? ''}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -334,7 +346,7 @@ export function EditarAlumnoDrawer({
                       {planes.map((p) => (
                         <CheckRow
                           key={p.id}
-                          label={`${p.nombre} — $${Number(p.monto).toFixed(2)} ${FRECUENCIA_LABEL[p.frecuencia] ?? ''}`}
+                          label={`${p.nombre} — ${formatCurrencyCompact(p.monto)} ${FRECUENCIA_LABEL[p.frecuencia] ?? ''}`}
                           checked={planIds.has(p.id)}
                           onClick={() => toggle(planIds, setPlanIds, p.id)}
                         />
@@ -370,3 +382,6 @@ export function EditarAlumnoDrawer({
     </Drawer>
   )
 }
+
+
+

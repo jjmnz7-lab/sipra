@@ -232,7 +232,7 @@ export async function crearPromesaAction(prevState: FormState, formData: FormDat
       categoria: 'FINANZAS',
       tipo: 'PROMESA',
       titulo: 'Promesa de pago',
-      descripcion: `Compromiso para el: ${fechaPactada} · ${validatedFields.data.comentario}`,
+      descripcion: `Compromiso para el: ${fechaPactada} • ${validatedFields.data.comentario}`,
       metadata: {
         fecha_promesa: validatedFields.data.fecha_promesa,
         comentario: validatedFields.data.comentario
@@ -597,7 +597,7 @@ export async function anularCargoAction(prevState: FormState, formData: FormData
       categoria: 'FINANZAS',
       tipo: 'ANULACION_CARGO',
       titulo: 'Cargo anulado',
-      descripcion: `${cargo.concepto} · ${validated.data.motivo}`,
+      descripcion: `${cargo.concepto} • ${validated.data.motivo}`,
       monto: Number(cargo.saldo_pendiente),
       metadata: {
         cargo_id: cargo.id,
@@ -617,6 +617,60 @@ export async function anularCargoAction(prevState: FormState, formData: FormData
 // ============================================================================
 // Paginación del timeline (para el modal "Ver todo")
 // ============================================================================
+
+// ============================================================================
+// Enlace de historial compartible
+// ============================================================================
+
+/** Genera un nuevo token (invalida el anterior) para el enlace público. */
+export async function regenerarEnlaceHistorialAction(
+  persona_id: string,
+): Promise<{ success: boolean; token?: string; message?: string }> {
+  const validated = personaIdSchema.safeParse({ persona_id })
+  if (!validated.success) return { success: false, message: 'Persona inválida' }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const academiaId = user?.app_metadata?.academia_id
+  if (!academiaId) return { success: false, message: 'Academia no encontrada' }
+
+  const nuevoToken = crypto.randomUUID()
+  const { error } = await (supabase as any)
+    .from('persona')
+    .update({ share_token: nuevoToken })
+    .eq('id', persona_id)
+    .eq('academia_id', academiaId)
+
+  if (error) return { success: false, message: translateRpcError(error) }
+
+  revalidatePath('/seguimiento/[persona_id]', 'page')
+  return { success: true, token: nuevoToken }
+}
+
+/** Activa o desactiva el bloqueo manual del enlace público. */
+export async function toggleBloqueoEnlaceAction(
+  persona_id: string,
+  bloquear: boolean,
+): Promise<{ success: boolean; bloqueado?: boolean; message?: string }> {
+  const validated = personaIdSchema.safeParse({ persona_id })
+  if (!validated.success) return { success: false, message: 'Persona inválida' }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const academiaId = user?.app_metadata?.academia_id
+  if (!academiaId) return { success: false, message: 'Academia no encontrada' }
+
+  const { error } = await (supabase as any)
+    .from('persona')
+    .update({ share_link_bloqueado: bloquear })
+    .eq('id', persona_id)
+    .eq('academia_id', academiaId)
+
+  if (error) return { success: false, message: translateRpcError(error) }
+
+  revalidatePath('/seguimiento/[persona_id]', 'page')
+  return { success: true, bloqueado: bloquear }
+}
 
 export async function listarTimelineAction(
   persona_id: string,

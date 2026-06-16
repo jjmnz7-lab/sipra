@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
@@ -10,7 +10,6 @@ import { ESTADOS_FINANCIEROS, type EstadoFinancieroAlumno } from '@/lib/constant
 import { formatearDiasSemanaCorto, formatearHorario } from '@/lib/constants/dias-semana'
 import { cn } from '@/lib/utils'
 import { MassCargoDrawer } from '@/components/domain/grupo/mass-cargo-drawer'
-import { WhatsappSummaryDrawer } from '@/components/domain/grupo/whatsapp-summary-drawer'
 import { AsignarAlumnoSheet, type AlumnoLite } from '@/components/domain/grupo/asignar-alumno-sheet'
 import { AccionesGrupoSheet } from '@/components/domain/grupo/acciones-grupo-sheet'
 import { EditarGrupoDrawer } from '@/components/domain/grupo/editar-grupo-drawer'
@@ -24,7 +23,7 @@ import {
 
 type PlanLite = { id: string; nombre: string; monto: number; frecuencia: string }
 
-// Semáforo financiero único (mismos 4 colores que ESTADOS_FINANCIEROS).
+// SemÃ¡foro financiero Ãºnico (mismos 4 colores que ESTADOS_FINANCIEROS).
 const COLOR_POR_ESTADO: Record<EstadoFinancieroAlumno, string> = Object.fromEntries(
   ESTADOS_FINANCIEROS.map((e) => [e.slug, e.hex]),
 ) as Record<EstadoFinancieroAlumno, string>
@@ -33,7 +32,7 @@ const FRECUENCIA_LABEL: Record<string, string> = {
   mensual: '/mes',
   semanal: '/sem',
   por_visita: '/visita',
-  pago_unico: 'único',
+  pago_unico: '/visita',
 }
 
 export function GrupoClientView({
@@ -70,7 +69,7 @@ export function GrupoClientView({
   /** Alumnos activos NO inscritos a este grupo (para el sheet Asignar alumno). */
   alumnosDisponibles?: AlumnoLite[]
   timezone?: string
-  /** Si true, abre automáticamente el drawer de archivación. */
+  /** Si true, abre automÃ¡ticamente el drawer de archivaciÃ³n. */
   abrirArchivar?: boolean
 }) {
   const [suspendedExpanded, setSuspendedExpanded] = useState(false)
@@ -80,7 +79,6 @@ export function GrupoClientView({
   const [isKebabOpen, setIsKebabOpen] = useState(false)
   const [isEditarOpen, setIsEditarOpen] = useState(false)
   const [isArchivarOpen, setIsArchivarOpen] = useState(abrirArchivar || false)
-  const [isResumenOpen, setIsResumenOpen] = useState(false)
   const [isCargoOpen, setIsCargoOpen] = useState(false)
   const [isAsignarOpen, setIsAsignarOpen] = useState(false)
   const [isFabSheetOpen, setIsFabSheetOpen] = useState(false)
@@ -98,14 +96,6 @@ export function GrupoClientView({
 
   const colorGrupo = colorPorSlug(grupo.color)
 
-  // Costo a mostrar: el del plan sugerido del grupo (si existe).
-  const planSugerido = grupo.plan_sugerido_id
-    ? planes.find((p) => p.id === grupo.plan_sugerido_id) ?? null
-    : null
-  const costoLabel = planSugerido
-    ? `$${Number(planSugerido.monto).toFixed(0)}${FRECUENCIA_LABEL[planSugerido.frecuencia] ?? ''}`
-    : null
-
   // Días/horario reales del grupo. Si no hay nada, no se muestra la línea.
   const diasLabel = formatearDiasSemanaCorto(grupo.dias_semana ?? null)
   const horaLabel = formatearHorario(grupo.hora_inicio ?? null, grupo.hora_fin ?? null)
@@ -118,7 +108,7 @@ export function GrupoClientView({
       icon: <UserPlus className="h-5 w-5" />,
       color: '#22887c',
       titulo: 'Asignar alumno',
-      desc: 'Inscribe rápidamente a un alumno existente a este grupo.',
+      desc: 'Inscribe rÃ¡pidamente a un alumno existente a este grupo.',
       onClick: () => { setIsFabSheetOpen(false); setIsAsignarOpen(true) },
     },
     {
@@ -126,7 +116,7 @@ export function GrupoClientView({
       icon: <Receipt className="h-5 w-5" />,
       color: '#15435a',
       titulo: 'Cargo grupal',
-      desc: 'Aplica un cobro extra a los miembros de este grupo (con opción de excluir).',
+      desc: 'Aplica un cobro extra a los miembros de este grupo (con opciÃ³n de excluir).',
       onClick: () => { setIsFabSheetOpen(false); setIsCargoOpen(true) },
     },
   ]
@@ -171,10 +161,10 @@ export function GrupoClientView({
           >
             {totalAlumnos} {totalAlumnos === 1 ? 'alumno' : 'alumnos'}
             {grupo.cupo_maximo != null ? (
-              ` · máx ${grupo.cupo_maximo}`
+              ` • máx ${grupo.cupo_maximo}`
             ) : (
               <>
-                {' · '}
+                {' • '}
                 <span className="text-[10px] font-normal align-middle">∞</span>
               </>
             )}
@@ -186,11 +176,7 @@ export function GrupoClientView({
             </ListonBadge>
           )}
 
-          {costoLabel && (
-            <ListonBadge>
-              {costoLabel}
-            </ListonBadge>
-          )}
+
         </div>
       </div>
 
@@ -203,7 +189,7 @@ export function GrupoClientView({
           return (
             <Link href={`/seguimiento/${persona.id}?from=grupos`} key={persona.id} className="block">
               <div className="relative overflow-hidden flex flex-col sm:flex-row sm:items-center sm:justify-between items-start bg-card border border-border rounded-lg py-2 pr-3 pl-5 hover:border-primary/50 transition-[transform,border-color,box-shadow,background-color] duration-150 active:scale-[0.985] active:border-[#22887c]/60 active:shadow-[0_0_0_1px_rgba(34,136,124,0.18),0_8px_20px_rgba(34,136,124,0.08)] gap-2 sm:gap-3 min-h-[62px] sm:min-h-[38px]">
-                {/* Indicator strip (6px, color del semáforo financiero) */}
+                {/* Indicator strip (6px, color del semÃ¡foro financiero) */}
                 <div
                   className="absolute left-0 top-0 bottom-0 w-[6px]"
                   style={{ backgroundColor: bordeHex }}
@@ -239,7 +225,7 @@ export function GrupoClientView({
         {(!alumnosActivos || alumnosActivos.length === 0) && (
           <div className="text-center py-8 px-4 border border-dashed border-border rounded-xl bg-muted/20">
             <p className="text-sm text-muted-foreground">
-              Aún no hay alumnos activos en este grupo. Toca el botón + para asignar al primero.
+              AÃºn no hay alumnos activos en este grupo. Toca el botÃ³n + para asignar al primero.
             </p>
           </div>
         )}
@@ -267,7 +253,7 @@ export function GrupoClientView({
                   return (
                     <Link href={`/seguimiento/${persona.id}?from=grupos`} key={persona.id} className="block">
                       <div className="relative overflow-hidden flex flex-col sm:flex-row sm:items-center sm:justify-between items-start bg-card/65 border border-border/65 rounded-lg py-2 pr-3 pl-5 hover:border-primary/50 transition-[transform,border-color,box-shadow,background-color] duration-150 active:scale-[0.985] active:border-[#22887c]/60 active:shadow-[0_0_0_1px_rgba(34,136,124,0.18),0_8px_20px_rgba(34,136,124,0.08)] gap-2 sm:gap-3 min-h-[62px] sm:min-h-[38px]">
-                        {/* Indicator strip (6px, color del semáforo financiero) */}
+                        {/* Indicator strip (6px, color del semÃ¡foro financiero) */}
                         <div
                           className="absolute left-0 top-0 bottom-0 w-[6px]"
                           style={{ backgroundColor: bordeHex }}
@@ -321,7 +307,7 @@ export function GrupoClientView({
         <DrawerContent className="max-h-[60vh]">
           <div className="mx-auto w-full max-w-md flex flex-col pb-6">
             <DrawerHeader className="text-left">
-              <DrawerTitle>¿Qué quieres hacer en este grupo?</DrawerTitle>
+              <DrawerTitle>Â¿QuÃ© quieres hacer en este grupo?</DrawerTitle>
             </DrawerHeader>
             <div className="px-4 space-y-2">
               {opcionesFab.map((op) => (
@@ -350,13 +336,6 @@ export function GrupoClientView({
       </Drawer>
 
       {/* Drawers / sheets */}
-      <WhatsappSummaryDrawer
-        nombreGrupo={grupo.nombre}
-        inscripciones={inscripciones || []}
-        mapEstadoMiembro={mapEstadoMiembro}
-        open={isResumenOpen}
-        onOpenChange={setIsResumenOpen}
-      />
       <MassCargoDrawer
         grupoId={grupo.id}
         inscripciones={inscripciones || []}
@@ -367,7 +346,7 @@ export function GrupoClientView({
         grupoId={grupo.id}
         grupoNombre={grupo.nombre}
         alumnos={alumnosDisponibles}
-        planSugerido={planSugerido}
+        planSugerido={grupo.plan_sugerido_id ? planes.find((p) => p.id === grupo.plan_sugerido_id) ?? null : null}
         cobrarInscripcionDefault={cobrarInscripcionDefault}
         montoInscripcionDefault={montoInscripcionDefault}
         open={isAsignarOpen}
@@ -382,7 +361,6 @@ export function GrupoClientView({
         grupoNombre={grupo.nombre}
         onEditar={() => setIsEditarOpen(true)}
         onArchivar={() => setIsArchivarOpen(true)}
-        onCompartirResumen={() => setIsResumenOpen(true)}
       />
 
       <ArchivarGrupoDrawer
@@ -421,3 +399,4 @@ function ListonBadge({ children, icon, className }: { children: React.ReactNode;
     </span>
   )
 }
+

@@ -77,6 +77,60 @@ export function buildWhatsAppUrl(telefono: string | null | undefined, mensaje: s
   return `https://wa.me/${clean}?text=${encodeURIComponent(mensaje)}`
 }
 
+/**
+ * Variante para compartir: si no hay teléfono, abre WhatsApp con el mensaje
+ * precargado y deja que el remitente elija el contacto (wa.me sin número).
+ */
+export function buildWhatsAppShareUrl(telefono: string | null | undefined, mensaje: string): string {
+  const clean = (telefono ?? '').replace(/\D/g, '')
+  const base = clean ? `https://wa.me/${clean}` : 'https://wa.me/'
+  return `${base}?text=${encodeURIComponent(mensaje)}`
+}
+
+/** URL absoluta del historial público por token: {origin}/historial/{token}. */
+export function buildShareLink(token: string, origin?: string): string {
+  const base = (origin ?? '').replace(/\/$/, '')
+  return `${base}/historial/${token}`
+}
+
+/** Mensaje para compartir el enlace del historial con el tutor/alumno. */
+export function buildHistorialShareMensaje(params: {
+  academia: string
+  alumno: string
+  link: string
+}): string {
+  const { academia, alumno, link } = params
+  return (
+    `Hola 😊, te compartimos el historial de pagos de *${alumno}* en ${academia}. ` +
+    `Puedes consultarlo cuando quieras desde este enlace seguro:\n${link}\n\n` +
+    `¡Cualquier duda quedamos a tus órdenes! 🙌`
+  )
+}
+
+/** Mensaje de confirmación tras registrar un pago (incluye el enlace seguro). */
+export function buildPagoConfirmacionMensaje(params: {
+  academia: string
+  alumno: string
+  monto: number
+  fecha: string
+  link: string
+}): string {
+  const { academia, alumno, monto, fecha, link } = params
+  const montoStr = formatCurrency(monto)
+  return (
+    `Hola, te escribimos de ${academia} para confirmar el pago de ${montoStr} ` +
+    `el día ${fecha} a la cuenta de *${alumno}*. ` +
+    `Puedes consultar el detalle completo de tus pagos en el siguiente enlace seguro:\n${link}\n\n` +
+    `¡Muchas gracias!`
+  )
+}
+
+/** Anexa la línea del enlace de historial a un mensaje de recordatorio. */
+export function appendEnlaceHistorial(mensaje: string, link: string): string {
+  if (!link) return mensaje
+  return `${mensaje}\n\nConsulta tu historial completo aquí:\n${link}`
+}
+
 export function buildRecordatorioMensaje(params: {
   nombre: string
   academia: string

@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { normalizeWholeMoneyInput, preventMoneyWheel } from '@/lib/utils/money-input'
 import {
   Loader2,
   Camera,
@@ -314,12 +315,13 @@ export function OnboardingWizard() {
                       <Input
                         id="montoMensualidad"
                         type="number"
-                        step="0.01"
+                        step="1"
                         min="0"
-                        inputMode="decimal"
+                        inputMode="numeric"
                         value={montoMensualidad}
-                        onChange={(e) => setMontoMensualidad(e.target.value)}
-                        placeholder="0.00"
+                        onChange={(e) => setMontoMensualidad(normalizeWholeMoneyInput(e.target.value))}
+                        onWheel={preventMoneyWheel}
+                        placeholder="0"
                         className="h-11 pl-7 bg-white"
                       />
                     </div>

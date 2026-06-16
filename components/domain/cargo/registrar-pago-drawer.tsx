@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2, Banknote, Landmark, CheckCircle2 } from 'lucide-react'
+import { parseWholeMoneyInput, preventMoneyWheel } from '@/lib/utils/money-input'
 import {
   Drawer,
   DrawerClose,
@@ -19,6 +20,7 @@ import {
   DrawerTrigger,
 } from '@/components/ui/drawer'
 import type { CargoConPersona } from '@/lib/types/domain'
+import { useConfirmarPago } from './pago-confirmacion-provider'
 
 const initialState: FormState = {}
 
@@ -71,9 +73,10 @@ export function RegistrarPagoDrawer({
     ? `${cargo.persona?.nombre ?? '—'} ${cargo.persona?.apellido ?? ''}`.trim()
     : (personaNombre ?? '')
 
+  const confirmarPago = useConfirmarPago()
   const [state, formAction] = useActionState(registrarPagoAction, initialState)
   const [idempotencyKey, setIdempotencyKey] = useState('')
-  const [monto, setMonto] = useState<number | ''>(adeudo > 0 ? adeudo : '')
+  const [monto, setMonto] = useState<number | ''>(adeudo > 0 ? Math.round(adeudo) : '')
 
   const montoNumerico = typeof monto === 'number' ? monto : 0
   const esCobroLibre = adeudo <= 0                       // sin deuda → anticipo puro
@@ -90,13 +93,18 @@ export function RegistrarPagoDrawer({
   useEffect(() => {
     if (open) {
       setIdempotencyKey(crypto.randomUUID())
-      setMonto(adeudo > 0 ? adeudo : '')
+      setMonto(adeudo > 0 ? Math.round(adeudo) : '')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   useEffect(() => {
-    if (state.success) setOpen(false)
+    if (state.success) {
+      // Dispara la confirmación en el provider (estable, sobrevive el desmontaje
+      // de esta tarjeta/drawer al revalidar) y cierra el drawer de cobro.
+      if (pid) confirmarPago({ personaId: pid, monto: montoNumerico, alumnoNombre: nombre })
+      setOpen(false)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.success])
 
@@ -115,7 +123,7 @@ export function RegistrarPagoDrawer({
                 <span className="block text-xs mt-0.5">
                   {esCobroLibre
                     ? 'Sin adeudo: el cobro se registrará como saldo a favor.'
-                    : `Saldo deudor actual: $${adeudo.toFixed(2)}`}
+                    : `Saldo deudor actual: $${Math.round(adeudo)}`}
                 </span>
               )}
             </DrawerDescription>
@@ -135,18 +143,19 @@ export function RegistrarPagoDrawer({
                   id="monto_pago"
                   name="monto_pago"
                   type="number"
-                  step="0.01"
-                  min="0.01"
+                  step="1"
+                  min="1"
                   value={monto}
-                  onChange={(e) => setMonto(e.target.value ? parseFloat(e.target.value) : '')}
-                  inputMode="decimal"
+                  onChange={(e) => setMonto(parseWholeMoneyInput(e.target.value))}
+                  onWheel={preventMoneyWheel}
+                  inputMode="numeric"
                   required
-                  placeholder="0.00"
+                  placeholder="0"
                   className="h-16 text-3xl font-bold text-center text-primary bg-primary/10 border-primary/20"
                 />
                 <div className="text-center mt-2 font-medium text-sm min-h-[20px]">
                   {esCobroLibre && montoNumerico > 0 && (
-                    <span className="text-[#15435a]">Se registrará como saldo a favor: ${montoNumerico.toFixed(2)}</span>
+                    <span className="text-[#15435a]">Se registrará como saldo a favor: ${Math.round(montoNumerico)}</span>
                   )}
                   {!esCobroLibre && faltante === 0 && montoNumerico > 0 && (
                     <span className="text-[#22887c] flex items-center justify-center">
@@ -154,13 +163,13 @@ export function RegistrarPagoDrawer({
                     </span>
                   )}
                   {!esCobroLibre && faltante > 0 && allowPartial && (
-                    <span className="text-amber-600">Quedará pendiente: ${faltante.toFixed(2)}</span>
+                    <span className="text-amber-600">Quedará pendiente: ${Math.round(faltante)}</span>
                   )}
                   {!esCobroLibre && faltante > 0 && !allowPartial && (
-                    <span className="text-red-600">Esta academia exige cubrir al menos ${adeudo.toFixed(2)}</span>
+                    <span className="text-red-600">Esta academia exige cubrir al menos ${Math.round(adeudo)}</span>
                   )}
                   {!esCobroLibre && excedente > 0 && (
-                    <span className="text-[#15435a]">Genera saldo a favor: ${excedente.toFixed(2)}</span>
+                    <span className="text-[#15435a]">Genera saldo a favor: ${Math.round(excedente)}</span>
                   )}
                 </div>
                 {state?.errors?.monto_pago && <p className="text-sm text-red-600 text-center">{state.errors.monto_pago[0]}</p>}

@@ -2,7 +2,8 @@
 
 import * as React from 'react'
 import { Button } from '@/components/ui/button'
-import { CalendarClock, XCircle, Zap, Ticket, Receipt } from 'lucide-react'
+import { CalendarClock, XCircle, Ticket, Receipt } from 'lucide-react'
+import { WhatsappLinkIcon } from '@/components/ui/whatsapp-link-icon'
 import {
   Drawer,
   DrawerClose,
@@ -19,11 +20,12 @@ type Props = {
   onRegistrarPromesa: () => void
   onAnularCargo: () => void
   onRegistrarVisita: () => void
+  onEnviarEnlace: () => void
   /** Si el alumno está suspendido, se deshabilitan las acciones que generan cargos $. */
   suspendido?: boolean
 }
 
-export function MasAccionesSheet({ open, onOpenChange, onAgregarCargo, onRegistrarPromesa, onAnularCargo, onRegistrarVisita, suspendido = false }: Props) {
+export function MasAccionesSheet({ open, onOpenChange, onAgregarCargo, onRegistrarPromesa, onAnularCargo, onRegistrarVisita, onEnviarEnlace, suspendido = false }: Props) {
   const handle = (cb: () => void) => {
     onOpenChange(false)
     setTimeout(cb, 200)
@@ -64,7 +66,16 @@ export function MasAccionesSheet({ open, onOpenChange, onAgregarCargo, onRegistr
               <Receipt className="h-5 w-5 text-[#22887c] flex-shrink-0" />
               <span className="text-sm font-medium text-foreground">Agregar cargo extra</span>
             </button>
- 
+
+            <button
+              onClick={() => handle(onEnviarEnlace)}
+              disabled={suspendido}
+              className={cargoBtnClass}
+            >
+              <WhatsappLinkIcon className="text-[#22887c]" />
+              <span className="text-sm font-medium text-foreground">Enviar enlace a historial</span>
+            </button>
+
             <button
               onClick={() => handle(onRegistrarPromesa)}
               className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-accent transition-colors text-left"

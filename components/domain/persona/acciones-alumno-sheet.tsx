@@ -11,7 +11,7 @@ import {
 } from '@/app/(app)/seguimiento/actions'
 import { useFormStatus } from 'react-dom'
 import { Button } from '@/components/ui/button'
-import { Pencil, Pause, Play, Trash2, AlertTriangle, Loader2 } from 'lucide-react'
+import { Pencil, Pause, Play, Trash2, AlertTriangle, Loader2, Link2, ChevronRight } from 'lucide-react'
 import {
   Drawer,
   DrawerClose,
@@ -21,6 +21,7 @@ import {
   DrawerTitle,
   DrawerDescription,
 } from '@/components/ui/drawer'
+import { EnlaceHistorialPanel } from './enlace-historial-panel'
 
 const initialState: FormState = {}
 
@@ -37,13 +38,20 @@ type Props = {
   tieneHistorial: boolean
   /** Abre el drawer de edición desde el padre. */
   onEditar: () => void
+  /** Token y estado del enlace (la gestión vive como subvista del propio sheet). */
+  shareToken: string
+  linkBloqueado: boolean
+  /** Toast sutil del padre. */
+  onToast: (msg: string) => void
   onSuccess?: () => void
 }
 
-export function AccionesAlumnoSheet({ open, onOpenChange, persona, tieneHistorial, onEditar, onSuccess }: Props) {
+export function AccionesAlumnoSheet({ open, onOpenChange, persona, tieneHistorial, onEditar, shareToken, linkBloqueado, onToast, onSuccess }: Props) {
   const [confirmOpen, setConfirmOpen] = useState<null | 'suspender' | 'reactivar' | 'eliminar' | 'baja'>(null)
+  const [step, setStep] = useState<'menu' | 'enlace'>('menu')
 
   const suspendido = persona.estado_registro !== 'activo'
+  const nombreCompleto = `${persona.nombre} ${persona.apellido ?? ''}`.trim()
 
   const handleClick = (accion: 'editar' | 'suspender' | 'reactivar' | 'eliminar' | 'baja') => {
     if (accion === 'editar') {
@@ -57,59 +65,97 @@ export function AccionesAlumnoSheet({ open, onOpenChange, persona, tieneHistoria
 
   return (
     <>
-      <Drawer open={open} onOpenChange={onOpenChange}>
+      <Drawer
+        open={open}
+        onOpenChange={(o) => {
+          if (!o) setStep('menu')
+          onOpenChange(o)
+        }}
+      >
         <DrawerContent>
-          <div className="mx-auto w-full max-w-sm">
-            <DrawerHeader className="text-left pb-2">
-              <DrawerTitle className="text-base">Acciones del alumno</DrawerTitle>
-              <DrawerDescription className="text-xs">
-                {persona.nombre} {persona.apellido ?? ''}
-              </DrawerDescription>
-            </DrawerHeader>
+          <div className="mx-auto w-full max-w-sm overflow-hidden">
+            {step === 'menu' ? (
+              <div className="animate-in fade-in duration-200">
+                <DrawerHeader className="text-left pb-2">
+                  <DrawerTitle className="text-base">Acciones del alumno</DrawerTitle>
+                  <DrawerDescription className="text-xs">
+                    {persona.nombre} {persona.apellido ?? ''}
+                  </DrawerDescription>
+                </DrawerHeader>
 
-            <div className="px-4 pb-2 space-y-1.5">
-              <button
-                onClick={() => handleClick('editar')}
-                className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-accent transition-colors text-left"
-              >
-                <Pencil className="h-5 w-5 text-foreground/80 flex-shrink-0" />
-                <span className="text-sm font-medium text-foreground">Editar alumno</span>
-              </button>
+                <div className="px-4 pb-2 space-y-1.5">
+                  <button
+                    onClick={() => handleClick('editar')}
+                    className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-accent transition-colors text-left"
+                  >
+                    <Pencil className="h-5 w-5 text-foreground/80 flex-shrink-0" />
+                    <span className="text-sm font-medium text-foreground">Editar alumno</span>
+                  </button>
 
-              {suspendido ? (
-                <button
-                  onClick={() => handleClick('reactivar')}
-                  className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-accent transition-colors text-left"
-                >
-                  <Play className="h-5 w-5 text-[#22887c] flex-shrink-0" />
-                  <span className="text-sm font-medium text-foreground">Activar alumno</span>
-                </button>
-              ) : (
-                <button
-                  onClick={() => handleClick('suspender')}
-                  className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-accent transition-colors text-left"
-                >
-                  <Pause className="h-5 w-5 text-amber-600 flex-shrink-0" />
-                  <span className="text-sm font-medium text-foreground">Suspender alumno</span>
-                </button>
-              )}
+                  <button
+                    onClick={() => setStep('enlace')}
+                    className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-accent transition-colors text-left"
+                  >
+                    <Link2 className="h-5 w-5 text-[#22887c] flex-shrink-0" />
+                    <span className="text-sm font-medium text-foreground">Enlace a historial</span>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto flex-shrink-0" />
+                  </button>
 
-              {!tieneHistorial && (
-                <button
-                  onClick={() => handleClick('eliminar')}
-                  className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-destructive/10 transition-colors text-left"
-                >
-                  <Trash2 className="h-5 w-5 text-destructive flex-shrink-0" />
-                  <span className="text-sm font-medium text-destructive">Eliminar alumno</span>
-                </button>
-              )}
-            </div>
+                  {suspendido ? (
+                    <button
+                      onClick={() => handleClick('reactivar')}
+                      className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-accent transition-colors text-left"
+                    >
+                      <Play className="h-5 w-5 text-[#22887c] flex-shrink-0" />
+                      <span className="text-sm font-medium text-foreground">Activar alumno</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleClick('suspender')}
+                      className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-accent transition-colors text-left"
+                    >
+                      <Pause className="h-5 w-5 text-amber-600 flex-shrink-0" />
+                      <span className="text-sm font-medium text-foreground">Suspender alumno</span>
+                    </button>
+                  )}
 
-            <DrawerFooter className="pt-2">
-              <DrawerClose asChild>
-                <Button variant="ghost" className="h-11">Cerrar</Button>
-              </DrawerClose>
-            </DrawerFooter>
+                  {!tieneHistorial && (
+                    <button
+                      onClick={() => handleClick('eliminar')}
+                      className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-destructive/10 transition-colors text-left"
+                    >
+                      <Trash2 className="h-5 w-5 text-destructive flex-shrink-0" />
+                      <span className="text-sm font-medium text-destructive">Eliminar alumno</span>
+                    </button>
+                  )}
+                </div>
+
+                <DrawerFooter className="pt-2">
+                  <DrawerClose asChild>
+                    <Button variant="ghost" className="h-11">Cerrar</Button>
+                  </DrawerClose>
+                </DrawerFooter>
+              </div>
+            ) : (
+              <div className="animate-in slide-in-from-left fade-in duration-300">
+                <DrawerTitle className="sr-only">Enlace a historial</DrawerTitle>
+                <EnlaceHistorialPanel
+                  personaId={persona.id}
+                  alumnoNombre={nombreCompleto}
+                  shareToken={shareToken}
+                  bloqueado={linkBloqueado}
+                  suspendido={suspendido}
+                  onToast={onToast}
+                  onBack={() => setStep('menu')}
+                  onClose={() => onOpenChange(false)}
+                />
+                <DrawerFooter className="pt-2">
+                  <DrawerClose asChild>
+                    <Button variant="ghost" className="h-11">Cerrar</Button>
+                  </DrawerClose>
+                </DrawerFooter>
+              </div>
+            )}
           </div>
         </DrawerContent>
       </Drawer>

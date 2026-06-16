@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2 } from 'lucide-react'
+import { normalizeWholeMoneyInput, preventMoneyWheel } from '@/lib/utils/money-input'
 import {
   Drawer,
   DrawerClose,
@@ -110,10 +111,16 @@ export function CrearCargoIndividualDrawer({
                     id="monto"
                     name="monto"
                     type="number"
-                    step="0.01"
-                    min="0.01"
-                    defaultValue={montoDefault != null ? montoDefault.toFixed(2) : ''}
+                    step="1"
+                    min="1"
+                    defaultValue={montoDefault != null ? String(Math.round(montoDefault)) : ''}
                     required
+                    onChange={(e) => {
+                      e.currentTarget.value = normalizeWholeMoneyInput(e.currentTarget.value)
+                    }}
+                    onWheel={preventMoneyWheel}
+                    inputMode="numeric"
+                    placeholder="0"
                     className="h-11 pl-7"
                   />
                 </div>

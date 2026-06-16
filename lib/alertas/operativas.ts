@@ -20,6 +20,12 @@ export type AlertasOperativas = {
   actividadesVencidas: number
   /** IDs de actividades vencidas (para navegación especial cuando hay solo 1). */
   actividadesVencidasIds?: string[]
+  /** [info] Actividades activas cuya fecha de fin es hoy. */
+  actividadesFinalizanHoy: number
+  actividadesFinalizanHoyIds?: string[]
+  /** [info] Actividades activas cuya fecha de fin es mañana. */
+  actividadesPorFinalizar: number
+  actividadesPorFinalizarIds?: string[]
   /** [info] Alumnos sin adeudo que no tienen teléfono/WhatsApp registrado. */
   sinAdeudoSinTelefono: number
   /** [info] Alumnos suspendidos con saldo en $0. */
@@ -35,6 +41,10 @@ const VACIO: AlertasOperativas = {
   planInactivo: 0,
   actividadesVencidas: 0,
   actividadesVencidasIds: [],
+  actividadesFinalizanHoy: 0,
+  actividadesFinalizanHoyIds: [],
+  actividadesPorFinalizar: 0,
+  actividadesPorFinalizarIds: [],
   sinAdeudoSinTelefono: 0,
   suspendidosSaldoCero: 0,
   total: 0,
@@ -45,6 +55,9 @@ export async function computeAlertasOperativas(supabase: any, academiaId?: strin
   if (!academiaId) return VACIO
 
   const hoy = new Date().toISOString().slice(0, 10)
+  const mananaDate = new Date()
+  mananaDate.setDate(mananaDate.getDate() + 1)
+  const manana = mananaDate.toISOString().slice(0, 10)
 
   const [
     personasRes,
@@ -53,6 +66,7 @@ export async function computeAlertasOperativas(supabase: any, academiaId?: strin
     planesRes,
     cargosRes,
     actividadesRes,
+    actividadesPorFinalizarRes,
   ] = await Promise.all([
     supabase
       .from('persona')
@@ -83,6 +97,13 @@ export async function computeAlertasOperativas(supabase: any, academiaId?: strin
       .eq('es_temporal', true)
       .eq('estado', 'activo')
       .lt('fecha_fin', hoy),
+    supabase
+      .from('grupo')
+      .select('id, fecha_fin')
+      .eq('academia_id', academiaId)
+      .eq('es_temporal', true)
+      .eq('estado', 'activo')
+      .in('fecha_fin', [hoy, manana]),
   ])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -138,6 +159,14 @@ export async function computeAlertasOperativas(supabase: any, academiaId?: strin
   const planInactivo = activos.filter((p) => tienePlanInactivo(p.id)).length
   const actividadesVencidasIds = (actividadesRes.data ?? []).map((t: { id: string }) => t.id)
   const actividadesVencidas = actividadesVencidasIds.length
+  const actividadesFinalizanHoyIds = ((actividadesPorFinalizarRes.data ?? []) as { id: string; fecha_fin: string }[])
+    .filter((t) => t.fecha_fin === hoy)
+    .map((t) => t.id)
+  const actividadesPorFinalizarIds = ((actividadesPorFinalizarRes.data ?? []) as { id: string; fecha_fin: string }[])
+    .filter((t) => t.fecha_fin === manana)
+    .map((t) => t.id)
+  const actividadesFinalizanHoy = actividadesFinalizanHoyIds.length
+  const actividadesPorFinalizar = actividadesPorFinalizarIds.length
   const sinAdeudoSinTelefono = personas.filter((p) => !conAdeudo.has(p.id) && !tieneTelefono(p.id)).length
   const suspendidosSaldoCero = inactivos.filter((p) => !conAdeudo.has(p.id)).length
 
@@ -148,6 +177,8 @@ export async function computeAlertasOperativas(supabase: any, academiaId?: strin
     adeudoSinTelefono,
     planInactivo,
     actividadesVencidas,
+    actividadesFinalizanHoy,
+    actividadesPorFinalizar,
     sinAdeudoSinTelefono,
     suspendidosSaldoCero,
   ].filter((c) => c > 0).length
@@ -159,6 +190,10 @@ export async function computeAlertasOperativas(supabase: any, academiaId?: strin
     planInactivo,
     actividadesVencidas,
     actividadesVencidasIds,
+    actividadesFinalizanHoy,
+    actividadesFinalizanHoyIds,
+    actividadesPorFinalizar,
+    actividadesPorFinalizarIds,
     sinAdeudoSinTelefono,
     suspendidosSaldoCero,
     total,

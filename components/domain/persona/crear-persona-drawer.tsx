@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/drawer'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import { formatCurrencyCompact } from '@/lib/utils/currency'
 
 const initialState: FormState = {}
 
@@ -44,7 +45,7 @@ const FRECUENCIA_LABEL: Record<PlanCobro['frecuencia'], string> = {
   mensual: '/mes',
   semanal: '/semana',
   por_visita: '/visita',
-  pago_unico: 'único',
+  pago_unico: '/visita',
 }
 
 type Props = {
@@ -118,6 +119,11 @@ export function CrearPersonaDrawer({
   const [apellido, setApellido] = useState('')
   const [telefono, setTelefono] = useState('')
 
+  const handleTelefonoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/[^0-9]/g, '')
+    setTelefono(value.slice(0, 10))
+  }
+
   // Modo SIMPLE
   const [grupoId, setGrupoId] = useState<string>(defaultGrupoId ?? '')
   const [monto, setMonto] = useState<string>('0')
@@ -129,7 +135,7 @@ export function CrearPersonaDrawer({
 
   // Inscripción (rastro de auditoría)
   const [cobrarInscripcion, setCobrarInscripcion] = useState(cobrarInscripcionDefault)
-  const [montoInscripcion, setMontoInscripcion] = useState(montoInscripcionDefault.toFixed(2))
+  const [montoInscripcion, setMontoInscripcion] = useState(String(Math.round(montoInscripcionDefault)))
   const [motivoInscripcion, setMotivoInscripcion] = useState('')
   // Captura del cargo de inscripción a generar tras crear al alumno (evita closure stale).
   const pendingInscripcionRef = React.useRef<{ monto: number; motivo: string | null } | null>(null)
@@ -192,7 +198,7 @@ export function CrearPersonaDrawer({
 
   // Sincroniza el monto sugerido (modo simple) cuando cambia el plan efectivo.
   useEffect(() => {
-    setMonto(preview.monto.toFixed(2))
+    setMonto(String(Math.round(preview.monto)))
     setCondonar(false)
   }, [preview.monto, open])
 
@@ -200,7 +206,7 @@ export function CrearPersonaDrawer({
   useEffect(() => {
     if (open) {
       setCobrarInscripcion(cobrarInscripcionDefault)
-      setMontoInscripcion(montoInscripcionDefault.toFixed(2))
+      setMontoInscripcion(String(Math.round(montoInscripcionDefault)))
       setMotivoInscripcion('')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -278,6 +284,7 @@ export function CrearPersonaDrawer({
     e.preventDefault()
     setLocalError(null)
     if (nombre.trim().length < 2) { setLocalError('El nombre es requerido.'); return }
+    if (telefono && telefono.length !== 10) { setLocalError('El teléfono debe tener exactamente 10 dígitos.'); return }
 
     let gruposSel: string[]
     let planesSel: string[]
@@ -352,7 +359,7 @@ export function CrearPersonaDrawer({
 
               <div className="space-y-2">
                 <Label htmlFor="telefono_whatsapp" className="text-xs font-semibold text-muted-foreground tracking-wider">Teléfono (WhatsApp)</Label>
-                <Input id="telefono_whatsapp" value={telefono} onChange={(e) => setTelefono(e.target.value)} type="tel" className="h-11" placeholder="10 dígitos" />
+                <Input id="telefono_whatsapp" value={telefono} onChange={handleTelefonoChange} type="tel" inputMode="numeric" maxLength={10} className="h-11" placeholder="10 dígitos" />
               </div>
 
               {/* ---------------- MODO SIMPLE ---------------- */}
@@ -375,7 +382,7 @@ export function CrearPersonaDrawer({
                         <Info className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
                         <div>
                           <span className="font-bold">Capacidad máxima alcanzada: </span>
-                          El grupo "{grupoSimpleSel?.nombre}" está lleno ({selectedGrupoActiveAlumnos} de {selectedGrupoCupoMaximo} alumnos).
+                          El grupo «{grupoSimpleSel?.nombre}» está lleno ({selectedGrupoActiveAlumnos} de {selectedGrupoCupoMaximo} alumnos).
                         </div>
                       </div>
                     )}
@@ -399,9 +406,10 @@ export function CrearPersonaDrawer({
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
                         <Input
-                          id="monto" type="number" step="0.01" min="0"
+                          id="monto" type="number" step="1" min="0"
                           value={condonar ? '0' : monto}
                           onChange={(e) => setMonto(e.target.value)}
+                          inputMode="numeric"
                           disabled={condonar}
                           className="h-10 pl-7"
                         />
@@ -414,7 +422,7 @@ export function CrearPersonaDrawer({
                     </div>
                     <div className="flex justify-between items-center pt-2 border-t border-border">
                       <span className="text-sm font-semibold text-foreground">Total a generar</span>
-                      <span className={`text-lg font-bold ${montoFinal > 0 ? 'text-primary' : 'text-[#22887c]'}`}>${montoFinal.toFixed(2)}</span>
+                      <span className={`text-lg font-bold ${montoFinal > 0 ? 'text-primary' : 'text-[#22887c]'}`}>${Math.round(montoFinal)}</span>
                     </div>
                   </div>
                 </>
@@ -453,7 +461,7 @@ export function CrearPersonaDrawer({
                       {planes.map((p) => (
                         <CheckRow
                           key={p.id}
-                          label={`${p.nombre} — $${Number(p.monto).toFixed(2)} ${FRECUENCIA_LABEL[p.frecuencia]}`}
+                          label={`${p.nombre} — ${formatCurrencyCompact(p.monto)} ${FRECUENCIA_LABEL[p.frecuencia]}`}
                           checked={planIds.has(p.id)}
                           onClick={() => toggle(planIds, setPlanIds, p.id)}
                         />
@@ -489,16 +497,16 @@ export function CrearPersonaDrawer({
                           <Input
                             id="monto_inscripcion"
                             type="number"
-                            step="0.01"
+                            step="1"
                             min="0"
-                            inputMode="decimal"
+                            inputMode="numeric"
                             value={montoInscripcion}
                             onChange={(e) => setMontoInscripcion(e.target.value)}
                             className="h-10 pl-7 bg-white"
                           />
                         </div>
                         <p className="text-[11px] text-muted-foreground">
-                          Estándar de la academia: ${montoInscripcionDefault.toFixed(2)}.
+                          Estándar de la academia: ${Math.round(montoInscripcionDefault)}.
                         </p>
                       </div>
 
@@ -566,3 +574,5 @@ function CheckRow({ label, checked, onClick }: { label: string; checked: boolean
     </button>
   )
 }
+
+

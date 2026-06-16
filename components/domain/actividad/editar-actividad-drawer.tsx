@@ -11,6 +11,7 @@ import { Loader2, Pencil, CheckCircle2 } from 'lucide-react'
 import { EMOJI_ACTIVIDAD_DEFAULT } from '@/lib/constants/actividad-apariencia'
 import { AparienciaActividadFields } from './apariencia-actividad-fields'
 import { LogisticaGrupoFields } from '@/components/domain/grupo/logistica-grupo-fields'
+import { normalizeWholeMoneyInput, preventMoneyWheel } from '@/lib/utils/money-input'
 import {
   Drawer,
   DrawerClose,
@@ -48,9 +49,10 @@ type Props = {
   }
   open: boolean
   onOpenChange: (open: boolean) => void
+  timezone?: string
 }
 
-export function EditarActividadDrawer({ actividad, open, onOpenChange }: Props) {
+export function EditarActividadDrawer({ actividad, open, onOpenChange, timezone = 'America/Mexico_City' }: Props) {
   const [state, formAction] = useActionState(editarActividadAction, initialState)
   const [nombre, setNombre] = useState<string>(actividad.nombre)
   const [emoji, setEmoji] = useState<string>(actividad.emoji ?? EMOJI_ACTIVIDAD_DEFAULT)
@@ -68,6 +70,9 @@ export function EditarActividadDrawer({ actividad, open, onOpenChange }: Props) 
   const [fechaInicio, setFechaInicio] = useState(actividad.fecha_inicio ?? '')
   const [fechaFin, setFechaFin] = useState(actividad.fecha_fin ?? '')
   const [costo, setCosto] = useState<string>(actividad.costo_actividad != null ? String(actividad.costo_actividad) : '')
+
+  const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: timezone })
+  const yaInicio = !!actividad.fecha_inicio && actividad.fecha_inicio <= todayStr
 
   // Resync cuando se abre el drawer (por si cambió la actividad entre aperturas).
   useEffect(() => {
@@ -110,6 +115,7 @@ export function EditarActividadDrawer({ actividad, open, onOpenChange }: Props) 
             <input type="hidden" name="actividad_id" value={actividad.id} />
             <input type="hidden" name="emoji" value={emoji} />
             <input type="hidden" name="un_solo_dia" value={unSoloDia ? 'true' : 'false'} />
+            {yaInicio && <input type="hidden" name="fecha_inicio" value={fechaInicio} />}
 
             <div className="p-4 pb-0 space-y-5">
               {/* 1. Nombre */}
@@ -162,6 +168,7 @@ export function EditarActividadDrawer({ actividad, open, onOpenChange }: Props) 
                       name="fecha_inicio"
                       type="date"
                       required
+                      disabled={yaInicio}
                       value={fechaInicio}
                       onChange={(e) => {
                         setFechaInicio(e.target.value)
@@ -169,8 +176,14 @@ export function EditarActividadDrawer({ actividad, open, onOpenChange }: Props) 
                           setFechaFin(e.target.value)
                         }
                       }}
+                      min={yaInicio ? undefined : todayStr}
                       className="h-11 text-sm"
                     />
+                    {yaInicio && (
+                      <p className="text-[11px] text-muted-foreground">
+                        La actividad ya inició: no se puede cambiar la fecha de inicio.
+                      </p>
+                    )}
                   </div>
                   {!unSoloDia && (
                     <div className="space-y-1.5">
@@ -204,13 +217,15 @@ export function EditarActividadDrawer({ actividad, open, onOpenChange }: Props) 
                     id="costo_actividad"
                     name="costo_actividad"
                     type="number"
-                    step="0.01"
+                    step="1"
                     min="0"
                     required
+                    onWheel={preventMoneyWheel}
+                    onChange={(e) => setCosto(normalizeWholeMoneyInput(e.target.value))}
+                    inputMode="numeric"
                     value={costo}
-                    onChange={(e) => setCosto(e.target.value)}
                     className="h-11 pl-7"
-                    placeholder="0.00"
+                    placeholder="0"
                   />
                 </div>
                 <p className="text-[11px] text-muted-foreground">

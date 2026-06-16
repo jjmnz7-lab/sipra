@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { Button } from '@/components/ui/button'
-import { Pencil, Archive, Share2 } from 'lucide-react'
+import { Pencil, Archive } from 'lucide-react'
 import {
   Drawer,
   DrawerClose,
@@ -19,10 +19,9 @@ type Props = {
   grupoNombre: string
   onEditar: () => void
   onArchivar: () => void
-  onCompartirResumen?: () => void
 }
 
-export function AccionesGrupoSheet({ open, onOpenChange, grupoNombre, onEditar, onArchivar, onCompartirResumen }: Props) {
+export function AccionesGrupoSheet({ open, onOpenChange, grupoNombre, onEditar, onArchivar }: Props) {
   const cierreLabel = 'Archivar grupo'
   const editarLabel = 'Editar grupo'
   const CierreIcon = Archive
@@ -49,16 +48,6 @@ export function AccionesGrupoSheet({ open, onOpenChange, grupoNombre, onEditar, 
               <Pencil className="h-5 w-5 text-foreground/80 flex-shrink-0" />
               <span className="text-sm font-medium text-foreground">{editarLabel}</span>
             </button>
-
-            {onCompartirResumen && (
-              <button
-                onClick={() => handle(onCompartirResumen)}
-                className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-accent transition-colors text-left"
-              >
-                <Share2 className="h-5 w-5 text-[#22887c] flex-shrink-0" />
-                <span className="text-sm font-medium text-foreground">Compartir resumen</span>
-              </button>
-            )}
 
             <button
               onClick={() => handle(onArchivar)}

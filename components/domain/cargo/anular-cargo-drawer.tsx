@@ -101,7 +101,7 @@ export function AnularCargoDrawer({ open, onOpenChange, cargos }: Props) {
                     <SelectContent>
                       {cargosAnulables.map(c => (
                         <SelectItem key={c.id} value={c.id}>
-                          {c.concepto} · {formatCurrency(Number(c.saldo_pendiente))}
+                          {c.concepto} • {formatCurrency(Number(c.saldo_pendiente))}
                         </SelectItem>
                       ))}
                     </SelectContent>

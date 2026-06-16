@@ -11,8 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Plus, Trash2, Lightbulb } from 'lucide-react'
-import { DiaPickerPopover } from '@/components/domain/configuracion/dia-picker-popover'
+import { Plus, Trash2, Lightbulb, Pencil } from 'lucide-react'
 import { RadioOption } from '@/components/domain/configuracion/radio-option'
 import { SectionFooter } from '@/components/domain/configuracion/section-footer'
 import { useDirtySection } from '@/components/domain/configuracion/use-dirty-section'
@@ -20,13 +19,22 @@ import {
   guardarCobranzaAction,
   type FormState,
 } from '@/app/(app)/configuracion/actions'
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from '@/components/ui/drawer'
 
 /* -------------------------------------------------------------------------- */
 /* Tipos                                                                      */
 /* -------------------------------------------------------------------------- */
 
 type Regimen = 'completo' | 'proporcional' | 'no_cobrar' | 'reglas_dias'
-type Redondeo = 'ninguno' | '1' | '5' | '10' | '50' | '100'
+type Redondeo = '1' | '5' | '10' | '50' | '100'
 type AccionRegla = 'completo' | 'proporcional' | 'no_cobrar'
 type DiaFin = number | 'fin_mes'
 type Regla = { dia_inicio: number; dia_fin: DiaFin; accion: AccionRegla }
@@ -43,7 +51,6 @@ const DEFAULT_REGLAS: Regla[] = [
 ]
 
 const REDONDEO_OPCIONES: { value: Redondeo; label: string }[] = [
-  { value: 'ninguno', label: 'Sin redondeo' },
   { value: '1', label: 'Al peso más cercano ($1)' },
   { value: '5', label: 'Múltiplo de $5 más cercano' },
   { value: '10', label: 'Múltiplo de $10 más cercano' },
@@ -84,9 +91,11 @@ function inferirRegimen(initial: any): Regimen {
 }
 
 function deriveInitialState(initialConfig: any): CobranzaState {
+  const rawRedondeo = initialConfig?.proporcional_redondeo
+  const redondeoVal = (rawRedondeo && rawRedondeo !== 'ninguno') ? rawRedondeo as Redondeo : '1'
   return {
     regimen: inferirRegimen(initialConfig),
-    redondeo: (initialConfig?.proporcional_redondeo as Redondeo) || 'ninguno',
+    redondeo: redondeoVal,
     reglas: normalizarReglas(initialConfig?.reglas_dias),
   }
 }
@@ -102,6 +111,11 @@ export function CobranzaFormSection({ initialConfig }: { initialConfig: any }) {
   const [regimen, setRegimen] = useState<Regimen>(initial.regimen)
   const [redondeo, setRedondeo] = useState<Redondeo>(initial.redondeo)
   const [reglas, setReglas] = useState<Regla[]>(initial.reglas)
+
+  // Estados para la edición de regla en bottom sheet (Drawer)
+  const [editingRuleIdx, setEditingRuleIdx] = useState<number | null>(null)
+  const [tempDiaFin, setTempDiaFin] = useState<number | 'fin_mes'>('fin_mes')
+  const [tempAccion, setTempAccion] = useState<AccionRegla>('completo')
 
   const current: CobranzaState = { regimen, redondeo, reglas }
   const { dirty, snapshot, commitSnapshot } = useDirtySection(current, initial)
@@ -126,29 +140,29 @@ export function CobranzaFormSection({ initialConfig }: { initialConfig: any }) {
   const todasCompleto =
     regimen === 'reglas_dias' && reglas.every((r) => r.accion === 'completo')
 
-  const actualizarFinDeRegla = (idx: number, nuevoFin: number) => {
+  const guardarReglaEditada = (idx: number, nuevoFin: number | 'fin_mes', nuevaAccion: AccionRegla) => {
     const copia = [...reglas]
-    copia[idx] = { ...copia[idx], dia_fin: nuevoFin }
-    for (let i = idx + 1; i < copia.length; i++) {
-      const prev = copia[i - 1]
-      const prevFin = prev.dia_fin === 'fin_mes' ? 28 : prev.dia_fin
-      copia[i] = { ...copia[i], dia_inicio: prevFin + 1 }
-    }
-    for (let i = 0; i < copia.length - 1; i++) {
-      if (copia[i].dia_fin !== 'fin_mes' && (copia[i].dia_fin as number) < copia[i].dia_inicio) {
-        copia[i].dia_fin = copia[i].dia_inicio
-        if (i + 1 < copia.length) {
-          copia[i + 1].dia_inicio = (copia[i].dia_fin as number) + 1
+    copia[idx] = { ...copia[idx], accion: nuevaAccion }
+
+    if (idx < copia.length - 1 && nuevoFin !== 'fin_mes') {
+      copia[idx].dia_fin = nuevoFin
+      for (let i = idx + 1; i < copia.length; i++) {
+        const prev = copia[i - 1]
+        const prevFin = prev.dia_fin === 'fin_mes' ? 28 : prev.dia_fin
+        copia[i] = { ...copia[i], dia_inicio: prevFin + 1 }
+      }
+      for (let i = 0; i < copia.length - 1; i++) {
+        if (copia[i].dia_fin !== 'fin_mes' && (copia[i].dia_fin as number) < copia[i].dia_inicio) {
+          copia[i].dia_fin = copia[i].dia_inicio
+          if (i + 1 < copia.length) {
+            copia[i + 1].dia_inicio = (copia[i].dia_fin as number) + 1
+          }
         }
       }
     }
-    setReglas(copia)
-  }
 
-  const actualizarAccion = (idx: number, accion: AccionRegla) => {
-    const copia = [...reglas]
-    copia[idx] = { ...copia[idx], accion }
     setReglas(copia)
+    setEditingRuleIdx(null)
   }
 
   const agregarRegla = () => {
@@ -242,8 +256,11 @@ export function CobranzaFormSection({ initialConfig }: { initialConfig: any }) {
           {regimen === 'reglas_dias' && (
             <ReglasDiasEditor
               reglas={reglas}
-              onCambiarFin={actualizarFinDeRegla}
-              onCambiarAccion={actualizarAccion}
+              onEditar={(idx) => {
+                setEditingRuleIdx(idx)
+                setTempDiaFin(reglas[idx].dia_fin)
+                setTempAccion(reglas[idx].accion)
+              }}
               onAgregar={agregarRegla}
               onEliminar={eliminarRegla}
             />
@@ -274,6 +291,116 @@ export function CobranzaFormSection({ initialConfig }: { initialConfig: any }) {
           />
         </form>
       </CardContent>
+
+      {/* Drawer (Bottom Sheet) para editar una regla */}
+      <Drawer
+        open={editingRuleIdx !== null}
+        onOpenChange={(v) => {
+          if (!v) setEditingRuleIdx(null)
+        }}
+      >
+        <DrawerContent>
+          <div className="mx-auto w-full max-w-sm">
+            <DrawerHeader className="text-left">
+              <DrawerTitle>Editar regla</DrawerTitle>
+              <DrawerDescription>
+                Ajusta el rango de días y la acción para esta regla.
+              </DrawerDescription>
+            </DrawerHeader>
+
+            {editingRuleIdx !== null && (
+              <div className="p-4 pb-0 space-y-4">
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground tracking-wider uppercase">
+                    Rango de días
+                  </p>
+
+                  {editingRuleIdx === reglas.length - 1 ? (
+                    <div className="text-sm font-medium text-foreground py-2 px-3 bg-muted rounded-md inline-block">
+                      Día {reglas[editingRuleIdx].dia_inicio} al Fin de mes
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        Selecciona el día de fin de la regla (Día {reglas[editingRuleIdx].dia_inicio} al...):
+                      </p>
+                      <div className="grid grid-cols-5 gap-1.5 justify-items-center max-w-xs mx-auto">
+                        {Array.from({ length: 26 - 2 + 1 }, (_, i) => i + 2).map((d) => {
+                          const minVal = reglas[editingRuleIdx].dia_inicio + 1
+                          const disabled = d < minVal
+                          const selected = d === tempDiaFin
+                          return (
+                            <button
+                              key={d}
+                              type="button"
+                              disabled={disabled}
+                              onClick={() => setTempDiaFin(d)}
+                              className={`w-10 h-10 rounded-md text-sm font-medium transition-colors ${
+                                selected
+                                  ? 'bg-primary text-primary-foreground font-semibold'
+                                  : disabled
+                                  ? 'text-muted-foreground/30 cursor-not-allowed bg-muted/10'
+                                  : 'text-foreground hover:bg-muted border border-input'
+                              }`}
+                            >
+                              {d}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground tracking-wider uppercase">
+                    Acción
+                  </p>
+                  <div className="space-y-1.5">
+                    <RadioOption
+                      checked={tempAccion === 'completo'}
+                      label={ACCION_LABELS.completo}
+                      onClick={() => setTempAccion('completo')}
+                      compact
+                    />
+                    <RadioOption
+                      checked={tempAccion === 'proporcional'}
+                      label={ACCION_LABELS.proporcional}
+                      onClick={() => setTempAccion('proporcional')}
+                      compact
+                    />
+                    <RadioOption
+                      checked={tempAccion === 'no_cobrar'}
+                      label={ACCION_LABELS.no_cobrar}
+                      onClick={() => setTempAccion('no_cobrar')}
+                      compact
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <DrawerFooter className="flex flex-row gap-2 mt-4 pt-2">
+              <Button
+                type="button"
+                onClick={() => {
+                  if (editingRuleIdx !== null) {
+                    guardarReglaEditada(editingRuleIdx, tempDiaFin, tempAccion)
+                  }
+                }}
+                className="flex-1 h-11"
+              >
+                Listo
+              </Button>
+              <DrawerClose asChild>
+                <Button type="button" variant="ghost" className="flex-1 h-11">
+                  Cancelar
+                </Button>
+              </DrawerClose>
+            </DrawerFooter>
+          </div>
+        </DrawerContent>
+      </Drawer>
     </Card>
   )
 }
@@ -284,14 +411,12 @@ export function CobranzaFormSection({ initialConfig }: { initialConfig: any }) {
 
 function ReglasDiasEditor({
   reglas,
-  onCambiarFin,
-  onCambiarAccion,
+  onEditar,
   onAgregar,
   onEliminar,
 }: {
   reglas: Regla[]
-  onCambiarFin: (idx: number, nuevoFin: number) => void
-  onCambiarAccion: (idx: number, accion: AccionRegla) => void
+  onEditar: (idx: number) => void
   onAgregar: () => void
   onEliminar: (idx: number) => void
 }) {
@@ -305,40 +430,28 @@ function ReglasDiasEditor({
         return (
           <div
             key={idx}
-            className="flex flex-wrap items-center gap-2 p-2.5 rounded-lg border border-border bg-card text-sm"
+            className="flex items-center justify-between gap-3 p-3 rounded-lg border border-border bg-card text-sm"
           >
-            <span className="text-muted-foreground">Día</span>
-            <ChipFijo>{regla.dia_inicio}</ChipFijo>
-            <span className="text-muted-foreground">al</span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-foreground">
+                Día {regla.dia_inicio} al {regla.dia_fin === 'fin_mes' ? 'Fin de mes' : regla.dia_fin}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {ACCION_LABELS[regla.accion]}
+              </p>
+            </div>
 
-            {esUltima ? (
-              <ChipFijo>Fin de mes</ChipFijo>
-            ) : (
-              <DiaPickerPopover
-                value={regla.dia_fin as number}
-                rangoDias={[2, 26]}
-                cols={5}
-                min={regla.dia_inicio + 1}
-                max={26}
-                onChange={(v) => onCambiarFin(idx, v)}
-              />
-            )}
-
-            <span className="ml-auto flex items-center gap-1">
-              <Select
-                value={regla.accion}
-                onValueChange={(v) => onCambiarAccion(idx, v as AccionRegla)}
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => onEditar(idx)}
+                className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent"
+                aria-label={`Editar regla ${idx + 1}`}
               >
-                <SelectTrigger className="h-8 w-[200px] text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="completo">{ACCION_LABELS.completo}</SelectItem>
-                  <SelectItem value="proporcional">{ACCION_LABELS.proporcional}</SelectItem>
-                  <SelectItem value="no_cobrar">{ACCION_LABELS.no_cobrar}</SelectItem>
-                </SelectContent>
-              </Select>
-
+                <Pencil className="h-4 w-4" />
+              </Button>
               {esIntermedia && (
                 <Button
                   type="button"
@@ -346,12 +459,12 @@ function ReglasDiasEditor({
                   size="icon"
                   onClick={() => onEliminar(idx)}
                   className="h-8 w-8 text-destructive hover:text-destructive/80 hover:bg-destructive/10"
-                  aria-label="Eliminar regla"
+                  aria-label={`Eliminar regla ${idx + 1}`}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
               )}
-            </span>
+            </div>
           </div>
         )
       })}
@@ -368,14 +481,6 @@ function ReglasDiasEditor({
         </Button>
       )}
     </div>
-  )
-}
-
-function ChipFijo({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center justify-center h-8 min-w-[2.5rem] px-2 rounded-md bg-muted text-foreground text-sm font-medium">
-      {children}
-    </span>
   )
 }
 

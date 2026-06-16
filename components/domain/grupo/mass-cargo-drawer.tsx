@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { useActionState, useEffect, useState, useRef } from 'react'
+import { useActionState, useEffect, useState } from 'react'
 import { crearCargoGrupalAction, type FormState } from '@/app/(app)/grupos/actions'
 import { useFormStatus } from 'react-dom'
 import { Button } from '@/components/ui/button'
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Loader2, Banknote } from 'lucide-react'
+import { normalizeWholeMoneyInput, preventMoneyWheel } from '@/lib/utils/money-input'
 import {
   Drawer,
   DrawerClose,
@@ -121,10 +122,14 @@ export function MassCargoDrawer({ grupoId, inscripciones, open: controlledOpen, 
                   id="monto"
                   name="monto"
                   type="number"
-                  step="0.01"
+                  step="1"
                   min="1"
-                  placeholder="0.00"
+                  placeholder="0"
                   required
+                  onWheel={preventMoneyWheel}
+                  onChange={(e) => {
+                    e.currentTarget.value = normalizeWholeMoneyInput(e.currentTarget.value)
+                  }}
                   className="h-11"
                 />
                 {state?.errors?.monto && (

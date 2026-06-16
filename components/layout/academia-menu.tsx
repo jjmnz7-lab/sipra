@@ -47,31 +47,35 @@ export function AcademiaMenu() {
   )
 
   const irA = (href: string) => {
+    if (pathname === href) {
+      setOpen(false)
+      return
+    }
     setOpen(false)
     router.push(href)
   }
 
   const opciones = [
     {
+      key: 'reportes',
+      icon: <BarChart3 className="h-5 w-5" />,
+      color: '#15435a',
+      titulo: 'Reportes',
+      desc: 'Estado financiero de alumnos y control de cargos grupales.',
+      href: '/reportes',
+    },
+    {
       key: 'mi-academia',
       icon: <GraduationCap className="h-5 w-5" />,
-      color: '#22887c',
+      color: '#15435a',
       titulo: 'Mi academia',
       desc: 'Logo, nombre, alumnos y cierre de sesión.',
       href: '/mi-academia',
     },
     {
-      key: 'reportes',
-      icon: <BarChart3 className="h-5 w-5" />,
-      color: '#22887c',
-      titulo: 'Reportes',
-      desc: 'Cobranza del mes, ingresos y deuda acumulada.',
-      href: '/reportes',
-    },
-    {
       key: 'configuracion',
       icon: <Settings className="h-5 w-5" />,
-      color: '#15435a',
+      color: '#22887c',
       titulo: 'Configuración',
       desc: 'Cobranza, planes y pagos atrasados.',
       href: '/configuracion',

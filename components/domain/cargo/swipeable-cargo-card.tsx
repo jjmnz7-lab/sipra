@@ -190,7 +190,7 @@ export function SwipeableCargoCard({
                   >
                     {estado.label}
                   </span>
-                  {' · '}
+                  {' • '}
                   <span className="font-bold text-foreground text-sm">
                     {formatCurrency(alumno.totalAdeudado)}
                   </span>
@@ -247,6 +247,7 @@ export function SwipeableCargoCard({
           monto={alumno.totalAdeudado}
           concepto={concepto}
           cargosActivos={alumno.cargos}
+          personaId={alumno.persona_id}
         />
       )}
 

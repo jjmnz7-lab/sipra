@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { translateRpcError } from '@/lib/utils/rpc-errors'
 import { alumnoSuspendido, MSG_ALUMNO_SUSPENDIDO } from '@/lib/utils/guards'
+import { calcularEstadoActividad } from '@/lib/utils/actividad-estado'
 
 const HHMM_REGEX = /^\d{2}:\d{2}$/
 
@@ -175,7 +176,7 @@ export async function editarActividadAction(prevState: FormState, formData: Form
 
   const { data: existente } = await supabase
     .from('grupo')
-    .select('id, es_temporal')
+    .select('id, es_temporal, estado, fecha_inicio, fecha_fin')
     .eq('id', validated.data.actividad_id)
     .eq('academia_id', academiaId)
     .single() as any
@@ -183,8 +184,31 @@ export async function editarActividadAction(prevState: FormState, formData: Form
     return { message: 'La actividad no existe.', success: false }
   }
 
-  // En edición se permiten fechas pasadas (correcciones de actividades ya
-  // iniciadas); solo se exige coherencia entre inicio y fin.
+  const estadoExistente = calcularEstadoActividad(existente.fecha_inicio, existente.fecha_fin, existente.estado)
+  if (estadoExistente.archivada) {
+    return { message: 'No se puede editar una actividad archivada.', success: false }
+  }
+  if (estadoExistente.yaFinalizo) {
+    return { message: 'No se puede editar una actividad que ya finalizó.', success: false }
+  }
+
+  const timezone = await obtenerTimezone(supabase, academiaId)
+  const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: timezone })
+
+  if (estadoExistente.yaInicio && validated.data.fecha_inicio !== existente.fecha_inicio) {
+    return {
+      errors: { fecha_inicio: ['No se puede modificar la fecha de inicio: la actividad ya inició.'] },
+      message: 'No se puede modificar la fecha de inicio: la actividad ya inició.',
+      success: false,
+    }
+  }
+  if (!estadoExistente.yaInicio && validated.data.fecha_inicio < todayStr) {
+    return {
+      errors: { fecha_inicio: ['La fecha de inicio no debe ser anterior al día actual.'] },
+      message: 'La fecha de inicio no debe ser anterior al día actual.',
+      success: false,
+    }
+  }
   if (validated.data.fecha_fin < validated.data.fecha_inicio) {
     return {
       errors: { fecha_fin: ['La fecha de fin no puede ser anterior a la de inicio.'] },
@@ -229,6 +253,24 @@ export async function archivarActividadAction(actividadId: string): Promise<Form
   const academiaId = user?.app_metadata?.academia_id
   if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
 
+  const { data: existente } = await supabase
+    .from('grupo')
+    .select('id, es_temporal, estado, fecha_inicio, fecha_fin')
+    .eq('id', actividadId)
+    .eq('academia_id', academiaId)
+    .single() as any
+  if (!existente || !existente.es_temporal) {
+    return { message: 'La actividad no existe.', success: false }
+  }
+
+  const estadoExistente = calcularEstadoActividad(existente.fecha_inicio, existente.fecha_fin, existente.estado)
+  if (estadoExistente.archivada) {
+    return { message: 'Esta actividad ya está archivada.', success: false }
+  }
+  if (estadoExistente.activa) {
+    return { message: 'No se puede archivar una actividad que no ha terminado. Primero finalízala.', success: false }
+  }
+
   const { error } = await (supabase as any).rpc('archivar_grupo_v1', {
     p_academia_id: academiaId,
     p_grupo_id: actividadId,
@@ -241,6 +283,64 @@ export async function archivarActividadAction(actividadId: string): Promise<Form
   revalidatePath('/actividades/[actividad_id]', 'page')
   revalidatePath('/alumnos')
   return { success: true, message: 'Actividad archivada.' }
+}
+
+/**
+ * "Finalizar" no agrega un estado nuevo: mueve fecha_fin a hoy (cierre
+ * anticipado). A partir de ahí el cálculo de fechas ya existente la trata
+ * como terminada en toda la app. Si archivarTambien=true, además rompe las
+ * inscripciones activas (mismo RPC que archivarActividadAction).
+ */
+export async function finalizarActividadAction(actividadId: string, archivarTambien: boolean): Promise<FormState> {
+  if (!actividadId) return { message: 'Actividad inválida.', success: false }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const academiaId = user?.app_metadata?.academia_id
+  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
+
+  const { data: existente } = await supabase
+    .from('grupo')
+    .select('id, es_temporal, estado, fecha_inicio, fecha_fin')
+    .eq('id', actividadId)
+    .eq('academia_id', academiaId)
+    .single() as any
+  if (!existente || !existente.es_temporal) {
+    return { message: 'La actividad no existe.', success: false }
+  }
+
+  const estadoExistente = calcularEstadoActividad(existente.fecha_inicio, existente.fecha_fin, existente.estado)
+  if (estadoExistente.archivada) {
+    return { message: 'Esta actividad ya está archivada.', success: false }
+  }
+  if (!estadoExistente.activa) {
+    return { message: 'Esta actividad ya finalizó.', success: false }
+  }
+
+  const timezone = await obtenerTimezone(supabase, academiaId)
+  const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: timezone })
+
+  const { error } = await (supabase as any)
+    .from('grupo')
+    .update({ fecha_fin: todayStr })
+    .eq('id', actividadId)
+    .eq('academia_id', academiaId)
+
+  if (error) return { message: translateRpcError(error), success: false }
+
+  if (archivarTambien) {
+    const { error: errorArchivar } = await (supabase as any).rpc('archivar_grupo_v1', {
+      p_academia_id: academiaId,
+      p_grupo_id: actividadId,
+      p_grupo_id_destino: null,
+    })
+    if (errorArchivar) return { message: translateRpcError(errorArchivar), success: false }
+  }
+
+  revalidatePath('/actividades')
+  revalidatePath('/actividades/[actividad_id]', 'page')
+  revalidatePath('/alumnos')
+  return { success: true, message: archivarTambien ? 'Actividad finalizada y archivada.' : 'Actividad finalizada.' }
 }
 
 /**
@@ -274,6 +374,20 @@ export async function asignarAlumnoAActividadAction(prevState: FormState, formDa
   const { data: { user } } = await supabase.auth.getUser()
   const academiaId = user?.app_metadata?.academia_id
   if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
+
+  const { data: actividadExistente } = await supabase
+    .from('grupo')
+    .select('id, es_temporal, estado, fecha_inicio, fecha_fin')
+    .eq('id', validated.data.actividad_id)
+    .eq('academia_id', academiaId)
+    .single() as any
+  if (!actividadExistente || !actividadExistente.es_temporal) {
+    return { message: 'La actividad no existe.', success: false }
+  }
+  const estadoActividad = calcularEstadoActividad(actividadExistente.fecha_inicio, actividadExistente.fecha_fin, actividadExistente.estado)
+  if (!estadoActividad.activa) {
+    return { message: 'No se puede inscribir: la actividad ya finalizó.', success: false }
+  }
 
   // No se inscribe a un alumno suspendido (no se le pueden generar cargos).
   if (await alumnoSuspendido(supabase, academiaId, validated.data.persona_id)) {

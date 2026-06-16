@@ -639,6 +639,8 @@ export type Database = {
           notas_internas: string | null
           saldo_acumulado: number
           search_text: string | null
+          share_link_bloqueado: boolean
+          share_token: string
           telefono_whatsapp: string | null
           ultima_interaccion_at: string | null
           updated_at: string
@@ -660,6 +662,8 @@ export type Database = {
           notas_internas?: string | null
           saldo_acumulado?: number
           search_text?: string | null
+          share_link_bloqueado?: boolean
+          share_token?: string
           telefono_whatsapp?: string | null
           ultima_interaccion_at?: string | null
           updated_at?: string
@@ -681,6 +685,8 @@ export type Database = {
           notas_internas?: string | null
           saldo_acumulado?: number
           search_text?: string | null
+          share_link_bloqueado?: boolean
+          share_token?: string
           telefono_whatsapp?: string | null
           ultima_interaccion_at?: string | null
           updated_at?: string
@@ -1105,6 +1111,7 @@ export type Database = {
         }
         Returns: Json
       }
+      obtener_historial_publico_v1: { Args: { p_token: string }; Returns: Json }
       procesar_recargos_v1: { Args: { p_academia_id: string }; Returns: Json }
       procesar_visita_express_v1: {
         Args: {
