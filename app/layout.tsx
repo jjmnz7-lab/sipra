@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "SIPRA",
-  description: "Sistema Integrado de Pagos y Recaudación",
+  description: "Sistema de Pagos y Recordatorios para Academias",
   appleWebApp: {
     title: "SIPRA",
   },

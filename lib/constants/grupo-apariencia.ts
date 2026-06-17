@@ -27,7 +27,7 @@ export const COLOR_GRUPO_DEFAULT = COLORES_GRUPO[0]
 
 export const EMOJIS_GRUPO: string[] = [
   '🐣', '🍼', '👶', '👦', '👧', '🌱', '🌳', '⭐',
-  '🔥', '⚡', '🚀', '🎯', '👑', '💎', '🛡️', '🏆',
+  '⚡', '🚀', '🎯', '👑', '💎', '🛡️', '🏆',
 ]
 
 export function colorPorSlug(slug: string | null | undefined): ColorGrupo {
