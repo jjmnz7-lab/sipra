@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils/currency'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { colorPorSlug } from '@/lib/constants/grupo-apariencia'
 import {
   Clock,
   Banknote,
@@ -18,7 +19,6 @@ import {
   Plus,
   Copy,
   X,
-  RefreshCw,
   ChevronDown,
   ChevronRight,
 } from 'lucide-react'
@@ -69,7 +69,7 @@ export function SeguimientoClientView({
   currentPlanIds = [],
 }: {
   persona: any
-  gruposAlumno?: { id: string; nombre: string }[]
+  gruposAlumno?: { id: string; nombre: string; color: string | null; emoji: string | null }[]
   planesAlumno?: { id: string; nombre: string }[]
   cargosActivos: any[]
   deudaTotal: number
@@ -184,11 +184,35 @@ export function SeguimientoClientView({
             <ListonBadge className="bg-amber-500/10 text-amber-700 dark:text-amber-500 border-amber-500/30">
               ⚠️ sin grupo
             </ListonBadge>
-          ) : gruposAlumno.length === 1 ? (
-            <ListonBadge icon={<Users className="h-3 w-3" />}>
-              {gruposAlumno[0]!.nombre}
-            </ListonBadge>
-          ) : (
+          ) : gruposAlumno.length === 1 ? (() => {
+            const g = gruposAlumno[0]!
+            const gColor = colorPorSlug(g.color)
+            return (
+              <Link
+                href={`/grupos/${g.id}`}
+                className={cn(
+                  "inline-flex items-center flex-shrink-0 text-[10px] font-semibold px-2 py-1 rounded-full whitespace-nowrap",
+                  "cursor-pointer active:scale-95 transition-all"
+                )}
+                style={{
+                  borderWidth: '1px',
+                  borderStyle: 'solid',
+                  borderColor: gColor.border,
+                  color: gColor.textLight,
+                  backgroundColor: gColor.bg,
+                }}
+              >
+                {g.emoji ? (
+                  <span className="mr-1 text-[11px] leading-none">{g.emoji}</span>
+                ) : (
+                  <span className="text-[10px] mr-1 opacity-60" style={{ color: gColor.textLight }}>
+                    <Users className="h-3 w-3 inline" />
+                  </span>
+                )}
+                {g.nombre}
+              </Link>
+            )
+          })() : (
             <ListonBadge
               icon={<Users className="h-3 w-3" />}
               onClick={() => setGroupsExpanded(!groupsExpanded)}
@@ -213,12 +237,12 @@ export function SeguimientoClientView({
               ⚠️ sin esquema de pago
             </ListonBadge>
           ) : planesAlumno.length === 1 ? (
-            <ListonBadge icon={<RefreshCw className="h-3 w-3" />}>
+            <ListonBadge icon={<PlanIcon />}>
               {planesAlumno[0]!.nombre}
             </ListonBadge>
           ) : (
             <ListonBadge
-              icon={<RefreshCw className="h-3 w-3" />}
+              icon={<PlanIcon />}
               onClick={() => setPlansExpanded(!plansExpanded)}
               className={cn(plansExpanded && "border-[#22887c]/30 bg-[#22887c]/15 text-[#22887c]")}
             >
@@ -335,7 +359,7 @@ export function SeguimientoClientView({
           }}
           tieneHistorial={tieneHistorial}
           onEditar={() => setIsEditarOpen(true)}
-          shareToken={persona.share_token}
+          shareCode={persona.share_code}
           linkBloqueado={!!persona.share_link_bloqueado}
           onToast={showToast}
         />
@@ -345,7 +369,7 @@ export function SeguimientoClientView({
           onOpenChange={setIsEnviarEnlaceOpen}
           alumnoNombre={nombreCompleto}
           telefono={persona.telefono_whatsapp}
-          shareToken={persona.share_token}
+          shareCode={persona.share_code}
         />
 
         <EditarAlumnoDrawer
@@ -527,5 +551,28 @@ function ListonBadge({
       {icon && <span className="text-muted-foreground mr-1.5">{icon}</span>}
       {children}
     </Component>
+  )
+}
+
+/** Ícono de plan de cobro: flechas en ciclo con signo $ superpuesto. */
+function PlanIcon() {
+  return (
+    <span className="relative inline-flex items-center justify-center h-3.5 w-3.5 flex-shrink-0">
+      {/* Flechas en ciclo (SVG simplificado) */}
+      <svg viewBox="0 0 14 14" fill="none" className="h-full w-full" aria-hidden="true">
+        <path
+          d="M2.5 7A4.5 4.5 0 0 1 7 2.5c1.2 0 2.3.47 3.1 1.24L11.5 5"
+          stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"
+        />
+        <path d="M11.5 2.5V5H9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        <path
+          d="M11.5 7A4.5 4.5 0 0 1 7 11.5c-1.2 0-2.3-.47-3.1-1.24L2.5 9"
+          stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"
+        />
+        <path d="M2.5 11.5V9H5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        {/* Signo $ */}
+        <text x="7" y="8.2" textAnchor="middle" fontSize="5.5" fontWeight="700" fill="currentColor" fontFamily="system-ui">$</text>
+      </svg>
+    </span>
   )
 }

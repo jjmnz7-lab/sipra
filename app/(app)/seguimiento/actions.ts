@@ -622,10 +622,10 @@ export async function anularCargoAction(prevState: FormState, formData: FormData
 // Enlace de historial compartible
 // ============================================================================
 
-/** Genera un nuevo token (invalida el anterior) para el enlace público. */
+/** Genera un nuevo código corto (invalida el anterior) para el enlace público. */
 export async function regenerarEnlaceHistorialAction(
   persona_id: string,
-): Promise<{ success: boolean; token?: string; message?: string }> {
+): Promise<{ success: boolean; code?: string; message?: string }> {
   const validated = personaIdSchema.safeParse({ persona_id })
   if (!validated.success) return { success: false, message: 'Persona inválida' }
 
@@ -634,17 +634,21 @@ export async function regenerarEnlaceHistorialAction(
   const academiaId = user?.app_metadata?.academia_id
   if (!academiaId) return { success: false, message: 'Academia no encontrada' }
 
-  const nuevoToken = crypto.randomUUID()
+  // Delegar la generación de código único al RPC de Postgres (garantía de unicidad).
+  const { data: nuevoCode, error: genError } = await (supabase as any)
+    .rpc('generar_share_code')
+  if (genError || !nuevoCode) return { success: false, message: 'No se pudo generar el código' }
+
   const { error } = await (supabase as any)
     .from('persona')
-    .update({ share_token: nuevoToken })
+    .update({ share_code: nuevoCode })
     .eq('id', persona_id)
     .eq('academia_id', academiaId)
 
   if (error) return { success: false, message: translateRpcError(error) }
 
   revalidatePath('/seguimiento/[persona_id]', 'page')
-  return { success: true, token: nuevoToken }
+  return { success: true, code: nuevoCode }
 }
 
 /** Activa o desactiva el bloqueo manual del enlace público. */

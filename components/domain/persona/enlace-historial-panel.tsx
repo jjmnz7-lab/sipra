@@ -12,7 +12,7 @@ import { buildShareLink } from '@/lib/utils/whatsapp'
 type Props = {
   personaId: string
   alumnoNombre: string
-  shareToken: string
+  shareCode: string
   bloqueado: boolean
   suspendido: boolean
   onToast: (msg: string) => void
@@ -30,24 +30,24 @@ type Props = {
 export function EnlaceHistorialPanel({
   personaId,
   alumnoNombre,
-  shareToken,
+  shareCode,
   bloqueado,
   suspendido,
   onToast,
   onBack,
   onClose,
 }: Props) {
-  const [token, setToken] = useState(shareToken)
+  const [code, setCode] = useState(shareCode)
   const [bloq, setBloq] = useState(bloqueado)
   const [origin] = useState(() => (typeof window !== 'undefined' ? window.location.origin : ''))
   const [confirm, setConfirm] = useState<null | 'regen' | 'bloq'>(null)
   const [loading, setLoading] = useState<null | 'regen' | 'bloq'>(null)
 
-  const link = buildShareLink(token, origin)
+  const link = buildShareLink(code, origin)
 
   const copiar = async () => {
     try {
-      await navigator.clipboard.writeText(buildShareLink(token, window.location.origin))
+      await navigator.clipboard.writeText(buildShareLink(code, window.location.origin))
       onToast('Enlace copiado.')
       onClose()
     } catch {
@@ -60,8 +60,8 @@ export function EnlaceHistorialPanel({
     const res = await regenerarEnlaceHistorialAction(personaId)
     setLoading(null)
     setConfirm(null)
-    if (res.success && res.token) {
-      setToken(res.token)
+    if (res.success && res.code) {
+      setCode(res.code)
       onToast('Enlace regenerado.')
     } else {
       onToast(res.message ?? 'No se pudo regenerar.')

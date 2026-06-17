@@ -14,9 +14,9 @@ export default async function HistorialCompletoPage({ params }: { params: Promis
 
   const { data: persona } = await supabase
     .from('persona')
-    .select('id, nombre, apellido, estado_registro, share_token, telefono_whatsapp')
+    .select('id, nombre, apellido, estado_registro, share_code, telefono_whatsapp')
     .eq('id', persona_id)
-    .single() as { data: { id: string; nombre: string; apellido: string | null; estado_registro: string; share_token: string; telefono_whatsapp: string | null } | null; error: unknown }
+    .single() as { data: { id: string; nombre: string; apellido: string | null; estado_registro: string; share_code: string; telefono_whatsapp: string | null } | null; error: unknown }
 
   if (!persona) notFound()
 

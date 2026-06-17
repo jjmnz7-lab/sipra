@@ -131,13 +131,13 @@ export function GrupoClientView({
         title={
           <div className="flex items-center gap-2.5 min-w-0">
             <div
-              className="h-9 w-9 rounded-full flex items-center justify-center text-base bg-transparent flex-shrink-0"
-              style={{ border: `3px solid ${colorGrupo.hex}` }}
+              className="h-9 w-9 rounded-full flex items-center justify-center text-base flex-shrink-0"
+              style={{ backgroundColor: colorGrupo.bg, border: `2px solid ${colorGrupo.border}` }}
               aria-hidden="true"
             >
               {grupo.emoji ?? ''}
             </div>
-            <span className="truncate">{grupo.nombre}</span>
+            <span className="truncate" style={{ color: colorGrupo.textLight }}>{grupo.nombre}</span>
           </div>
         }
         onBack={handleBack}

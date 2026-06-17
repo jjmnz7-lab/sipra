@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2, UsersRound, CheckCircle2, Plus } from 'lucide-react'
-import { COLORES_GRUPO } from '@/lib/constants/grupo-apariencia'
+import { COLORES_GRUPO, EMOJIS_GRUPO } from '@/lib/constants/grupo-apariencia'
 import { formatCurrencyCompact } from '@/lib/utils/currency'
 import { AparienciaGrupoFields } from './apariencia-grupo-fields'
 import { LogisticaGrupoFields } from './logistica-grupo-fields'
@@ -53,7 +53,7 @@ export function CrearGrupoDrawer({ planes = [] }: CrearGrupoDrawerProps) {
   const [planSugerido, setPlanSugerido] = useState<string>(NONE)
   const [nombre, setNombre] = useState<string>('')
   const [colorSlug, setColorSlug] = useState<string>(COLORES_GRUPO[0].slug)
-  const [emoji, setEmoji] = useState<string>('')
+  const [emoji, setEmoji] = useState<string>(EMOJIS_GRUPO[0])
   const [dias, setDias] = useState<number[]>([])
   const [horaInicio, setHoraInicio] = useState<string>('')
   const [horaFin, setHoraFin] = useState<string>('')
@@ -67,7 +67,7 @@ export function CrearGrupoDrawer({ planes = [] }: CrearGrupoDrawerProps) {
     if (open) {
       setNombre('')
       setColorSlug(COLORES_GRUPO[0].slug)
-      setEmoji('')
+      setEmoji(EMOJIS_GRUPO[0])
       setPlanSugerido(NONE)
       setDias([])
       setHoraInicio('')

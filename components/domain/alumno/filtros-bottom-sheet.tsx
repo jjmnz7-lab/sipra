@@ -296,7 +296,7 @@ export function FiltrosBottomSheet({
                     <OptionRow
                       key={g.id}
                       label={g.nombre}
-                      dotColor={c.hex}
+                      dotColor={c.border}
                       selected={pGrupos.has(g.id)}
                       onClick={() => toggleGrupo(g.id)}
                     />

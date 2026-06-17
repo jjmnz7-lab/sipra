@@ -25,7 +25,7 @@ type Props = {
   onOpenChange: (open: boolean) => void
   alumnoNombre: string
   telefono: string | null | undefined
-  shareToken: string
+  shareCode: string
 }
 
 /** Bottom sheet con la vista previa del mensaje de enlace + Enviar / Cancelar. */
@@ -34,12 +34,12 @@ export function EnviarEnlaceHistorialSheet({
   onOpenChange,
   alumnoNombre,
   telefono,
-  shareToken,
+  shareCode,
 }: Props) {
   const { academiaNombre } = useAcademia()
   const [origin] = useState(() => (typeof window !== 'undefined' ? window.location.origin : ''))
 
-  const link = buildShareLink(shareToken, origin)
+  const link = buildShareLink(shareCode, origin)
   const mensaje = buildHistorialShareMensaje({ academia: academiaNombre, alumno: alumnoNombre, link })
 
   const enviar = () => {
@@ -72,7 +72,7 @@ export function EnviarEnlaceHistorialSheet({
           <DrawerFooter>
             <Button
               onClick={enviar}
-              disabled={!shareToken}
+              disabled={!shareCode}
               className="w-full h-12 text-base font-bold bg-[#22887c] hover:bg-[#1a6b62]"
             >
               <Send className="mr-2 h-4 w-4" /> Enviar por WhatsApp

@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Search, X, Filter, ArrowUpDown, Tag, AlertTriangle, ChevronRight } from 'lucide-react'
+import { Search, X, Filter, ArrowUpDown, Tag, AlertTriangle, ChevronRight, RefreshCw } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils/currency'
 import { cn } from '@/lib/utils'
 import {
@@ -296,7 +296,7 @@ export function AlumnosClientView({ alumnos, grupos, planes, modoProrrateo, mult
               {Array.from(filtroGrupos).map(id => {
                 const g = id === '__sin__' ? null : grupoById.get(id)
                 const label = g?.nombre ?? 'Sin grupo'
-                const color = g ? colorPorSlug(g.color).hex : '#FFFFFF'
+                const color = g ? colorPorSlug(g.color).border : '#FFFFFF'
                 const dotClassName = g ? undefined : 'border border-gray-400 dark:border-gray-500'
                 return (
                   <ResumenChip
@@ -473,7 +473,7 @@ function AlumnoCard({ a, multiPlanEnabled }: { a: AlumnoListItem; multiPlanEnabl
                      <div
                        key={g.id}
                        className="w-2 h-2 rounded-full border border-white dark:border-card"
-                       style={{ backgroundColor: gColor.hex, zIndex: 10 - idx }}
+                       style={{ backgroundColor: gColor.border, zIndex: 10 - idx }}
                      />
                    )
                  })}
@@ -483,10 +483,11 @@ function AlumnoCard({ a, multiPlanEnabled }: { a: AlumnoListItem; multiPlanEnabl
              </span>
           ) : a.grupo && grupoColor ? (
             <span
-              className="inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full border-2 whitespace-nowrap"
-              style={{ borderColor: `${grupoColor.hex}66`, color: grupoColor.hex, backgroundColor: `${grupoColor.hex}14` }}
+              className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full border whitespace-nowrap"
+              style={{ borderColor: grupoColor.border, color: grupoColor.textLight, backgroundColor: grupoColor.bg }}
               title={a.grupo.nombre}
             >
+              {a.grupo.emoji && <span className="text-[10px]">{a.grupo.emoji}</span>}
               {a.grupo.nombre}
             </span>
           ) : (
@@ -497,15 +498,19 @@ function AlumnoCard({ a, multiPlanEnabled }: { a: AlumnoListItem; multiPlanEnabl
 
           {/* Badge de plan */}
           {a.sinPlan ? (
-             <span className="inline-flex items-center text-[9px] font-semibold border border-amber-200 bg-amber-50 text-amber-600 rounded-full px-1.5 py-0.5 flex-shrink-0 whitespace-nowrap">
+             <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold bg-amber-50 text-amber-600 rounded-full px-1.5 py-0.5 flex-shrink-0 whitespace-nowrap">
+               <span className="relative inline-flex items-center justify-center w-3 h-3 flex-shrink-0">
+                 <RefreshCw className="h-3 w-3 absolute" />
+                 <span className="absolute text-[5px] font-black leading-none">$</span>
+               </span>
                Sin plan
              </span>
           ) : multiPlanEnabled && planPrincipal ? (
              <span
-               className="inline-flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full border bg-white border-gray-200 dark:bg-card dark:border-border dark:text-foreground flex-shrink-0 whitespace-nowrap"
-               style={{ color: '#333a4a' }}
+               className="inline-flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-muted/80 text-muted-foreground flex-shrink-0 whitespace-nowrap"
                title={a.planes.map((p) => p.nombre).join(', ')}
              >
+               <PlanIcon />
                <span>{planPrincipal.nombre}</span>
                {planesExtra > 0 && <span className="flex-shrink-0">, +{planesExtra}</span>}
              </span>
@@ -556,3 +561,23 @@ function ResumenChip({
   )
 }
 
+/** Ícono de plan de cobro: flechas en ciclo con signo $ superpuesto. */
+function PlanIcon() {
+  return (
+    <span className="relative inline-flex items-center justify-center h-3 w-3 flex-shrink-0">
+      <svg viewBox="0 0 14 14" fill="none" className="h-full w-full" aria-hidden="true">
+        <path
+          d="M2.5 7A4.5 4.5 0 0 1 7 2.5c1.2 0 2.3.47 3.1 1.24L11.5 5"
+          stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"
+        />
+        <path d="M11.5 2.5V5H9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        <path
+          d="M11.5 7A4.5 4.5 0 0 1 7 11.5c-1.2 0-2.3-.47-3.1-1.24L2.5 9"
+          stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"
+        />
+        <path d="M2.5 11.5V9H5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        <text x="7" y="8.2" textAnchor="middle" fontSize="5.5" fontWeight="700" fill="currentColor" fontFamily="system-ui">$</text>
+      </svg>
+    </span>
+  )
+}

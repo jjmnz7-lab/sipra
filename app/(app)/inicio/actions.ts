@@ -85,7 +85,7 @@ export async function registrarPagoAction(prevState: FormState, formData: FormDa
 
 export type DatosCompartir = {
   telefono: string | null
-  share_token: string
+  share_code: string
   nombre: string
   apellido: string | null
   bloqueado: boolean
@@ -107,7 +107,7 @@ export async function obtenerDatosCompartir(persona_id: string): Promise<DatosCo
 
   const { data } = await supabase
     .from('persona')
-    .select('nombre, apellido, telefono_whatsapp, share_token, share_link_bloqueado, estado_registro')
+    .select('nombre, apellido, telefono_whatsapp, share_code, share_link_bloqueado, estado_registro')
     .eq('id', persona_id)
     .eq('academia_id', academiaId)
     .single() as {
@@ -115,7 +115,7 @@ export async function obtenerDatosCompartir(persona_id: string): Promise<DatosCo
         nombre: string
         apellido: string | null
         telefono_whatsapp: string | null
-        share_token: string
+        share_code: string
         share_link_bloqueado: boolean
         estado_registro: string
       } | null
@@ -125,7 +125,7 @@ export async function obtenerDatosCompartir(persona_id: string): Promise<DatosCo
 
   return {
     telefono: data.telefono_whatsapp,
-    share_token: data.share_token,
+    share_code: data.share_code,
     nombre: data.nombre,
     apellido: data.apellido,
     bloqueado: data.share_link_bloqueado,

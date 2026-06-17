@@ -113,7 +113,8 @@ export default async function InicioPage() {
           grupo (
             id,
             nombre,
-            color
+            color,
+            emoji
           )
         )
       ),
@@ -150,7 +151,7 @@ export default async function InicioPage() {
             estado_registro: cargo.persona?.estado_registro ?? 'activo',
             grupo_nombre: grupoNombre,
             grupo: grupo
-              ? { id: grupo.id ?? null, nombre: grupo.nombre ?? grupoNombre, color: grupo.color ?? null }
+              ? { id: grupo.id ?? null, nombre: grupo.nombre ?? grupoNombre, color: grupo.color ?? null, emoji: grupo.emoji ?? null }
               : null,
           },
           email: cargo.persona?.email ?? null,

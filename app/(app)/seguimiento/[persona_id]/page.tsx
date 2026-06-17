@@ -73,14 +73,14 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
   // actividades del alumno viven en su pantalla y en el historial.
   const { data: personaGrupos } = await supabase
     .from('persona_grupo')
-    .select('grupo_id, grupo (id, nombre, es_temporal)')
+    .select('grupo_id, grupo (id, nombre, color, emoji, es_temporal)')
     .eq('persona_id', persona_id)
     .eq('estado', 'activo') as any
 
   const gruposAlumno = (personaGrupos ?? [])
     .map((pg: any) => pg.grupo)
     .filter((g: any) => g && !g.es_temporal)
-    .map((g: any) => ({ id: g.id, nombre: g.nombre })) as { id: string; nombre: string }[]
+    .map((g: any) => ({ id: g.id, nombre: g.nombre, color: g.color ?? null, emoji: g.emoji ?? null })) as { id: string; nombre: string; color: string | null; emoji: string | null }[]
   const currentGrupoId: string | null = gruposAlumno[0]?.id ?? null
 
   // 1c. Planes por visita (catálogo de "clases" para el modal de Visita Express)

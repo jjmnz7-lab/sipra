@@ -13,7 +13,8 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+// Alfabeto sin caracteres ambiguos: A-Z sin I,O + 2-9 → 32 chars
+const CODE_RE = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/
 
 type CargoLite = {
   concepto: string | null
@@ -34,16 +35,16 @@ type HistorialPublico = {
 export default async function HistorialPublicoPage({
   params,
 }: {
-  params: Promise<{ token: string }>
+  params: Promise<{ code: string }>
 }) {
-  const { token } = await params
+  const { code } = await params
 
-  // Token mal formado → no disponible (sin tocar la base de datos).
-  if (!UUID_RE.test(token)) return <EnlaceNoDisponible />
+  // Código mal formado → no disponible (sin tocar la base de datos).
+  if (!CODE_RE.test(code)) return <EnlaceNoDisponible />
 
   const supabase = await createClient()
   const { data, error } = await supabase.rpc('obtener_historial_publico_v1', {
-    p_token: token,
+    p_code: code,
   })
 
   const payload = data as unknown as HistorialPublico | null

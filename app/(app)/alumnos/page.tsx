@@ -11,8 +11,8 @@ export type AlumnoListItem = {
   telefono_whatsapp: string | null
   estado_registro: string
   created_at: string
-  grupo: { id: string; nombre: string; color: string | null } | null
-  grupos: { id: string; nombre: string; color: string | null }[]
+  grupo: { id: string; nombre: string; color: string | null; emoji: string | null } | null
+  grupos: { id: string; nombre: string; color: string | null; emoji: string | null }[]
   planes: { id: string; nombre: string }[]
   sinGrupo: boolean
   sinPlan: boolean
@@ -79,7 +79,7 @@ export default async function AlumnosPage() {
       id, nombre, apellido, telefono_whatsapp, estado_registro, created_at,
       persona_grupo (
         estado,
-        grupo ( id, nombre, color, es_temporal )
+        grupo ( id, nombre, color, emoji, es_temporal )
       ),
       alumno_planes (
         planes_cobro ( id, nombre, activo, frecuencia )
@@ -100,7 +100,8 @@ export default async function AlumnosPage() {
       .map((pg: any) => ({
         id: pg.grupo.id,
         nombre: pg.grupo.nombre,
-        color: pg.grupo.color ?? null
+        color: pg.grupo.color ?? null,
+        emoji: pg.grupo.emoji ?? null
       }))
     const grupo = grupos.length > 0 ? grupos[0] : null
     const tieneActividad = pgActivos.some((pg: any) => pg.grupo?.es_temporal)

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2, Pencil, CheckCircle2 } from 'lucide-react'
-import { COLORES_GRUPO } from '@/lib/constants/grupo-apariencia'
+import { COLORES_GRUPO, EMOJIS_GRUPO } from '@/lib/constants/grupo-apariencia'
 import { formatCurrencyCompact } from '@/lib/utils/currency'
 import { AparienciaGrupoFields } from './apariencia-grupo-fields'
 import { LogisticaGrupoFields } from './logistica-grupo-fields'
@@ -63,7 +63,7 @@ type Props = {
 export function EditarGrupoDrawer({ grupo, planes = [], open, onOpenChange }: Props) {
   const [state, formAction] = useActionState(editarGrupoAction, initialState)
   const [colorSlug, setColorSlug] = useState<string>(grupo.color ?? COLORES_GRUPO[0].slug)
-  const [emoji, setEmoji] = useState<string>(grupo.emoji ?? '')
+  const [emoji, setEmoji] = useState<string>(grupo.emoji || EMOJIS_GRUPO[0])
   const [nombre, setNombre] = useState<string>(grupo.nombre)
   const [planSugerido, setPlanSugerido] = useState<string>(grupo.plan_sugerido_id ?? NONE)
   const [dias, setDias] = useState<number[]>(grupo.dias_semana ?? [])
@@ -78,7 +78,7 @@ export function EditarGrupoDrawer({ grupo, planes = [], open, onOpenChange }: Pr
   useEffect(() => {
     if (open) {
       setColorSlug(grupo.color ?? COLORES_GRUPO[0].slug)
-      setEmoji(grupo.emoji ?? '')
+      setEmoji(grupo.emoji || EMOJIS_GRUPO[0])
       setNombre(grupo.nombre)
       setPlanSugerido(grupo.plan_sugerido_id ?? NONE)
       setDias(grupo.dias_semana ?? [])

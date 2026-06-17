@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
+  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -639,6 +644,7 @@ export type Database = {
           notas_internas: string | null
           saldo_acumulado: number
           search_text: string | null
+          share_code: string
           share_link_bloqueado: boolean
           share_token: string
           telefono_whatsapp: string | null
@@ -662,6 +668,7 @@ export type Database = {
           notas_internas?: string | null
           saldo_acumulado?: number
           search_text?: string | null
+          share_code?: string
           share_link_bloqueado?: boolean
           share_token?: string
           telefono_whatsapp?: string | null
@@ -685,6 +692,7 @@ export type Database = {
           notas_internas?: string | null
           saldo_acumulado?: number
           search_text?: string | null
+          share_code?: string
           share_link_bloqueado?: boolean
           share_token?: string
           telefono_whatsapp?: string | null
@@ -1088,6 +1096,7 @@ export type Database = {
         Args: { p_academia_id: string }
         Returns: Json
       }
+      generar_share_code: { Args: never; Returns: string }
       get_dashboard_kpis_v1: { Args: { p_academia_id: string }; Returns: Json }
       inscribir_alumno_a_actividad_v1: {
         Args: {
@@ -1111,7 +1120,7 @@ export type Database = {
         }
         Returns: Json
       }
-      obtener_historial_publico_v1: { Args: { p_token: string }; Returns: Json }
+      obtener_historial_publico_v1: { Args: { p_code: string }; Returns: Json }
       procesar_recargos_v1: { Args: { p_academia_id: string }; Returns: Json }
       procesar_visita_express_v1: {
         Args: {
@@ -1310,4 +1319,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

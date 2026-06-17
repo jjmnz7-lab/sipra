@@ -39,14 +39,14 @@ type Props = {
   /** Abre el drawer de edición desde el padre. */
   onEditar: () => void
   /** Token y estado del enlace (la gestión vive como subvista del propio sheet). */
-  shareToken: string
+  shareCode: string
   linkBloqueado: boolean
   /** Toast sutil del padre. */
   onToast: (msg: string) => void
   onSuccess?: () => void
 }
 
-export function AccionesAlumnoSheet({ open, onOpenChange, persona, tieneHistorial, onEditar, shareToken, linkBloqueado, onToast, onSuccess }: Props) {
+export function AccionesAlumnoSheet({ open, onOpenChange, persona, tieneHistorial, onEditar, shareCode, linkBloqueado, onToast, onSuccess }: Props) {
   const [confirmOpen, setConfirmOpen] = useState<null | 'suspender' | 'reactivar' | 'eliminar' | 'baja'>(null)
   const [step, setStep] = useState<'menu' | 'enlace'>('menu')
 
@@ -142,7 +142,7 @@ export function AccionesAlumnoSheet({ open, onOpenChange, persona, tieneHistoria
                 <EnlaceHistorialPanel
                   personaId={persona.id}
                   alumnoNombre={nombreCompleto}
-                  shareToken={shareToken}
+                  shareCode={shareCode}
                   bloqueado={linkBloqueado}
                   suspendido={suspendido}
                   onToast={onToast}

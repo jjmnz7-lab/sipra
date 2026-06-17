@@ -64,7 +64,7 @@ export function PagoConfirmacionProvider({ children }: { children: React.ReactNo
 
   const notificar = () => {
     if (!datos || !info) return
-    const link = buildShareLink(datos.share_token, window.location.origin)
+    const link = buildShareLink(datos.share_code, window.location.origin)
     const msg = buildPagoConfirmacionMensaje({
       academia: academiaNombre,
       alumno: info.alumno,

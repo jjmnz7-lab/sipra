@@ -77,16 +77,16 @@ export function RecordatorioMensajeDrawer({
   const [editado, setEditado] = useState(false)
   const [incluirDesglose, setIncluirDesglose] = useState(true)
   const [incluirEnlace, setIncluirEnlace] = useState(false)
-  const [shareToken, setShareToken] = useState<string | null>(null)
+  const [shareCode, setShareCode] = useState<string | null>(null)
 
-  // Carga perezosa del token al abrir (sólo si hay alumno asociado).
+  // Carga perezosa del código al abrir (sólo si hay alumno asociado).
   useEffect(() => {
-    if (open && personaId && !shareToken) {
+    if (open && personaId && !shareCode) {
       obtenerDatosCompartir(personaId).then((d) => {
-        if (d) setShareToken(d.share_token)
+        if (d) setShareCode(d.share_code)
       })
     }
-  }, [open, personaId, shareToken])
+  }, [open, personaId, shareCode])
 
   // Generar mensaje cuando cambia el tono, desglose, enlace o al abrir (salvo si fue editado manualmente)
   useEffect(() => {
@@ -96,12 +96,12 @@ export function RecordatorioMensajeDrawer({
         { nombre, academia: academiaNombre, monto, concepto, desglose: desgloseText },
         tono
       )
-      if (incluirEnlace && shareToken) {
-        msg = appendEnlaceHistorial(msg, buildShareLink(shareToken, window.location.origin))
+      if (incluirEnlace && shareCode) {
+        msg = appendEnlaceHistorial(msg, buildShareLink(shareCode, window.location.origin))
       }
       setMensaje(msg)
     }
-  }, [open, tono, nombre, academiaNombre, monto, concepto, editado, incluirDesglose, cargosActivos, incluirEnlace, shareToken])
+  }, [open, tono, nombre, academiaNombre, monto, concepto, editado, incluirDesglose, cargosActivos, incluirEnlace, shareCode])
 
   const handleTonoChange = (nuevoTono: TonoRecordatorio) => {
     setTono(nuevoTono)

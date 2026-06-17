@@ -168,12 +168,13 @@ export function SwipeableCargoCard({
                     <span
                       className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full border max-w-[120px] truncate select-none flex-shrink-0"
                       style={{
-                        borderColor: `${grupoColor.hex}66`,
-                        color: grupoColor.hex,
-                        backgroundColor: `${grupoColor.hex}14`,
+                        borderColor: grupoColor.border,
+                        color: grupoColor.textLight,
+                        backgroundColor: grupoColor.bg,
                       }}
                       title={grupo.nombre}
                     >
+                      {grupo.emoji && <span className="mr-0.5">{grupo.emoji}</span>}
                       {grupo.nombre}
                     </span>
                   ) : (

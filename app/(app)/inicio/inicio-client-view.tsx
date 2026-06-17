@@ -22,7 +22,7 @@ export type AlumnoConDeuda = {
     telefono_whatsapp: string | null
     estado_registro: string
     grupo_nombre: string
-    grupo: { id: string; nombre: string; color: string | null } | null
+    grupo: { id: string; nombre: string; color: string | null; emoji: string | null } | null
   }
   email: string | null
   planIds: string[]

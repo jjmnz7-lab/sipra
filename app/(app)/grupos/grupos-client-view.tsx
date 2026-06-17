@@ -240,21 +240,21 @@ function GrupoCard({ grupo }: { grupo: any }) {
         {/* Indicator strip */}
         <div
           className="absolute left-0 top-0 bottom-0 w-[6px]"
-          style={{ backgroundColor: colorGrupo.hex }}
+          style={{ backgroundColor: colorGrupo.border }}
         />
         <div className="py-3 pr-8 pl-5 flex items-center min-h-[76px] relative z-10 gap-3">
           <div className="flex items-center gap-3 min-w-0 flex-1">
-            {/* Círculo con emoji y halo de color */}
+            {/* Círculo con emoji y color del grupo */}
             <div
               className="h-9 w-9 rounded-full flex items-center justify-center text-base flex-shrink-0"
-              style={{ border: `3px solid ${colorGrupo.hex}`, backgroundColor: 'transparent' }}
+              style={{ backgroundColor: colorGrupo.bg, border: `2px solid ${colorGrupo.border}` }}
             >
               {grupo.emoji || ''}
             </div>
 
             <div className="flex-1 min-w-0 flex flex-col justify-center">
               <div className="flex items-center gap-1.5 min-w-0 w-full">
-                <h3 className="font-bold text-sm text-foreground truncate min-w-0 flex-1">{grupo.nombre}</h3>
+                <h3 className="font-bold text-sm truncate min-w-0 flex-1" style={{ color: colorGrupo.textLight }}>{grupo.nombre}</h3>
               </div>
 
               {/* Conteo de alumnos y horario en líneas separadas.
@@ -265,7 +265,7 @@ function GrupoCard({ grupo }: { grupo: any }) {
                     {totalAlumnos === 0 ? 'Sin alumnos' : `${totalAlumnos} ${totalAlumnos === 1 ? 'alumno' : 'alumnos'}`}
                   </span>
                   {grupo.cupo_maximo != null && totalAlumnos >= grupo.cupo_maximo && (
-                    <span className="inline-flex items-center text-[9px] font-bold px-1.5 py-[1.5px] rounded-full border border-[#c6bab5] bg-[#ffffff] text-amber-600 dark:text-amber-500 lowercase">
+                    <span className="inline-flex items-center text-[9px] font-bold px-1.5 py-[1.5px] rounded-full bg-amber-50 text-amber-600 lowercase">
                       lleno
                     </span>
                   )}
