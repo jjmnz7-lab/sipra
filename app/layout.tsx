@@ -22,7 +22,8 @@ export const metadata: Metadata = {
     title: "SIPRA",
   },
   applicationName: "SIPRA",
-  manifest: "/manifest.webmanifest",
+  // manifest no se declara aquí: app/manifest.ts lo sirve automáticamente
+  // y ya inyecta <link rel="manifest"> — duplicarlo causaría dos errores en consola.
   icons: {
     icon: [
       { url: "/favicon-96x96.png", sizes: "96x96", type: "image/png" },

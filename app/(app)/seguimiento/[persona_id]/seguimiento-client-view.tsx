@@ -540,6 +540,7 @@ function ListonBadge({
   return (
     <Component
       onClick={onClick}
+      {...(onClick ? { type: 'button' as const, tabIndex: -1 } : {})}
       className={cn(
         "inline-flex items-center flex-shrink-0 text-[10px] font-semibold px-2 py-1 rounded-full whitespace-nowrap",
         onClick 
