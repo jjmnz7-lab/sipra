@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
@@ -108,7 +108,7 @@ export function GrupoClientView({
       icon: <UserPlus className="h-5 w-5" />,
       color: '#22887c',
       titulo: 'Asignar alumno',
-      desc: 'Inscribe rÃ¡pidamente a un alumno existente a este grupo.',
+      desc: 'Inscribe rápidamente a un alumno existente a este grupo.',
       onClick: () => { setIsFabSheetOpen(false); setIsAsignarOpen(true) },
     },
     {
@@ -116,7 +116,7 @@ export function GrupoClientView({
       icon: <Receipt className="h-5 w-5" />,
       color: '#15435a',
       titulo: 'Cargo grupal',
-      desc: 'Aplica un cobro extra a los miembros de este grupo (con opciÃ³n de excluir).',
+      desc: 'Aplica un cobro extra a los miembros de este grupo (con opción de excluir).',
       onClick: () => { setIsFabSheetOpen(false); setIsCargoOpen(true) },
     },
   ]
@@ -307,7 +307,7 @@ export function GrupoClientView({
         <DrawerContent className="max-h-[60vh]">
           <div className="mx-auto w-full max-w-md flex flex-col pb-6">
             <DrawerHeader className="text-left">
-              <DrawerTitle>Â¿QuÃ© quieres hacer en este grupo?</DrawerTitle>
+              <DrawerTitle>¿Qué quieres hacer en este grupo?</DrawerTitle>
             </DrawerHeader>
             <div className="px-4 space-y-2">
               {opcionesFab.map((op) => (
