@@ -419,7 +419,7 @@ export async function crearCargoGrupalAction(prevState: FormState, formData: For
     error: PostgrestError | null
   }>
 
-  const rpcCrearCargo = supabase.rpc as unknown as CrearCargoGrupalRpc
+  const rpcCrearCargo = supabase.rpc.bind(supabase) as unknown as CrearCargoGrupalRpc
   const { data, error } = await rpcCrearCargo('crear_cargo_grupal_v1', {
     p_academia_id: academiaId,
     p_grupo_id: validatedFields.data.grupo_id,
@@ -487,7 +487,7 @@ export async function crearAvisoGrupalAction(prevState: FormState, formData: For
     error: PostgrestError | null
   }>
 
-  const rpcCrearAviso = supabase.rpc as unknown as CrearAvisoGrupalRpc
+  const rpcCrearAviso = supabase.rpc.bind(supabase) as unknown as CrearAvisoGrupalRpc
   const { error } = await rpcCrearAviso('crear_aviso_grupal_v1', {
     p_academia_id: academiaId,
     p_grupo_id: validatedFields.data.grupo_id,
