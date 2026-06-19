@@ -16,6 +16,7 @@ import { AccionesActividadSheet } from '@/components/domain/actividad/acciones-a
 import { EditarActividadDrawer } from '@/components/domain/actividad/editar-actividad-drawer'
 import { ArchivarActividadDrawer } from '@/components/domain/actividad/archivar-actividad-drawer'
 import { FinalizarActividadDrawer } from '@/components/domain/actividad/finalizar-actividad-drawer'
+import { useToast } from '@/components/ui/use-toast'
 import {
   Drawer,
   DrawerContent,
@@ -58,6 +59,7 @@ export function ActividadClientView({
   const [isCargoOpen, setIsCargoOpen] = useState(false)
   const [isAsignarOpen, setIsAsignarOpen] = useState(false)
   const [isFabSheetOpen, setIsFabSheetOpen] = useState(false)
+  const { showToast, toast } = useToast()
 
   const { alumnosActivos, alumnosSuspendidos } = useMemo(() => {
     const activos = (inscripciones ?? []).filter((ins: any) => ins.persona?.estado_registro === 'activo')
@@ -346,6 +348,7 @@ export function ActividadClientView({
         inscripciones={inscripciones || []}
         open={isCargoOpen}
         onOpenChange={setIsCargoOpen}
+        onSuccess={showToast}
       />
       <AsignarAlumnoActividadSheet
         actividadId={actividad.id}
@@ -401,6 +404,8 @@ export function ActividadClientView({
         open={isEditarOpen}
         onOpenChange={setIsEditarOpen}
       />
+
+      {toast}
     </div>
   )
 }

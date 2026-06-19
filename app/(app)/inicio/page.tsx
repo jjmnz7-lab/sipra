@@ -38,7 +38,7 @@ export default async function InicioPage() {
   // Las actividades se gestionan desde su propia pantalla.
   const { data: gruposRaw } = await supabase
     .from('grupo')
-    .select('id, nombre, color, plan_sugerido_id')
+    .select('id, nombre, color, emoji, plan_sugerido_id')
     .eq('estado', 'activo')
     .eq('es_temporal', false)
     .order('nombre') as any
@@ -78,13 +78,15 @@ export default async function InicioPage() {
 
   const { data: pgMiembros } = await supabase
     .from('persona_grupo')
-    .select('grupo_id, persona ( id, nombre, apellido )')
+    .select('grupo_id, persona ( id, nombre, apellido, estado_registro )')
     .eq('academia_id', academiaId)
     .eq('estado', 'activo') as any
 
+  // Solo alumnos activos: a los suspendidos no se les pueden generar cargos.
   const miembrosPorGrupo = new Map<string, { persona: { id: string; nombre: string; apellido: string | null } }[]>()
   for (const r of (pgMiembros ?? [])) {
     if (!r.grupo_id || !r.persona) continue
+    if (r.persona.estado_registro !== 'activo') continue
     const arr = miembrosPorGrupo.get(r.grupo_id) ?? []
     arr.push({ persona: { id: r.persona.id, nombre: r.persona.nombre, apellido: r.persona.apellido ?? '' } })
     miembrosPorGrupo.set(r.grupo_id, arr)
@@ -94,6 +96,7 @@ export default async function InicioPage() {
     id: g.id,
     nombre: g.nombre,
     color: g.color ?? null,
+    emoji: g.emoji ?? null,
     inscripciones: miembrosPorGrupo.get(g.id) ?? [],
   }))
 

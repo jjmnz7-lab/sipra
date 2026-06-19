@@ -438,12 +438,126 @@ export async function crearCargoGrupalAction(prevState: FormState, formData: For
   revalidatePath(`/grupos/${validatedFields.data.grupo_id}`)
   revalidatePath('/actividades')
   revalidatePath(`/actividades/${validatedFields.data.grupo_id}`)
+  // Superficies globales de saldo: el cargo afecta el adeudo del alumno en
+  // Inicio, la lista de Alumnos, el detalle de cada alumno y los reportes.
+  revalidatePath('/inicio')
+  revalidatePath('/alumnos')
+  revalidatePath('/seguimiento/[persona_id]', 'page')
+  revalidatePath('/reportes')
 
   if (data?.idempotent_hit) {
      return { success: true, message: 'El cargo ya había sido procesado (Idempotencia).' }
   }
 
   return { success: true, message: `Se generaron ${data?.cargos_creados || 0} cargos masivos con éxito.` }
+}
+
+// ── Cargo masivo multi-grupo ─────────────────────────────────────────────────
+// Aplica un mismo concepto/monto a varios grupos en una sola operación. Todos
+// los cargos comparten un `lote_id` (para que Reportes los muestre como UNA
+// tarjeta), pero cada grupo conserva su propio idempotency_key (estable por
+// lote+grupo) para que los reenvíos sigan siendo idempotentes.
+//
+// La de-duplicación de alumnos que están en más de un grupo se resuelve en el
+// cliente vía las listas de exclusión por grupo (cuando "duplicar" está apagado,
+// el alumno se excluye de todos sus grupos salvo el primero seleccionado).
+const cargoMasivoGrupoSchema = z.object({
+  grupo_id: z.string().uuid(),
+  excluded_persona_ids: z.array(z.string().uuid()).default([]),
+})
+
+const cargoMasivoMultigrupoSchema = z.object({
+  lote_id: z.string().uuid(),
+  concepto: z.string().min(2, { message: 'El concepto es muy corto' }),
+  monto: z.coerce.number().positive({ message: 'El monto debe ser mayor a 0' }),
+  grupos: z.array(cargoMasivoGrupoSchema).min(1, { message: 'Selecciona al menos un grupo' }),
+})
+
+export async function crearCargoMasivoMultigrupoAction(prevState: FormState, formData: FormData): Promise<FormState> {
+  let gruposParsed: unknown = []
+  try {
+    gruposParsed = JSON.parse((formData.get('grupos') as string) || '[]')
+  } catch {
+    return { message: 'Datos de grupos inválidos.', success: false }
+  }
+
+  const payload = {
+    lote_id: formData.get('lote_id') as string,
+    concepto: formData.get('concepto') as string,
+    monto: formData.get('monto'),
+    grupos: gruposParsed,
+  }
+
+  const validated = cargoMasivoMultigrupoSchema.safeParse(payload)
+  if (!validated.success) {
+    return {
+      errors: validated.error.flatten().fieldErrors,
+      message: 'Faltan campos por completar o son inválidos.',
+      success: false,
+    }
+  }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const academiaId = user?.app_metadata?.academia_id
+  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
+
+  type CrearCargoGrupalRpc = (
+    fn: 'crear_cargo_grupal_v1',
+    args: {
+      p_academia_id: string
+      p_grupo_id: string
+      p_concepto: string
+      p_monto: number
+      p_excluded_persona_ids: string[]
+      p_idempotency_key: string
+      p_lote_id: string
+    }
+  ) => Promise<{
+    data: { idempotent_hit: boolean; cargos_creados: number } | null
+    error: PostgrestError | null
+  }>
+
+  const rpcCrearCargo = supabase.rpc.bind(supabase) as unknown as CrearCargoGrupalRpc
+  const { lote_id, concepto, monto, grupos } = validated.data
+
+  let totalCreados = 0
+  let huboCreacion = false
+  for (const g of grupos) {
+    const { data, error } = await rpcCrearCargo('crear_cargo_grupal_v1', {
+      p_academia_id: academiaId,
+      p_grupo_id: g.grupo_id,
+      p_concepto: concepto,
+      p_monto: monto,
+      p_excluded_persona_ids: g.excluded_persona_ids,
+      // Llave estable por lote+grupo: reenviar la operación no duplica cargos.
+      p_idempotency_key: `${lote_id}_${g.grupo_id}`,
+      p_lote_id: lote_id,
+    })
+    if (error) return { message: translateRpcError(error), success: false }
+    totalCreados += data?.cargos_creados ?? 0
+    if (!data?.idempotent_hit) huboCreacion = true
+  }
+
+  revalidatePath('/inicio')
+  revalidatePath('/grupos')
+  revalidatePath('/grupos/[grupo_id]', 'page')
+  revalidatePath('/actividades')
+  revalidatePath('/actividades/[actividad_id]', 'page')
+  revalidatePath('/reportes')
+  // Superficies globales de saldo: el cargo afecta el adeudo del alumno en la
+  // lista de Alumnos y en el detalle de cada alumno.
+  revalidatePath('/alumnos')
+  revalidatePath('/seguimiento/[persona_id]', 'page')
+
+  if (!huboCreacion && totalCreados === 0) {
+    return { success: true, message: 'El cargo ya había sido procesado (Idempotencia).' }
+  }
+
+  return {
+    success: true,
+    message: `Se generaron ${totalCreados} ${totalCreados === 1 ? 'cargo' : 'cargos'} en ${grupos.length} ${grupos.length === 1 ? 'grupo' : 'grupos'}.`,
+  }
 }
 
 const avisoGrupalSchema = z.object({

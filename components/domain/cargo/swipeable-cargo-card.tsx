@@ -256,7 +256,10 @@ export function SwipeableCargoCard({
         <RegistrarPagoDrawer
           open={isPagoOpen}
           onOpenChange={setIsPagoOpen}
-          cargo={primaryCargo}
+          personaId={alumno.persona_id}
+          personaNombre={nombreCompleto}
+          cargoIds={alumno.cargos?.map((c: any) => c.id) ?? []}
+          saldoTotal={alumno.totalAdeudado}
           allowPartial={allowPartial}
         />
       )}

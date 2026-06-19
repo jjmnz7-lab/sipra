@@ -16,6 +16,21 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 export type FamiliaLote = 'mensualidad' | 'grupal' | 'actividad'
 export type VisibilidadLote = 'visible' | 'archivado'
 
+/** Grupo incluido en un lote masivo multi-grupo (para filtros del detalle). */
+export type GrupoMeta = {
+  id: string
+  nombre: string
+  color: string | null
+  emoji: string | null
+}
+
+/** Desglose del adeudo de un alumno dentro de un grupo concreto del lote. */
+export type AlumnoGrupoEnLote = {
+  grupoId: string
+  montoOriginal: number
+  saldoPendiente: number
+}
+
 export type AlumnoEnLote = {
   personaId: string
   nombre: string
@@ -24,6 +39,8 @@ export type AlumnoEnLote = {
   estadoRegistro: string
   montoOriginal: number
   saldoPendiente: number
+  /** Desglose por grupo (solo lotes grupales). Permite filtrar el detalle por grupo. */
+  grupos: AlumnoGrupoEnLote[]
 }
 
 export type LoteCargos = {
@@ -41,6 +58,8 @@ export type LoteCargos = {
   fechaLote: string
   visibilidad: VisibilidadLote
   alumnos: AlumnoEnLote[]
+  /** Grupos incluidos (lotes grupales). >1 ⇒ cargo masivo multi-grupo. */
+  grupos: GrupoMeta[]
 }
 
 type CargoRow = {
@@ -82,11 +101,12 @@ function addDays(iso: string, dias: number): Date {
  */
 export function agruparLotesCargos(
   cargos: CargoRow[],
-  grupos: GrupoLite[],
+  grupos: GrupoMeta[],
   planes: GrupoLite[] = [],
   ahora: Date = new Date(),
 ): LoteCargos[] {
   const grupoById = new Map(grupos.map((g) => [g.id, g.nombre]))
+  const grupoMetaById = new Map(grupos.map((g) => [g.id, g]))
   const planById = new Map(planes.map((p) => [p.id, p.nombre]))
 
   type Acc = {
@@ -116,12 +136,18 @@ export function agruparLotesCargos(
       contexto = meta.plan_nombre ?? planById.get(meta.plan_id) ?? null
     } else if (c.origen === 'grupal') {
       const grupoId = meta.grupo_id ?? c.grupo_id_origen
+      const loteId = meta.lote_id
       const idem = meta.idempotency_key
-      // Fallback para lotes históricos sin llave: concepto + día de creación.
-      clave = idem
-        ? `g_${idem}`
-        : `g_${grupoId ?? 'x'}_${c.concepto.toLowerCase().trim()}_${c.created_at.slice(0, 10)}`
+      // Lotes masivos multi-grupo comparten lote_id ⇒ colapsan en una sola
+      // tarjeta. Fallback histórico: idempotency_key; o concepto + día.
+      clave = loteId
+        ? `g_lote_${loteId}`
+        : idem
+          ? `g_${idem}`
+          : `g_${grupoId ?? 'x'}_${c.concepto.toLowerCase().trim()}_${c.created_at.slice(0, 10)}`
       familia = 'grupal'
+      // El contexto/grupos definitivos se calculan al cerrar el lote (puede ser
+      // multi-grupo). Aquí se deja el nombre del primer grupo como provisional.
       contexto = grupoId ? (grupoById.get(grupoId) ?? null) : null
     } else if (c.origen === 'actividad') {
       const grupoId = meta.grupo_id ?? c.grupo_id_origen
@@ -147,6 +173,7 @@ export function agruparLotesCargos(
     let fechaLote = ''
     let ultimoMovimiento = ''
     const porPersona = new Map<string, AlumnoEnLote>()
+    const grupoIds = new Set<string>()
 
     for (const c of acc.cargos) {
       const monto = Number(c.monto_original)
@@ -156,19 +183,35 @@ export function agruparLotesCargos(
       if (c.created_at > fechaLote) fechaLote = c.created_at
       if (c.updated_at > ultimoMovimiento) ultimoMovimiento = c.updated_at
 
-      const prev = porPersona.get(c.persona_id)
-      if (prev) {
-        prev.montoOriginal += monto
-        prev.saldoPendiente += saldo
+      const grupoId: string | null = (c.metadata?.grupo_id as string | undefined) ?? c.grupo_id_origen ?? null
+      if (grupoId) grupoIds.add(grupoId)
+
+      let alumno = porPersona.get(c.persona_id)
+      if (alumno) {
+        alumno.montoOriginal += monto
+        alumno.saldoPendiente += saldo
       } else {
-        porPersona.set(c.persona_id, {
+        alumno = {
           personaId: c.persona_id,
           nombre: c.persona?.nombre ?? 'Alumno',
           apellido: c.persona?.apellido ?? null,
           estadoRegistro: c.persona?.estado_registro ?? 'activo',
           montoOriginal: monto,
           saldoPendiente: saldo,
-        })
+          grupos: [],
+        }
+        porPersona.set(c.persona_id, alumno)
+      }
+
+      // Desglose por grupo (para filtros del detalle en lotes multi-grupo).
+      if (grupoId) {
+        const gb = alumno.grupos.find((x) => x.grupoId === grupoId)
+        if (gb) {
+          gb.montoOriginal += monto
+          gb.saldoPendiente += saldo
+        } else {
+          alumno.grupos.push({ grupoId, montoOriginal: monto, saldoPendiente: saldo })
+        }
       }
     }
 
@@ -193,11 +236,27 @@ export function agruparLotesCargos(
       `${a.nombre} ${a.apellido ?? ''}`.localeCompare(`${b.nombre} ${b.apellido ?? ''}`, 'es'),
     )
 
+    // Grupos del lote (solo grupal). Orden estable por nombre.
+    const gruposLote: GrupoMeta[] =
+      acc.familia === 'grupal'
+        ? Array.from(grupoIds)
+            .map((id) => grupoMetaById.get(id) ?? { id, nombre: grupoById.get(id) ?? 'Grupo', color: null, emoji: null })
+            .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+        : []
+
+    // Contexto: para grupal multi-grupo, "N grupos"; un solo grupo, su nombre.
+    const contexto =
+      acc.familia === 'grupal'
+        ? gruposLote.length > 1
+          ? `${gruposLote.length} grupos`
+          : (gruposLote[0]?.nombre ?? acc.contexto)
+        : acc.contexto
+
     resultado.push({
       clave,
       familia: acc.familia,
       titulo: acc.titulo,
-      contexto: acc.contexto,
+      contexto,
       total,
       cobrado,
       pendiente,
@@ -205,6 +264,7 @@ export function agruparLotesCargos(
       fechaLote,
       visibilidad,
       alumnos,
+      grupos: gruposLote,
     })
   }
 
@@ -226,12 +286,12 @@ export async function fetchLotesCargos(
       .eq('academia_id', academiaId)
       .in('origen', ['grupal', 'recurrente', 'actividad'])
       .neq('estado_financiero', 'anulado'),
-    supabase.from('grupo').select('id, nombre').eq('academia_id', academiaId),
+    supabase.from('grupo').select('id, nombre, color, emoji').eq('academia_id', academiaId),
     supabase.from('planes_cobro').select('id, nombre').eq('academia_id', academiaId),
   ])
 
   const cargos = (cargosRes.data ?? []) as unknown as CargoRow[]
-  const grupos = (gruposRes.data ?? []) as GrupoLite[]
+  const grupos = (gruposRes.data ?? []) as GrupoMeta[]
   const planes = (planesRes.data ?? []) as GrupoLite[]
   return agruparLotesCargos(cargos, grupos, planes)
 }

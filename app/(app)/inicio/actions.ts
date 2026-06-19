@@ -78,8 +78,16 @@ export async function registrarPagoAction(prevState: FormState, formData: FormDa
     return { message: translateRpcError(error), success: false }
   }
 
+  // El pago cambia el adeudo del alumno, visible en todas estas superficies.
   revalidatePath('/inicio')
   revalidatePath(`/seguimiento/${validatedFields.data.persona_id}`)
+  revalidatePath('/seguimiento/[persona_id]', 'page')
+  revalidatePath('/alumnos')
+  revalidatePath('/grupos')
+  revalidatePath('/grupos/[grupo_id]', 'page')
+  revalidatePath('/actividades')
+  revalidatePath('/actividades/[actividad_id]', 'page')
+  revalidatePath('/reportes')
   return { success: true, message: 'Pago liquidado con éxito.' }
 }
 

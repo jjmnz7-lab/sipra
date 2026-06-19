@@ -20,7 +20,8 @@ import {
 } from '@/components/domain/cargo/visita-express-drawer'
 import { RegistrarPagoDrawer } from '@/components/domain/cargo/registrar-pago-drawer'
 import { CrearCargoIndividualDrawer } from '@/components/domain/cargo/crear-cargo-individual-drawer'
-import { MassCargoDrawer } from '@/components/domain/grupo/mass-cargo-drawer'
+import { CargoMasivoWizard, type GrupoCargoMasivo } from '@/components/domain/cargo/cargo-masivo-wizard'
+import { useToast } from '@/components/ui/use-toast'
 
 type AlumnoDeuda = {
   persona_id: string
@@ -30,14 +31,9 @@ type AlumnoDeuda = {
   saldoTotal: number
 }
 
-type GrupoCargo = {
-  id: string
-  nombre: string
-  color: string | null
-  inscripciones: { persona: { id: string; nombre: string; apellido: string | null } }[]
-}
+type GrupoCargo = GrupoCargoMasivo
 
-type Step = 'menu' | 'cobro' | 'cargo' | 'grupo'
+type Step = 'menu' | 'cobro' | 'cargo'
 
 export function FabOperativo({
   alumnos,
@@ -54,27 +50,23 @@ export function FabOperativo({
 }) {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [step, setStep] = useState<Step>('menu')
+  const { showToast, toast } = useToast()
 
   // Acción seleccionada + drawer destino
   const [cobroSel, setCobroSel] = useState<AlumnoDeuda | null>(null)
   const [cobroOpen, setCobroOpen] = useState(false)
   const [cargoSel, setCargoSel] = useState<AlumnoLite | null>(null)
   const [cargoOpen, setCargoOpen] = useState(false)
-  const [grupoSel, setGrupoSel] = useState<GrupoCargo | null>(null)
   const [masivoOpen, setMasivoOpen] = useState(false)
   const [visitaOpen, setVisitaOpen] = useState(false)
 
   const abrirMenu = () => { setStep('menu'); setSheetOpen(true) }
-  const cerrarSheet = () => setSheetOpen(false)
 
   const elegirCobro = (a: AlumnoDeuda) => {
     setCobroSel(a); setSheetOpen(false); setCobroOpen(true)
   }
   const elegirCargo = (a: AlumnoLite) => {
     setCargoSel(a); setSheetOpen(false); setCargoOpen(true)
-  }
-  const elegirGrupo = (g: GrupoCargo) => {
-    setGrupoSel(g); setSheetOpen(false); setMasivoOpen(true)
   }
 
   const opciones = [
@@ -99,8 +91,8 @@ export function FabOperativo({
       icon: <Users className="h-5 w-5" />,
       color: '#15435a',
       titulo: 'Cargo masivo',
-      desc: 'Asigna un cargo adicional para varios alumnos.',
-      onClick: () => setStep('grupo'),
+      desc: 'Asigna un cargo a uno o varios grupos.',
+      onClick: () => { setSheetOpen(false); setMasivoOpen(true) },
     },
     {
       key: 'visita' as const,
@@ -124,14 +116,6 @@ export function FabOperativo({
   const cargoItems = useMemo(
     () => alumnos.map(a => ({ id: a.id, nombre: a.nombre, apellido: a.apellido ?? '' })),
     [alumnos],
-  )
-  const grupoItems = useMemo(
-    () => grupos.map(g => ({
-      id: g.id,
-      nombre: g.nombre,
-      subtitle: `${g.inscripciones.length} ${g.inscripciones.length === 1 ? 'alumno' : 'alumnos'}`,
-    })),
-    [grupos],
   )
 
   return (
@@ -208,20 +192,6 @@ export function FabOperativo({
                 }}
               />
             )}
-
-            {step === 'grupo' && (
-              <PickerStep
-                titulo="Cargo masivo"
-                placeholder="Buscar grupo…"
-                items={grupoItems}
-                emptyText="No hay grupos activos."
-                onBack={() => setStep('menu')}
-                onSelect={(id) => {
-                  const g = grupos.find(x => x.id === id)
-                  if (g) elegirGrupo(g)
-                }}
-              />
-            )}
           </div>
         </DrawerContent>
       </Drawer>
@@ -248,14 +218,12 @@ export function FabOperativo({
         />
       )}
 
-      {grupoSel && (
-        <MassCargoDrawer
-          open={masivoOpen}
-          onOpenChange={setMasivoOpen}
-          grupoId={grupoSel.id}
-          inscripciones={grupoSel.inscripciones}
-        />
-      )}
+      <CargoMasivoWizard
+        open={masivoOpen}
+        onOpenChange={setMasivoOpen}
+        grupos={grupos}
+        onSuccess={showToast}
+      />
 
       <VisitaExpressDrawer
         open={visitaOpen}
@@ -263,6 +231,8 @@ export function FabOperativo({
         alumnos={alumnos}
         planesPorVisita={planesPorVisita}
       />
+
+      {toast}
     </>
   )
 }

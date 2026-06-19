@@ -39,9 +39,11 @@ interface MassCargoDrawerProps {
   /** Controlado desde el padre (opcional). Si se omite, el drawer se autocontrola y renderiza su trigger por defecto. */
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  /** Se llama al generar los cargos con éxito (para mostrar un toast desde el padre). */
+  onSuccess?: (msg: string) => void
 }
 
-export function MassCargoDrawer({ grupoId, inscripciones, open: controlledOpen, onOpenChange }: MassCargoDrawerProps) {
+export function MassCargoDrawer({ grupoId, inscripciones, open: controlledOpen, onOpenChange, onSuccess }: MassCargoDrawerProps) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
   const isControlled = controlledOpen !== undefined
   const open = isControlled ? controlledOpen : uncontrolledOpen
@@ -62,9 +64,10 @@ export function MassCargoDrawer({ grupoId, inscripciones, open: controlledOpen, 
   }, [open, inscripciones])
 
   useEffect(() => {
-    if (state.success) {
-      setOpen(false)
-    }
+    if (!state.success) return
+    onSuccess?.(state.message ?? 'Cargos generados con éxito.')
+    setOpen(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.success])
 
   const togglePersona = (id: string, isChecked: boolean) => {
@@ -107,7 +110,7 @@ export function MassCargoDrawer({ grupoId, inscripciones, open: controlledOpen, 
                 <Input
                   id="concepto"
                   name="concepto"
-                  placeholder="Ej. Mensualidad Junio"
+                  placeholder="Ej. Inscripción torneo"
                   required
                   className="h-11"
                 />

@@ -14,6 +14,7 @@ import { AsignarAlumnoSheet, type AlumnoLite } from '@/components/domain/grupo/a
 import { AccionesGrupoSheet } from '@/components/domain/grupo/acciones-grupo-sheet'
 import { EditarGrupoDrawer } from '@/components/domain/grupo/editar-grupo-drawer'
 import { ArchivarGrupoDrawer } from '@/components/domain/grupo/archivar-grupo-drawer'
+import { useToast } from '@/components/ui/use-toast'
 import {
   Drawer,
   DrawerContent,
@@ -82,6 +83,7 @@ export function GrupoClientView({
   const [isCargoOpen, setIsCargoOpen] = useState(false)
   const [isAsignarOpen, setIsAsignarOpen] = useState(false)
   const [isFabSheetOpen, setIsFabSheetOpen] = useState(false)
+  const { showToast, toast } = useToast()
 
   const { alumnosActivos, alumnosSuspendidos } = useMemo(() => {
     const activos = (inscripciones ?? []).filter((ins: any) => ins.persona?.estado_registro === 'activo')
@@ -341,6 +343,7 @@ export function GrupoClientView({
         inscripciones={inscripciones || []}
         open={isCargoOpen}
         onOpenChange={setIsCargoOpen}
+        onSuccess={showToast}
       />
       <AsignarAlumnoSheet
         grupoId={grupo.id}
@@ -387,6 +390,8 @@ export function GrupoClientView({
         open={isEditarOpen}
         onOpenChange={setIsEditarOpen}
       />
+
+      {toast}
     </div>
   )
 }

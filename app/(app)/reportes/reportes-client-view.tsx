@@ -302,7 +302,7 @@ export function ReportesClientView({
         <section className="space-y-3">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Control de cargos grupales</CardTitle>
+              <CardTitle className="text-lg">Control de cargos grupales/masivos</CardTitle>
               <CardAction>
                 <button
                   type="button"

@@ -1,9 +1,9 @@
 'use client'
 
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef, type CSSProperties } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Users, FileText, MessageCircle } from 'lucide-react'
+import { Users, FileText, MessageCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { PageSubheader } from '@/components/layout/page-subheader'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -22,6 +22,7 @@ import {
 import { formatCurrency, formatCurrencyCompact } from '@/lib/utils/currency'
 import { formatFechaCorta } from '@/lib/utils/format-fecha'
 import { buildWhatsAppShareUrl } from '@/lib/utils/whatsapp'
+import { colorPorSlug } from '@/lib/constants/grupo-apariencia'
 import { cn } from '@/lib/utils'
 import type { AlumnoEnLote, LoteCargos } from '@/lib/reportes/cargos-grupales'
 
@@ -37,16 +38,59 @@ export function LoteClientView({ lote }: { lote: LoteCargos }) {
   const [incluirLiquidados, setIncluirLiquidados] = useState(false)
   const [mensaje, setMensaje] = useState('')
   const [edited, setEdited] = useState(false)
+  // Filtro por grupo (solo lotes masivos multi-grupo). null = Todos.
+  const [grupoSel, setGrupoSel] = useState<string | null>(null)
+
+  // Para scroll de filtros
+  const filtrosRef = useRef<HTMLDivElement>(null)
+  const [filtrosScrollLeft, setFiltrosScrollLeft] = useState(0)
+  const [filtrosScrollWidth, setFiltrosScrollWidth] = useState(0)
+  const [filtrosClientWidth, setFiltrosClientWidth] = useState(0)
+
+  const esMultigrupo = lote.grupos.length > 1
+
+  const hasOverflow = filtrosScrollWidth > filtrosClientWidth
 
   const handleBack = () => {
     setIsExiting(true)
     setTimeout(() => router.back(), 200)
   }
 
+  const updateFiltrosMetrics = () => {
+    if (!filtrosRef.current) return
+    setFiltrosScrollLeft(filtrosRef.current.scrollLeft)
+    setFiltrosScrollWidth(filtrosRef.current.scrollWidth)
+    setFiltrosClientWidth(filtrosRef.current.clientWidth)
+  }
+
+  useEffect(() => {
+    updateFiltrosMetrics()
+    const ref = filtrosRef.current
+    if (!ref) return
+    ref.addEventListener('scroll', updateFiltrosMetrics)
+    window.addEventListener('resize', updateFiltrosMetrics)
+    return () => {
+      ref.removeEventListener('scroll', updateFiltrosMetrics)
+      window.removeEventListener('resize', updateFiltrosMetrics)
+    }
+  }, [esMultigrupo])
+
+  // Alumnos según el filtro de grupo. Con un grupo seleccionado se usa su
+  // desglose (monto/saldo de ese grupo); con "Todos", el total del lote.
+  const alumnosEfectivos = useMemo(() => {
+    if (!grupoSel) return lote.alumnos
+    return lote.alumnos
+      .filter((a) => a.grupos.some((g) => g.grupoId === grupoSel))
+      .map((a) => {
+        const gb = a.grupos.find((g) => g.grupoId === grupoSel)!
+        return { ...a, montoOriginal: gb.montoOriginal, saldoPendiente: gb.saldoPendiente }
+      })
+  }, [lote.alumnos, grupoSel])
+
   const { pendientes, liquidados } = useMemo(() => {
     const p: AlumnoEnLote[] = []
     const l: AlumnoEnLote[] = []
-    for (const a of lote.alumnos) {
+    for (const a of alumnosEfectivos) {
       if (a.saldoPendiente > 0) p.push(a)
       else l.push(a)
     }
@@ -57,7 +101,7 @@ export function LoteClientView({ lote }: { lote: LoteCargos }) {
       return sa - sb
     })
     return { pendientes: p, liquidados: l }
-  }, [lote.alumnos])
+  }, [alumnosEfectivos])
 
   const lista = tab === 'pendientes' ? pendientes : liquidados
 
@@ -67,8 +111,11 @@ export function LoteClientView({ lote }: { lote: LoteCargos }) {
   ]
 
   const mensajeResumen = useMemo(() => {
-    let msg = `*${lote.titulo}${lote.contexto ? ` • ${lote.contexto}` : ''}*`
-    
+    // Si hay un grupo seleccionado, el resumen es solo de ese grupo.
+    const meta = grupoSel ? lote.grupos.find((g) => g.id === grupoSel) : null
+    const ctx = meta ? meta.nombre : lote.contexto
+    let msg = `*${lote.titulo}${ctx ? ` • ${ctx}` : ''}*`
+
     msg += `\n\n*Pendientes de pago (${pendientes.length}):*`
     if (pendientes.length === 0) {
       msg += `\n• Ninguno`
@@ -90,7 +137,7 @@ export function LoteClientView({ lote }: { lote: LoteCargos }) {
     }
 
     return msg
-  }, [lote.titulo, lote.contexto, pendientes, liquidados, incluirLiquidados])
+  }, [lote.titulo, lote.contexto, lote.grupos, grupoSel, pendientes, liquidados, incluirLiquidados])
 
   useEffect(() => {
     if (!edited) {
@@ -135,22 +182,19 @@ export function LoteClientView({ lote }: { lote: LoteCargos }) {
       />
 
       <div className="p-4 space-y-4">
-        {/* Resumen del lote: strip de progreso + fracción */}
-        <Card>
-          <CardContent className="px-3 pt-0.5 pb-1 space-y-1">
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-xs font-semibold text-foreground">{lote.pct}% cobrado</span>
-            </div>
+        {/* Resumen del lote: strip de progreso + (% cobrado · fracción) debajo */}
+        <Card className="py-2">
+          <CardContent className="px-3 space-y-1.5">
             <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
               <div
                 className="h-full rounded-full transition-all duration-500"
                 style={{ width: `${Math.min(100, lote.pct)}%`, backgroundColor: AZUL_PROGRESO }}
               />
             </div>
-            <div className="flex items-center justify-end text-xs">
-              <span className="font-semibold text-foreground tabular-nums">
-                {formatCurrencyCompact(lote.cobrado)}
-                <span className="font-normal text-muted-foreground"> / {formatCurrencyCompact(lote.total)}</span>
+            <div className="flex items-baseline justify-between text-xs">
+              <span className="font-semibold text-foreground">{lote.pct}%</span>
+              <span className="text-muted-foreground tabular-nums">
+                <span className="font-semibold text-foreground">{formatCurrencyCompact(lote.cobrado)}</span> / {formatCurrencyCompact(lote.total)}
               </span>
             </div>
           </CardContent>
@@ -178,6 +222,69 @@ export function LoteClientView({ lote }: { lote: LoteCargos }) {
             )
           })}
         </div>
+
+        {/* Filtros por grupo (solo lotes masivos multi-grupo). Desplazable en horizontal. */}
+        {esMultigrupo && (
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1">
+              {/* Botón izquierda — solo desktop, solo con overflow */}
+              {hasOverflow && (
+                <button
+                  onClick={() => filtrosRef.current?.scrollBy({ left: -200, behavior: 'smooth' })}
+                  className="hidden md:flex flex-shrink-0 items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Desplazar filtros a la izquierda"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+              )}
+
+              {/* Fila de badges: centrada cuando no hay overflow, scrollable cuando sí */}
+              <div
+                ref={filtrosRef}
+                className={cn(
+                  'flex flex-1 items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden',
+                  hasOverflow ? 'justify-start' : 'justify-center',
+                )}
+              >
+                <GrupoFiltroBadge todos label="Todos" selected={grupoSel === null} onClick={() => setGrupoSel(null)} />
+                {lote.grupos.map((g) => (
+                  <GrupoFiltroBadge
+                    key={g.id}
+                    label={g.nombre}
+                    emoji={g.emoji}
+                    colorSlug={g.color}
+                    selected={grupoSel === g.id}
+                    onClick={() => setGrupoSel(g.id)}
+                  />
+                ))}
+              </div>
+
+              {/* Botón derecha — solo desktop, solo con overflow */}
+              {hasOverflow && (
+                <button
+                  onClick={() => filtrosRef.current?.scrollBy({ left: 200, behavior: 'smooth' })}
+                  className="hidden md:flex flex-shrink-0 items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Desplazar filtros a la derecha"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Scrollbar indicator — solo visible cuando hay overflow */}
+            {hasOverflow && (
+              <div className="relative h-0.5 rounded-full bg-border/50 mx-1">
+                <div
+                  className="absolute top-0 h-full rounded-full bg-primary/40 transition-all duration-75"
+                  style={{
+                    width: `${(filtrosClientWidth / filtrosScrollWidth) * 100}%`,
+                    left: `${(filtrosScrollLeft / filtrosScrollWidth) * 100}%`,
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Lista de alumnos del tab activo */}
         <div className="space-y-2">
@@ -276,6 +383,48 @@ export function LoteClientView({ lote }: { lote: LoteCargos }) {
   )
 }
 
+function GrupoFiltroBadge({
+  label,
+  emoji,
+  colorSlug,
+  selected,
+  onClick,
+  todos = false,
+}: {
+  label: string
+  emoji?: string | null
+  colorSlug?: string | null
+  selected: boolean
+  onClick: () => void
+  todos?: boolean
+}) {
+  let style: CSSProperties | undefined
+  let className =
+    'flex-shrink-0 inline-flex items-center gap-1 rounded-full h-7 px-2.5 text-[10px] font-semibold border transition-all whitespace-nowrap '
+
+  if (todos) {
+    className += selected
+      ? 'bg-[#15435a] text-white border-transparent'
+      : 'bg-secondary text-muted-foreground border-transparent hover:bg-accent'
+  } else {
+    const c = colorPorSlug(colorSlug)
+    if (selected) {
+      className += 'font-bold'
+      style = { color: c.textLight, borderColor: c.border, backgroundColor: c.bg }
+    } else {
+      className += 'bg-secondary border-transparent hover:bg-accent'
+      style = { color: c.textLight }
+    }
+  }
+
+  return (
+    <button type="button" onClick={onClick} className={className} style={style} aria-pressed={selected}>
+      {emoji ? <span aria-hidden="true">{emoji}</span> : null}
+      <span className="truncate max-w-[9rem]">{label}</span>
+    </button>
+  )
+}
+
 function WhatsappSummaryIcon({ className }: { className?: string }) {
   return (
     <span className={cn('relative inline-flex h-5 w-5 flex-shrink-0 items-center justify-center', className)}>
@@ -309,19 +458,19 @@ function AlumnoLoteRow({ alumno, liquidado }: { alumno: AlumnoEnLote; liquidado:
         </p>
 
         {liquidado ? (
-          <span className="flex-shrink-0 inline-flex items-center text-[10px] font-semibold rounded-full border px-2 py-0.5 whitespace-nowrap border-[#22887c]/30 bg-[#22887c]/10 text-[#22887c]">
+          <span className="flex-shrink-0 inline-flex items-center text-[10px] font-semibold rounded-full border px-2 py-0.5 whitespace-nowrap border-[#22887c]/30 text-[#22887c]">
             Liquidado
           </span>
         ) : suspendido ? (
-          <span className="flex-shrink-0 inline-flex items-center text-[10px] font-semibold rounded-full border px-2 py-0.5 whitespace-nowrap border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
+          <span className="flex-shrink-0 inline-flex items-center text-[10px] font-semibold rounded-full border px-2 py-0.5 whitespace-nowrap border-slate-300 text-slate-700 dark:border-slate-600 dark:text-slate-300">
             Suspendido • {formatCurrencyCompact(alumno.saldoPendiente)}
           </span>
         ) : abonado > 0 ? (
-          <span className="flex-shrink-0 inline-flex items-center text-[10px] font-semibold rounded-full border px-2 py-0.5 whitespace-nowrap border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-600/60 dark:bg-amber-900/40 dark:text-amber-200">
+          <span className="flex-shrink-0 inline-flex items-center text-[10px] font-semibold rounded-full border px-2 py-0.5 whitespace-nowrap border-amber-300 text-amber-900 dark:border-amber-600/60 dark:text-amber-200">
             Abonó {formatCurrencyCompact(abonado)} (Resta {formatCurrencyCompact(alumno.saldoPendiente)})
           </span>
         ) : (
-          <span className="flex-shrink-0 inline-flex items-center text-[10px] font-semibold rounded-full border px-2 py-0.5 whitespace-nowrap border-red-200 bg-red-50 text-red-600 dark:border-red-800/50 dark:bg-red-900/25 dark:text-red-400">
+          <span className="flex-shrink-0 inline-flex items-center text-[10px] font-semibold rounded-full border px-2 py-0.5 whitespace-nowrap border-red-200 text-red-600 dark:border-red-800/50 dark:text-red-400">
             Pendiente {formatCurrencyCompact(alumno.saldoPendiente)}
           </span>
         )}
