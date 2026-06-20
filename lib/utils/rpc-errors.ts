@@ -3,6 +3,7 @@ const RPC_ERROR_MAP: Record<string, string> = {
   'MONTO_INVALIDO':          'El monto debe ser mayor a cero.',
   'SALDO_INSUFICIENTE':      'El monto supera el saldo pendiente.',
   'PAGO_PARCIAL_NO_PERMITIDO':'Esta academia no permite abonos parciales. Debes liquidar el total del adeudo.',
+  'SALDO_A_FAVOR_NO_PERMITIDO':'Esta academia no permite pagos mayores al saldo pendiente (saldo a favor).',
   'CONCEPTO_REQUERIDO':      'El concepto del cargo es obligatorio.',
   'FECHA_VENCIMIENTO_PASADA':'La fecha de vencimiento no puede ser en el pasado.',
   'ACTIVIDAD_NO_ENCONTRADA': 'La actividad no existe o fue eliminada.',

@@ -62,10 +62,11 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
   // 1a. Bandera de abonos parciales de la academia y multi_plan
   const { data: academia } = await supabase
     .from('academia')
-    .select('allow_partial_payments, multi_plan_enabled')
+    .select('allow_partial_payments, allow_overpayment, multi_plan_enabled')
     .eq('id', persona.academia_id)
     .single() as any
   const allowPartial = academia?.allow_partial_payments ?? true
+  const allowOverpayment = academia?.allow_overpayment ?? true
   const multiPlanEnabled = !!academia?.multi_plan_enabled
 
   // 1b. Fetch grupos a los que pertenece el alumno.
@@ -163,6 +164,7 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
       primerCargo={primerCargo}
       timeline={timeline || []}
       allowPartial={allowPartial}
+      allowOverpayment={allowOverpayment}
       planesPorVisita={planesPorVisita || []}
       grupos={grupos || []}
       planes={planes || []}

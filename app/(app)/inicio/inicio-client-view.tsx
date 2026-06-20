@@ -39,6 +39,7 @@ export type PlanEditar = { id: string; nombre: string; monto: number; frecuencia
 type Props = {
   alumnos: AlumnoConDeuda[]
   allowPartial: boolean
+  allowOverpayment: boolean
   gruposEditar: GrupoEditar[]
   planesEditar: PlanEditar[]
   multiPlanEnabled: boolean
@@ -75,6 +76,7 @@ function normalizar(s: string | null | undefined) {
 export function InicioClientView({
   alumnos,
   allowPartial,
+  allowOverpayment,
   gruposEditar,
   planesEditar,
   multiPlanEnabled,
@@ -276,6 +278,7 @@ export function InicioClientView({
             key={alumno.persona_id}
             alumno={alumno}
             allowPartial={allowPartial}
+            allowOverpayment={allowOverpayment}
             grupos={gruposEditar}
             planes={planesEditar}
             multiPlanEnabled={multiPlanEnabled}

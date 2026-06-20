@@ -41,6 +41,7 @@ export type Database = {
     Tables: {
       academia: {
         Row: {
+          allow_overpayment: boolean
           allow_partial_payments: boolean
           automatizacion_recurrente: boolean
           cobrar_inscripcion_default: boolean
@@ -58,6 +59,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          allow_overpayment?: boolean
           allow_partial_payments?: boolean
           automatizacion_recurrente?: boolean
           cobrar_inscripcion_default?: boolean
@@ -75,6 +77,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          allow_overpayment?: boolean
           allow_partial_payments?: boolean
           automatizacion_recurrente?: boolean
           cobrar_inscripcion_default?: boolean
@@ -780,6 +783,41 @@ export type Database = {
             columns: ["persona_id"]
             isOneToOne: false
             referencedRelation: "persona"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cobros_frecuentes: {
+        Row: {
+          academia_id: string
+          activo: boolean
+          concepto: string
+          created_at: string
+          id: string
+          monto: number
+        }
+        Insert: {
+          academia_id: string
+          activo?: boolean
+          concepto: string
+          created_at?: string
+          id?: string
+          monto: number
+        }
+        Update: {
+          academia_id?: string
+          activo?: boolean
+          concepto?: string
+          created_at?: string
+          id?: string
+          monto?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cobros_frecuentes_academia_id_fkey"
+            columns: ["academia_id"]
+            isOneToOne: false
+            referencedRelation: "academia"
             referencedColumns: ["id"]
           },
         ]

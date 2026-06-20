@@ -41,12 +41,14 @@ export function FabOperativo({
   grupos = [],
   planesPorVisita = [],
   allowPartial = true,
+  allowOverpayment = true,
 }: {
   alumnos: AlumnoLite[]
   alumnosConDeuda?: AlumnoDeuda[]
   grupos?: GrupoCargo[]
   planesPorVisita?: PlanVisita[]
   allowPartial?: boolean
+  allowOverpayment?: boolean
 }) {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [step, setStep] = useState<Step>('menu')
@@ -206,6 +208,7 @@ export function FabOperativo({
           cargoIds={cobroSel.cargoIds}
           saldoTotal={cobroSel.saldoTotal}
           allowPartial={allowPartial}
+          allowOverpayment={allowOverpayment}
         />
       )}
 

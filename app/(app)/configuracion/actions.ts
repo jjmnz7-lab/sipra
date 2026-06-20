@@ -389,6 +389,232 @@ export async function convertirAPlanUnicoAction(planIdFallback: string): Promise
   return { success: true, message: 'Academia convertida a plan único.' }
 }
 
+/**
+ * Crea o edita un plan de cobro mensual (concepto + monto). Los planes que se
+ * crean/editan aquí son siempre de recurrencia mensual. Editar el monto NO afecta
+ * cargos históricos: cada cargo guarda su propio `monto_original`.
+ */
+const planEditSchema = z.object({
+  nombre: z.string().trim().min(2, { message: 'El nombre del plan es muy corto' }),
+  monto: z.coerce.number().nonnegative({ message: 'El monto no puede ser negativo' }),
+})
+
+export async function guardarPlanCobroAction(input: {
+  id?: string | null
+  nombre: string
+  monto: number
+}): Promise<FormState> {
+  const parsed = planEditSchema.safeParse({ nombre: input.nombre, monto: input.monto })
+  if (!parsed.success) {
+    return { errors: parsed.error.flatten().fieldErrors, message: 'Revisa los datos del plan.', success: false }
+  }
+
+  const { supabase, academiaId } = await getAcademiaId()
+  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
+
+  if (input.id) {
+    const { error } = await supabase
+      .from('planes_cobro')
+      .update({ nombre: parsed.data.nombre, monto: parsed.data.monto } as any)
+      .eq('id', input.id)
+      .eq('academia_id', academiaId)
+    if (error) return { message: translateRpcError(error), success: false }
+  } else {
+    const { error } = await supabase.from('planes_cobro').insert({
+      academia_id: academiaId,
+      nombre: parsed.data.nombre,
+      monto: parsed.data.monto,
+      frecuencia: 'mensual',
+    } as any)
+    if (error) return { message: translateRpcError(error), success: false }
+  }
+
+  revalidatePath('/configuracion')
+  revalidatePath('/grupos')
+  revalidatePath('/alumnos')
+  return { success: true, message: input.id ? 'Plan actualizado.' : 'Plan creado.' }
+}
+
+/**
+ * Elimina DEFINITIVAMENTE un plan de cobro. Solo permitido cuando no hay ningún
+ * alumno (activo o inactivo) vinculado al plan en `alumno_planes`. El ledger de
+ * cargos no referencia al plan, por lo que el historial no se ve afectado.
+ */
+export async function eliminarPlanDefinitivoAction(planId: string): Promise<FormState> {
+  if (!planId) return { message: 'Plan inválido.', success: false }
+
+  const { supabase, academiaId } = await getAcademiaId()
+  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
+
+  const { count, error: countError } = await supabase
+    .from('alumno_planes')
+    .select('plan_cobro_id', { count: 'exact', head: true })
+    .eq('academia_id', academiaId)
+    .eq('plan_cobro_id', planId)
+  if (countError) return { message: translateRpcError(countError), success: false }
+  if ((count ?? 0) > 0) {
+    return { message: 'No se puede eliminar: el plan tiene alumnos relacionados. Archívalo en su lugar.', success: false }
+  }
+
+  const { error } = await supabase
+    .from('planes_cobro')
+    .delete()
+    .eq('id', planId)
+    .eq('academia_id', academiaId)
+  if (error) return { message: translateRpcError(error), success: false }
+
+  revalidatePath('/configuracion')
+  revalidatePath('/grupos')
+  revalidatePath('/alumnos')
+  return { success: true, message: 'Plan eliminado.' }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Meses de cobro — config_cobro.meses_sin_cobro (1..12 que NO generan cargo)  */
+/* -------------------------------------------------------------------------- */
+
+const mesesSinCobroSchema = z.array(z.number().int().min(1).max(12)).max(12)
+
+export async function guardarMesesCobroAction(meses: number[]): Promise<FormState> {
+  const parsed = mesesSinCobroSchema.safeParse(meses)
+  if (!parsed.success) return { message: 'Selección de meses inválida.', success: false }
+  const unicos = Array.from(new Set(parsed.data)).sort((a, b) => a - b)
+
+  const { supabase, academiaId } = await getAcademiaId()
+  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
+
+  const { data: academiaData } = await supabase
+    .from('academia')
+    .select('config_cobro')
+    .eq('id', academiaId)
+    .single() as any
+
+  const currentConfig = academiaData?.config_cobro || {}
+  const updatedConfig = { ...currentConfig, meses_sin_cobro: unicos }
+
+  const { error } = await supabase
+    .from('academia')
+    .update({ config_cobro: updatedConfig } as any)
+    .eq('id', academiaId)
+  if (error) return { message: translateRpcError(error), success: false }
+
+  revalidatePath('/configuracion')
+  return { success: true, message: 'Meses de cobro guardados.' }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Políticas de cobro — allow_partial_payments + allow_overpayment             */
+/* -------------------------------------------------------------------------- */
+
+export async function guardarPoliticasCobroAction(input: {
+  allowPartial: boolean
+  allowOverpayment: boolean
+}): Promise<FormState> {
+  const { supabase, academiaId } = await getAcademiaId()
+  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
+
+  const { error } = await supabase
+    .from('academia')
+    .update({
+      allow_partial_payments: !!input.allowPartial,
+      allow_overpayment: !!input.allowOverpayment,
+    } as any)
+    .eq('id', academiaId)
+  if (error) return { message: translateRpcError(error), success: false }
+
+  revalidatePath('/configuracion')
+  revalidatePath('/inicio')
+  return { success: true, message: 'Políticas de cobro guardadas.' }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Catálogo de Cobros Frecuentes                                               */
+/* -------------------------------------------------------------------------- */
+
+const cobroFrecuenteSchema = z.object({
+  concepto: z.string().trim().min(2, { message: 'El concepto es muy corto' }),
+  monto: z.coerce.number().nonnegative({ message: 'El monto no puede ser negativo' }),
+})
+
+export async function guardarCobroFrecuenteAction(input: {
+  id?: string | null
+  concepto: string
+  monto: number
+}): Promise<FormState> {
+  const parsed = cobroFrecuenteSchema.safeParse({ concepto: input.concepto, monto: input.monto })
+  if (!parsed.success) {
+    return { errors: parsed.error.flatten().fieldErrors, message: 'Revisa los datos del cobro.', success: false }
+  }
+
+  const { supabase, academiaId } = await getAcademiaId()
+  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
+
+  if (input.id) {
+    const { error } = await supabase
+      .from('cobros_frecuentes')
+      .update({ concepto: parsed.data.concepto, monto: parsed.data.monto } as any)
+      .eq('id', input.id)
+      .eq('academia_id', academiaId)
+    if (error) return { message: translateRpcError(error), success: false }
+  } else {
+    const { error } = await supabase.from('cobros_frecuentes').insert({
+      academia_id: academiaId,
+      concepto: parsed.data.concepto,
+      monto: parsed.data.monto,
+    } as any)
+    if (error) return { message: translateRpcError(error), success: false }
+  }
+
+  revalidatePath('/configuracion')
+  return { success: true, message: input.id ? 'Cobro frecuente actualizado.' : 'Cobro frecuente creado.' }
+}
+
+/** Archiva (soft-delete) un cobro frecuente: deja de estar disponible pero
+ *  permanece en BD para los historiales. */
+export async function archivarCobroFrecuenteAction(id: string): Promise<FormState> {
+  if (!id) return { message: 'Cobro inválido.', success: false }
+  const { supabase, academiaId } = await getAcademiaId()
+  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
+
+  const { error } = await supabase
+    .from('cobros_frecuentes')
+    .update({ activo: false } as any)
+    .eq('id', id)
+    .eq('academia_id', academiaId)
+  if (error) return { message: translateRpcError(error), success: false }
+
+  revalidatePath('/configuracion')
+  return { success: true, message: 'Cobro frecuente archivado.' }
+}
+
+/** Elimina DEFINITIVAMENTE un cobro frecuente. Solo cuando no tiene registros
+ *  de movimientos relacionados (cargos generados a partir de él). */
+export async function eliminarCobroFrecuenteAction(id: string): Promise<FormState> {
+  if (!id) return { message: 'Cobro inválido.', success: false }
+  const { supabase, academiaId } = await getAcademiaId()
+  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
+
+  const { count, error: countError } = await supabase
+    .from('cargo')
+    .select('id', { count: 'exact', head: true })
+    .eq('academia_id', academiaId)
+    .eq('metadata->>cobro_frecuente_id', id)
+  if (countError) return { message: translateRpcError(countError), success: false }
+  if ((count ?? 0) > 0) {
+    return { message: 'No se puede eliminar: este cobro ya tiene registros. Archívalo en su lugar.', success: false }
+  }
+
+  const { error } = await supabase
+    .from('cobros_frecuentes')
+    .delete()
+    .eq('id', id)
+    .eq('academia_id', academiaId)
+  if (error) return { message: translateRpcError(error), success: false }
+
+  revalidatePath('/configuracion')
+  return { success: true, message: 'Cobro frecuente eliminado.' }
+}
+
 /* -------------------------------------------------------------------------- */
 /* Logout                                                                     */
 /* -------------------------------------------------------------------------- */

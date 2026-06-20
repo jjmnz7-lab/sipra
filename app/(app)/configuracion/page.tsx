@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
-import { CobranzaFormSection } from '@/components/domain/configuracion/cobranza-form-section'
 import { PlanesCobroSection, type PlanCobro } from '@/components/domain/configuracion/planes-cobro-section'
-import { PagosAtrasadosForm } from '@/components/domain/configuracion/pagos-atrasados-form'
+import { CobrosFrecuentesSection, type CobroFrecuente } from '@/components/domain/configuracion/cobros-frecuentes-section'
+import { RecargosExcepcionesSection } from '@/components/domain/configuracion/recargos-excepciones-section'
+import { PoliticasCobroSection } from '@/components/domain/configuracion/politicas-cobro-section'
 import { ConfiguracionSubheader } from './configuracion-subheader'
 import { Sparkles } from 'lucide-react'
 
@@ -20,7 +21,7 @@ export default async function ConfiguracionPage({
 
   const { data: academia } = await supabase
     .from('academia')
-    .select('config_recargos, config_cobro, multi_plan_enabled')
+    .select('config_recargos, config_cobro, allow_partial_payments, allow_overpayment')
     .eq('id', academiaId)
     .single() as any
 
@@ -31,7 +32,7 @@ export default async function ConfiguracionPage({
     .eq('activo', true)
     .order('nombre', { ascending: true }) as any
 
-  // Conteo de alumnos ACTIVOS por plan (para el modal de archivado inteligente)
+  // Conteo de alumnos por plan: activos (para archivado) y totales (para eliminar).
   const { data: alumnosActivos } = await supabase
     .from('persona')
     .select('id')
@@ -44,16 +45,48 @@ export default async function ConfiguracionPage({
     .from('alumno_planes')
     .select('plan_cobro_id, alumno_id')
     .eq('academia_id', academiaId) as any
-  const conteoPorPlan: Record<string, number> = {}
+  const conteoActivo: Record<string, number> = {}
+  const conteoTotal: Record<string, number> = {}
   for (const v of (vinculos ?? [])) {
+    conteoTotal[v.plan_cobro_id] = (conteoTotal[v.plan_cobro_id] ?? 0) + 1
     if (activosSet.has(v.alumno_id)) {
-      conteoPorPlan[v.plan_cobro_id] = (conteoPorPlan[v.plan_cobro_id] ?? 0) + 1
+      conteoActivo[v.plan_cobro_id] = (conteoActivo[v.plan_cobro_id] ?? 0) + 1
     }
   }
-  const planesConConteo = (planes ?? []).map((p: any) => ({ ...p, alumnosCount: conteoPorPlan[p.id] ?? 0 }))
+  const planesConConteo = (planes ?? []).map((p: any) => ({
+    ...p,
+    alumnosCount: conteoActivo[p.id] ?? 0,
+    vinculosCount: conteoTotal[p.id] ?? 0,
+  }))
+
+  // Catálogo de cobros frecuentes (activos) + si tienen registros relacionados.
+  const { data: cobros } = await supabase
+    .from('cobros_frecuentes')
+    .select('id, concepto, monto')
+    .eq('academia_id', academiaId)
+    .eq('activo', true)
+    .order('concepto', { ascending: true }) as any
+
+  const { data: usosCobros } = await supabase
+    .from('cargo')
+    .select('cf:metadata->>cobro_frecuente_id')
+    .eq('academia_id', academiaId)
+    .not('metadata->>cobro_frecuente_id', 'is', null) as any
+  const usadosSet = new Set<string>((usosCobros ?? []).map((u: any) => u.cf).filter(Boolean))
+  const cobrosFrecuentes: CobroFrecuente[] = (cobros ?? []).map((c: any) => ({
+    id: c.id,
+    concepto: c.concepto,
+    monto: Number(c.monto),
+    eliminable: !usadosSet.has(c.id),
+  }))
 
   const configRecargos = academia?.config_recargos || {}
   const configCobro = academia?.config_cobro || {}
+  const mesesSinCobro: number[] = Array.isArray(configCobro?.meses_sin_cobro)
+    ? configCobro.meses_sin_cobro.filter((m: any) => Number.isInteger(m) && m >= 1 && m <= 12)
+    : []
+  const allowPartial = academia?.allow_partial_payments ?? true
+  const allowOverpayment = academia?.allow_overpayment ?? true
 
   return (
     <div className="flex flex-col h-full min-h-screen bg-background pb-20">
@@ -66,22 +99,30 @@ export default async function ConfiguracionPage({
             <div>
               <h4 className="text-sm font-semibold text-foreground">¡Tu academia está lista!</h4>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Elegiste el modelo avanzado. Crea tu primer plan de cobro en la sección
-                <span className="font-semibold"> Planes de cobro </span>
-                de abajo para empezar a inscribir alumnos.
+                Crea tu primer plan con el botón
+                <span className="font-semibold"> Agregar plan </span>
+                en la sección Planes de Cobro Mensual para empezar a inscribir alumnos.
               </p>
             </div>
           </div>
         )}
 
-        <CobranzaFormSection initialConfig={configCobro} />
-
         <PlanesCobroSection
           planes={planesConConteo as PlanCobro[]}
-          multiPlanEnabled={!!academia?.multi_plan_enabled}
+          initialMesesSinCobro={mesesSinCobro}
         />
 
-        <PagosAtrasadosForm initialConfig={configRecargos} />
+        <CobrosFrecuentesSection cobros={cobrosFrecuentes} />
+
+        <RecargosExcepcionesSection
+          initialRecargos={configRecargos}
+          initialCobro={configCobro}
+        />
+
+        <PoliticasCobroSection
+          initialAllowPartial={allowPartial}
+          initialAllowOverpayment={allowOverpayment}
+        />
       </div>
     </div>
   )

@@ -2,7 +2,6 @@
 
 import * as React from 'react'
 import { useActionState, useEffect, useMemo, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -52,10 +51,10 @@ const DEFAULT_REGLAS: Regla[] = [
 
 const REDONDEO_OPCIONES: { value: Redondeo; label: string }[] = [
   { value: '1', label: 'Al peso más cercano ($1)' },
-  { value: '5', label: 'Múltiplo de $5 más cercano' },
-  { value: '10', label: 'Múltiplo de $10 más cercano' },
-  { value: '50', label: 'Múltiplo de $50 más cercano' },
-  { value: '100', label: 'Múltiplo de $100 más cercano' },
+  { value: '5', label: 'Al múltiplo de $5 más cercano' },
+  { value: '10', label: 'Al múltiplo de $10 más cercano' },
+  { value: '50', label: 'Al múltiplo de $50 más cercano' },
+  { value: '100', label: 'Al múltiplo de $100 más cercano' },
 ]
 
 const ACCION_LABELS: Record<AccionRegla, string> = {
@@ -101,12 +100,12 @@ function deriveInitialState(initialConfig: any): CobranzaState {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Componente principal                                                       */
+/* Bloque de prorrateo (sin Card; se monta dentro de "Recargos y Excepciones") */
 /* -------------------------------------------------------------------------- */
 
 const initialState: FormState = {}
 
-export function CobranzaFormSection({ initialConfig }: { initialConfig: any }) {
+export function ProrrateoBlock({ initialConfig }: { initialConfig: any }) {
   const initial = useMemo(() => deriveInitialState(initialConfig), [initialConfig])
   const [regimen, setRegimen] = useState<Regimen>(initial.regimen)
   const [redondeo, setRedondeo] = useState<Redondeo>(initial.redondeo)
@@ -139,6 +138,12 @@ export function CobranzaFormSection({ initialConfig }: { initialConfig: any }) {
 
   const todasCompleto =
     regimen === 'reglas_dias' && reglas.every((r) => r.accion === 'completo')
+
+  const abrirEdicion = (idx: number) => {
+    setEditingRuleIdx(idx)
+    setTempDiaFin(reglas[idx].dia_fin)
+    setTempAccion(reglas[idx].accion)
+  }
 
   const guardarReglaEditada = (idx: number, nuevoFin: number | 'fin_mes', nuevaAccion: AccionRegla) => {
     const copia = [...reglas]
@@ -199,105 +204,94 @@ export function CobranzaFormSection({ initialConfig }: { initialConfig: any }) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">Cobranza</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form action={formAction} className="space-y-4">
-          <input type="hidden" name="config_cobro_json" value={configJson} />
+    <>
+      <form action={formAction} className="space-y-4">
+        <input type="hidden" name="config_cobro_json" value={configJson} />
 
-          <p className="text-sm font-semibold text-foreground">
-            ¿Qué pasa si un alumno entra con el mes ya iniciado?
-          </p>
+        <p className="text-sm font-semibold text-foreground">
+          ¿Qué pasa si un alumno entra con el mes ya iniciado?
+        </p>
 
-          <div className="space-y-1.5">
-            <RadioOption
-              checked={regimen === 'completo'}
-              label="Cobrar siempre la mensualidad completa"
-              onClick={() => setRegimen('completo')}
-            />
-            <RadioOption
-              checked={regimen === 'proporcional'}
-              label="Cobrar proporcional según los días restantes"
-              onClick={() => setRegimen('proporcional')}
-            />
-            <RadioOption
-              checked={regimen === 'no_cobrar'}
-              label="No cobrar hasta el siguiente mes"
-              onClick={() => setRegimen('no_cobrar')}
-            />
-            <RadioOption
-              checked={regimen === 'reglas_dias'}
-              label="Configurar reglas por días"
-              onClick={() => setRegimen('reglas_dias')}
-            />
-          </div>
-
-          <div className="border-t border-dashed border-border my-2" />
-
-          {regimen === 'proporcional' && (
-            <div>
-              <Select value={redondeo} onValueChange={(v) => setRedondeo(v as Redondeo)}>
-                <SelectTrigger className="h-10 w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {REDONDEO_OPCIONES.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {regimen === 'reglas_dias' && (
-            <ReglasDiasEditor
-              reglas={reglas}
-              onEditar={(idx) => {
-                setEditingRuleIdx(idx)
-                setTempDiaFin(reglas[idx].dia_fin)
-                setTempAccion(reglas[idx].accion)
-              }}
-              onAgregar={agregarRegla}
-              onEliminar={eliminarRegla}
-            />
-          )}
-
-          <BulletsExplicacion regimen={regimen} reglas={reglas} />
-
-          {todasCompleto && (
-            <div className="flex items-start gap-2 p-3 rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300">
-              <Lightbulb className="h-4 w-4 mt-0.5 shrink-0" />
-              <p className="text-xs leading-relaxed">
-                Tus reglas actuales cobran el mes completo sin importar el día de ingreso.{' '}
-                <button
-                  type="button"
-                  className="underline font-semibold"
-                  onClick={() => setRegimen('completo')}
-                >
-                  ¿Deseas usar &ldquo;Siempre cobrar completo&rdquo;?
-                </button>
-              </p>
-            </div>
-          )}
-
-          <SectionFooter
-            dirty={dirty}
-            onCancel={onCancel}
-            errorMessage={state.success === false ? state.message : null}
+        <div className="space-y-1.5">
+          <RadioOption
+            checked={regimen === 'completo'}
+            label="Cobrar siempre la mensualidad completa"
+            onClick={() => setRegimen('completo')}
           />
-        </form>
-      </CardContent>
+
+          <RadioOption
+            checked={regimen === 'proporcional'}
+            label="Cobrar proporcional según los días restantes"
+            onClick={() => setRegimen('proporcional')}
+          />
+          {regimen === 'proporcional' && (
+            <div className="ml-3 pl-3 border-l-2 border-primary/20">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground whitespace-nowrap">Redondear :</span>
+                <Select value={redondeo} onValueChange={(v) => setRedondeo(v as Redondeo)}>
+                  <SelectTrigger className="h-10 w-auto min-w-0 flex-1 max-w-[15rem]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {REDONDEO_OPCIONES.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          <RadioOption
+            checked={regimen === 'no_cobrar'}
+            label="No cobrar hasta el siguiente mes"
+            onClick={() => setRegimen('no_cobrar')}
+          />
+
+          <RadioOption
+            checked={regimen === 'reglas_dias'}
+            label="Configurar reglas por días"
+            onClick={() => setRegimen('reglas_dias')}
+          />
+          {regimen === 'reglas_dias' && (
+            <div className="ml-3 pl-3 border-l-2 border-primary/20">
+              <ReglasDiasEditor
+                reglas={reglas}
+                onEditar={abrirEdicion}
+                onAgregar={agregarRegla}
+                onEliminar={eliminarRegla}
+              />
+            </div>
+          )}
+        </div>
+
+        {todasCompleto && (
+          <div className="flex items-start gap-2 p-3 rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300">
+            <Lightbulb className="h-4 w-4 mt-0.5 shrink-0" />
+            <p className="text-xs leading-relaxed">
+              Tus reglas actuales cobran el mes completo sin importar el día de ingreso.{' '}
+              <button
+                type="button"
+                className="underline font-semibold"
+                onClick={() => setRegimen('completo')}
+              >
+                ¿Deseas usar &ldquo;Siempre cobrar completo&rdquo;?
+              </button>
+            </p>
+          </div>
+        )}
+
+        <SectionFooter
+          dirty={dirty}
+          onCancel={onCancel}
+          errorMessage={state.success === false ? state.message : null}
+        />
+      </form>
 
       {/* Drawer (Bottom Sheet) para editar una regla */}
       <Drawer
         open={editingRuleIdx !== null}
-        onOpenChange={(v) => {
-          if (!v) setEditingRuleIdx(null)
-        }}
+        onOpenChange={(v) => { if (!v) setEditingRuleIdx(null) }}
       >
         <DrawerContent>
           <div className="mx-auto w-full max-w-sm">
@@ -357,51 +351,32 @@ export function CobranzaFormSection({ initialConfig }: { initialConfig: any }) {
                     Acción
                   </p>
                   <div className="space-y-1.5">
-                    <RadioOption
-                      checked={tempAccion === 'completo'}
-                      label={ACCION_LABELS.completo}
-                      onClick={() => setTempAccion('completo')}
-                      compact
-                    />
-                    <RadioOption
-                      checked={tempAccion === 'proporcional'}
-                      label={ACCION_LABELS.proporcional}
-                      onClick={() => setTempAccion('proporcional')}
-                      compact
-                    />
-                    <RadioOption
-                      checked={tempAccion === 'no_cobrar'}
-                      label={ACCION_LABELS.no_cobrar}
-                      onClick={() => setTempAccion('no_cobrar')}
-                      compact
-                    />
+                    <RadioOption checked={tempAccion === 'completo'} label={ACCION_LABELS.completo} onClick={() => setTempAccion('completo')} compact />
+                    <RadioOption checked={tempAccion === 'proporcional'} label={ACCION_LABELS.proporcional} onClick={() => setTempAccion('proporcional')} compact />
+                    <RadioOption checked={tempAccion === 'no_cobrar'} label={ACCION_LABELS.no_cobrar} onClick={() => setTempAccion('no_cobrar')} compact />
                   </div>
                 </div>
               </div>
             )}
 
             <DrawerFooter className="flex flex-row gap-2 mt-4 pt-2">
+              <DrawerClose asChild>
+                <Button type="button" variant="outline" className="flex-1 h-11">Cancelar</Button>
+              </DrawerClose>
               <Button
                 type="button"
                 onClick={() => {
-                  if (editingRuleIdx !== null) {
-                    guardarReglaEditada(editingRuleIdx, tempDiaFin, tempAccion)
-                  }
+                  if (editingRuleIdx !== null) guardarReglaEditada(editingRuleIdx, tempDiaFin, tempAccion)
                 }}
                 className="flex-1 h-11"
               >
                 Listo
               </Button>
-              <DrawerClose asChild>
-                <Button type="button" variant="ghost" className="flex-1 h-11">
-                  Cancelar
-                </Button>
-              </DrawerClose>
             </DrawerFooter>
           </div>
         </DrawerContent>
       </Drawer>
-    </Card>
+    </>
   )
 }
 
@@ -430,34 +405,29 @@ function ReglasDiasEditor({
         return (
           <div
             key={idx}
-            className="flex items-center justify-between gap-3 p-3 rounded-lg border border-border bg-card text-sm"
+            role="button"
+            tabIndex={0}
+            onClick={() => onEditar(idx)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onEditar(idx) } }}
+            className="flex items-center justify-between gap-3 p-3 rounded-lg border border-border bg-card text-sm cursor-pointer hover:bg-accent transition-colors"
           >
             <div className="min-w-0">
               <p className="text-sm font-semibold text-foreground">
                 Día {regla.dia_inicio} al {regla.dia_fin === 'fin_mes' ? 'Fin de mes' : regla.dia_fin}
               </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {ACCION_LABELS[regla.accion]}
-              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">{ACCION_LABELS[regla.accion]}</p>
             </div>
 
             <div className="flex items-center gap-1.5 flex-shrink-0">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => onEditar(idx)}
-                className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent"
-                aria-label={`Editar regla ${idx + 1}`}
-              >
+              <span className="h-8 w-8 inline-flex items-center justify-center text-muted-foreground" aria-hidden>
                 <Pencil className="h-4 w-4" />
-              </Button>
+              </span>
               {esIntermedia && (
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  onClick={() => onEliminar(idx)}
+                  onClick={(e) => { e.stopPropagation(); onEliminar(idx) }}
                   className="h-8 w-8 text-destructive hover:text-destructive/80 hover:bg-destructive/10"
                   aria-label={`Eliminar regla ${idx + 1}`}
                 >
@@ -480,57 +450,6 @@ function ReglasDiasEditor({
           <Plus className="h-4 w-4 mr-1" /> Agregar otra regla
         </Button>
       )}
-    </div>
-  )
-}
-
-function BulletsExplicacion({ regimen, reglas }: { regimen: Regimen; reglas: Regla[] }) {
-  const bullets = useMemo(() => {
-    if (regimen === 'completo') {
-      return [
-        'Si un alumno se inscribe el día 3, se le generará un cargo por el 100%.',
-        'Si un alumno se inscribe el día 25, se le generará un cargo por el 100%.',
-      ]
-    }
-    if (regimen === 'proporcional') {
-      return [
-        'Si un alumno se inscribe el día 1, se le generará un cargo por el 100%.',
-        'Si un alumno se inscribe el día 15, el sistema cobrará la mitad exacta.',
-        'Si un alumno se inscribe el día 27, el sistema cobrará solo los días restantes.',
-      ]
-    }
-    if (regimen === 'no_cobrar') {
-      return [
-        'Si un alumno se inscribe el día 12, entra activo de inmediato pero no genera cargo.',
-        'Su primer cargo automático (100%) se programará para el día 1 del siguiente mes.',
-      ]
-    }
-    return reglas.map((r) => {
-      const fin = r.dia_fin === 'fin_mes' ? 'fin' : r.dia_fin
-      const accionTxt =
-        r.accion === 'completo'
-          ? 'Mensualidad completa'
-          : r.accion === 'proporcional'
-          ? 'Cobro proporcional'
-          : 'Período de prueba (sin cargo este mes)'
-      return `Día ${r.dia_inicio}–${fin} → ${accionTxt}`
-    })
-  }, [regimen, reglas])
-
-  return (
-    <div className="space-y-1 text-xs text-muted-foreground leading-relaxed">
-      <ul className="space-y-1">
-        {bullets.map((b, i) => (
-          <li key={i} className="flex gap-2">
-            <span aria-hidden>•</span>
-            <span>{b}</span>
-          </li>
-        ))}
-      </ul>
-      <p className="pt-1">
-        Estas reglas se aplicarán de forma automática al inscribir nuevos alumnos. No afectan a
-        mensualidades que ya hayan sido generadas.
-      </p>
     </div>
   )
 }

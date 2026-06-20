@@ -44,6 +44,8 @@ interface RegistrarPagoDrawerProps {
   saldoTotal?: number
   /** Bandera de la academia. Si false, no se permiten abonos parciales. */
   allowPartial?: boolean
+  /** Bandera de la academia. Si false, no se permiten pagos mayores al saldo (saldo a favor). */
+  allowOverpayment?: boolean
   children?: React.ReactNode
   open?: boolean
   onOpenChange?: (open: boolean) => void
@@ -56,6 +58,7 @@ export function RegistrarPagoDrawer({
   cargoIds,
   saldoTotal,
   allowPartial = true,
+  allowOverpayment = true,
   children,
   open: controlledOpen,
   onOpenChange,
@@ -83,7 +86,9 @@ export function RegistrarPagoDrawer({
   const faltante = adeudo - montoNumerico                // >0 = aún debe
   const excedente = montoNumerico - adeudo               // >0 = saldo a favor
   const parcialBloqueado = !allowPartial && adeudo > 0 && montoNumerico < adeudo
-  const montoInvalido = montoNumerico <= 0 || parcialBloqueado
+  // Sobrepago (saldo a favor): excedente sobre deuda, o anticipo puro sin deuda.
+  const saldoFavorBloqueado = !allowOverpayment && montoNumerico > Math.max(adeudo, 0)
+  const montoInvalido = montoNumerico <= 0 || parcialBloqueado || saldoFavorBloqueado
 
   // El botón refleja la naturaleza del cobro.
   const esAbono = allowPartial && adeudo > 0 && montoNumerico > 0 && montoNumerico < adeudo
@@ -154,22 +159,32 @@ export function RegistrarPagoDrawer({
                   className="h-16 text-3xl font-bold text-center text-primary bg-primary/10 border-primary/20"
                 />
                 <div className="text-center mt-2 font-medium text-sm min-h-[20px]">
-                  {esCobroLibre && montoNumerico > 0 && (
-                    <span className="text-[#15435a]">Se registrará como saldo a favor: ${Math.round(montoNumerico)}</span>
-                  )}
-                  {!esCobroLibre && faltante === 0 && montoNumerico > 0 && (
-                    <span className="text-[#22887c] flex items-center justify-center">
-                      <CheckCircle2 className="w-4 h-4 mr-1" /> El saldo quedará liquidado
+                  {saldoFavorBloqueado ? (
+                    <span className="text-red-600">
+                      {"La opción 'Permitir pagos mayores al saldo pendiente' está bloqueada en la configuración del sistema."}
                     </span>
-                  )}
-                  {!esCobroLibre && faltante > 0 && allowPartial && (
-                    <span className="text-amber-600">Quedará pendiente: ${Math.round(faltante)}</span>
-                  )}
-                  {!esCobroLibre && faltante > 0 && !allowPartial && (
-                    <span className="text-red-600">Esta academia exige cubrir al menos ${Math.round(adeudo)}</span>
-                  )}
-                  {!esCobroLibre && excedente > 0 && (
-                    <span className="text-[#15435a]">Genera saldo a favor: ${Math.round(excedente)}</span>
+                  ) : (
+                    <>
+                      {esCobroLibre && montoNumerico > 0 && (
+                        <span className="text-[#15435a]">Se registrará como saldo a favor: ${Math.round(montoNumerico)}</span>
+                      )}
+                      {!esCobroLibre && faltante === 0 && montoNumerico > 0 && (
+                        <span className="text-[#22887c] flex items-center justify-center">
+                          <CheckCircle2 className="w-4 h-4 mr-1" /> El saldo quedará liquidado
+                        </span>
+                      )}
+                      {!esCobroLibre && faltante > 0 && allowPartial && (
+                        <span className="text-amber-600">Quedará pendiente: ${Math.round(faltante)}</span>
+                      )}
+                      {!esCobroLibre && faltante > 0 && !allowPartial && (
+                        <span className="text-red-600">
+                          {"La opción 'Permitir pagos parciales' está bloqueada en la configuración del sistema."}
+                        </span>
+                      )}
+                      {!esCobroLibre && excedente > 0 && (
+                        <span className="text-[#15435a]">Genera saldo a favor: ${Math.round(excedente)}</span>
+                      )}
+                    </>
                   )}
                 </div>
                 {state?.errors?.monto_pago && <p className="text-sm text-red-600 text-center">{state.errors.monto_pago[0]}</p>}

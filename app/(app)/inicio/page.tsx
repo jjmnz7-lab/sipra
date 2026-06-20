@@ -11,10 +11,11 @@ export default async function InicioPage() {
   const academiaId = user?.app_metadata?.academia_id
   const { data: academia } = await supabase
     .from('academia')
-    .select('allow_partial_payments, multi_plan_enabled')
+    .select('allow_partial_payments, allow_overpayment, multi_plan_enabled')
     .eq('id', academiaId)
     .single() as any
   const allowPartial = academia?.allow_partial_payments ?? true
+  const allowOverpayment = academia?.allow_overpayment ?? true
   const multiPlanEnabled = !!academia?.multi_plan_enabled
 
   // 1. Alumnos activos (para el FAB: cargo individual y búsqueda de visita)
@@ -214,6 +215,7 @@ export default async function InicioPage() {
       <InicioClientView
         alumnos={alumnosConDeudaList}
         allowPartial={allowPartial}
+        allowOverpayment={allowOverpayment}
         gruposEditar={gruposParaEditar}
         planesEditar={planesParaEditar}
         multiPlanEnabled={multiPlanEnabled}
@@ -225,6 +227,7 @@ export default async function InicioPage() {
         grupos={gruposParaCargo}
         planesPorVisita={planesPorVisita || []}
         allowPartial={allowPartial}
+        allowOverpayment={allowOverpayment}
       />
     </>
   )

@@ -61,6 +61,7 @@ export function SeguimientoClientView({
   primerCargo,
   timeline,
   allowPartial = true,
+  allowOverpayment = true,
   planesPorVisita = [],
   grupos = [],
   planes = [],
@@ -77,6 +78,7 @@ export function SeguimientoClientView({
   primerCargo: any
   timeline: any[]
   allowPartial?: boolean
+  allowOverpayment?: boolean
   planesPorVisita?: PlanVisita[]
   grupos?: any[]
   planes?: any[]
@@ -298,6 +300,7 @@ export function SeguimientoClientView({
           cargoIds={cargosActivos.map((c: any) => c.id)}
           saldoTotal={deudaTotal}
           allowPartial={allowPartial}
+          allowOverpayment={allowOverpayment}
           open={isPagoOpen}
           onOpenChange={setIsPagoOpen}
         />

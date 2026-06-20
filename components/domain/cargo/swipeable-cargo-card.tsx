@@ -19,6 +19,7 @@ type PlanEditar = { id: string; nombre: string; monto: number; frecuencia: strin
 interface SwipeableCargoCardProps {
   alumno: any
   allowPartial?: boolean
+  allowOverpayment?: boolean
   grupos?: GrupoEditar[]
   planes?: PlanEditar[]
   multiPlanEnabled?: boolean
@@ -33,6 +34,7 @@ function getIniciales(nombre: string | null | undefined, apellido: string | null
 export function SwipeableCargoCard({
   alumno,
   allowPartial = true,
+  allowOverpayment = true,
   grupos = [],
   planes = [],
   multiPlanEnabled = false,
@@ -261,6 +263,7 @@ export function SwipeableCargoCard({
           cargoIds={alumno.cargos?.map((c: any) => c.id) ?? []}
           saldoTotal={alumno.totalAdeudado}
           allowPartial={allowPartial}
+          allowOverpayment={allowOverpayment}
         />
       )}
 
