@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import type { Database } from '@/lib/types/database.types'
 import { SeguimientoClientView } from './seguimiento-client-view'
+import { clasificarAlumno } from '@/lib/constants/alumno-finanzas'
+import { ahoraAcademia } from '@/lib/utils/fecha-academia'
 
 type MovimientoMinimo = {
   id: string
@@ -62,12 +64,13 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
   // 1a. Bandera de abonos parciales de la academia y multi_plan
   const { data: academia } = await supabase
     .from('academia')
-    .select('allow_partial_payments, allow_overpayment, multi_plan_enabled')
+    .select('allow_partial_payments, allow_overpayment, multi_plan_enabled, timezone')
     .eq('id', persona.academia_id)
     .single() as any
   const allowPartial = academia?.allow_partial_payments ?? true
   const allowOverpayment = academia?.allow_overpayment ?? true
   const multiPlanEnabled = !!academia?.multi_plan_enabled
+  const timezone = academia?.timezone || 'America/Mexico_City'
 
   // 1b. Fetch grupos a los que pertenece el alumno.
   // El badge y el drawer de edición trabajan solo con grupos regulares; las
@@ -137,6 +140,7 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
     ['pendiente', 'parcial', 'vencido'].includes(c.estado_financiero)
   ) || []
   const deudaTotal = cargosActivos.reduce((acc: number, c: any) => acc + Number(c.saldo_pendiente), 0)
+  const estadoFinanciero = clasificarAlumno(cargosActivos, ahoraAcademia(timezone))
 
   // Preparar el primer cargo para el RegistrarPagoDrawer (inyectando la persona y el ID)
   const primerCargo = cargosActivos[0] ? {
@@ -167,6 +171,7 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
       gruposAlumno={gruposAlumno}
       planesAlumno={planesAlumno}
       cargosActivos={cargosActivos}
+      estadoFinanciero={estadoFinanciero}
       deudaTotal={deudaTotal}
       saldoAFavor={saldoAFavor}
       primerCargo={primerCargo}

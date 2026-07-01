@@ -28,7 +28,7 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from '@/components/ui/drawer'
-import { clasificarAlumno, colorEstado } from '@/lib/constants/alumno-finanzas'
+import { colorEstado, type EstadoFinancieroAlumno } from '@/lib/constants/alumno-finanzas'
 
 import { RegistrarPagoDrawer } from '@/components/domain/cargo/registrar-pago-drawer'
 import { RecordatorioMensajeDrawer } from '@/components/domain/envio/recordatorio-mensaje-drawer'
@@ -56,6 +56,7 @@ export function SeguimientoClientView({
   gruposAlumno = [],
   planesAlumno = [],
   cargosActivos,
+  estadoFinanciero,
   deudaTotal,
   saldoAFavor = 0,
   primerCargo,
@@ -74,6 +75,7 @@ export function SeguimientoClientView({
   gruposAlumno?: { id: string; nombre: string; color: string | null; emoji: string | null }[]
   planesAlumno?: { id: string; nombre: string }[]
   cargosActivos: any[]
+  estadoFinanciero: EstadoFinancieroAlumno
   deudaTotal: number
   saldoAFavor?: number
   primerCargo: any
@@ -116,7 +118,6 @@ export function SeguimientoClientView({
     }, 1000)
   }
 
-  const estadoFinanciero = clasificarAlumno(cargosActivos)
   const estadoDef = colorEstado(estadoFinanciero)
 
   const handleBack = () => {

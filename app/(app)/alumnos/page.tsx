@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { AlumnosClientView } from './alumnos-client-view'
 import { clasificarAlumno, type EstadoFinancieroAlumno } from '@/lib/constants/alumno-finanzas'
+import { ahoraAcademia } from '@/lib/utils/fecha-academia'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,13 +46,14 @@ export default async function AlumnosPage() {
   // Config de cobranza para el preview de prorrateo del CrearPersonaDrawer (FAB)
   const { data: academia } = await supabase
     .from('academia')
-    .select('config_cobro, multi_plan_enabled, monto_inscripcion_default, cobrar_inscripcion_default')
+    .select('config_cobro, multi_plan_enabled, monto_inscripcion_default, cobrar_inscripcion_default, timezone')
     .eq('id', academiaId)
     .single() as any
   const modoProrrateo = (academia?.config_cobro?.modo_prorrateo as 'proporcional' | 'completo') || 'proporcional'
   const multiPlanEnabled = !!academia?.multi_plan_enabled
   const montoInscripcionDefault = Number(academia?.monto_inscripcion_default ?? 0)
   const cobrarInscripcionDefault = !!academia?.cobrar_inscripcion_default
+  const now = ahoraAcademia(academia?.timezone || 'America/Mexico_City')
 
   // Solo grupos regulares: a las actividades se inscribe desde su propia pantalla.
   const { data: grupos } = await supabase
@@ -113,7 +115,7 @@ export default async function AlumnosPage() {
       (acc: number, c: any) => acc + Number(c.saldo_pendiente ?? 0),
       0,
     )
-    const estadoFinanciero = clasificarAlumno(cargosPendientes)
+    const estadoFinanciero = clasificarAlumno(cargosPendientes, now)
 
     // Solo planes ACTIVOS cuentan: un alumno con únicamente planes archivados
     // se considera huérfano de plan (el cron tampoco le genera cargos).

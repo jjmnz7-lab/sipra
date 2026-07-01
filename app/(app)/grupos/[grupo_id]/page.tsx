@@ -93,7 +93,7 @@ export default async function GrupoDetallePage({ params, searchParams }: { param
 
   // Clasificación del semáforo financiero (4 estados estándar) usando la misma
   // función que la pantalla Alumnos, para mantener una única regla en todo el sistema.
-  const now = ahoraAcademia()
+  const now = ahoraAcademia(timezone)
   const cargosPorPersona: Record<string, any[]> = {}
   for (const c of (cargos ?? [])) {
     if (!c.persona_id) continue

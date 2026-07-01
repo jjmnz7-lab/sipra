@@ -12,12 +12,13 @@ export default async function InicioPage() {
   const academiaId = user?.app_metadata?.academia_id
   const { data: academia } = await supabase
     .from('academia')
-    .select('allow_partial_payments, allow_overpayment, multi_plan_enabled')
+    .select('allow_partial_payments, allow_overpayment, multi_plan_enabled, timezone')
     .eq('id', academiaId)
     .single() as any
   const allowPartial = academia?.allow_partial_payments ?? true
   const allowOverpayment = academia?.allow_overpayment ?? true
   const multiPlanEnabled = !!academia?.multi_plan_enabled
+  const timezone = academia?.timezone || 'America/Mexico_City'
 
   // 1. Alumnos activos (para el FAB: cargo individual y búsqueda de visita)
   const { data: alumnos } = await supabase
@@ -191,7 +192,7 @@ export default async function InicioPage() {
   }
 
   // 4. Clasificar con la misma escala financiera usada en /alumnos.
-  const now = ahoraAcademia()
+  const now = ahoraAcademia(timezone)
   const alumnosConDeudaList: AlumnoConDeuda[] = Object.values(alumnosConDeudaMap).map((alumno) => {
     const estadoFinanciero = clasificarAlumno(alumno.cargos, now)
     alumno.estadoFinanciero = estadoFinanciero

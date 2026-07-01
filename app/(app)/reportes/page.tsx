@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { ReportesClientView, type CobradoMes } from './reportes-client-view'
 import { clasificarAlumno } from '@/lib/constants/alumno-finanzas'
 import { fetchLotesCargos } from '@/lib/reportes/cargos-grupales'
-import { ahoraAcademia, zonedAcademia } from '@/lib/utils/fecha-academia'
+import { ahoraAcademia, zonedAcademia, obtenerTimezoneAcademia } from '@/lib/utils/fecha-academia'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +20,7 @@ async function computarCobrado(
   supabase: any,
   academiaId: string,
   now: Date,
+  timezone: string,
 ): Promise<CobradoMes> {
   // now viene "falso-UTC" (ver zonedAcademia): siempre getUTC*(), nunca
   // accesores locales, para no depender del huso del proceso que ejecuta esto.
@@ -56,7 +57,7 @@ async function computarCobrado(
 
     // fecha_evento es un instante real (timestamptz); se convierte al
     // calendario de la academia antes de decidir a qué mes pertenece.
-    const fecha = zonedAcademia(new Date(e.fecha_evento))
+    const fecha = zonedAcademia(new Date(e.fecha_evento), timezone)
     const k = claveMes(fecha)
     const signo = e.tipo === 'PAGO_ABONO' ? 1 : -1
     porMes.set(k, (porMes.get(k) ?? 0) + signo * monto)
@@ -132,7 +133,8 @@ export default async function ReportesPage() {
   const { data: { user } } = await supabase.auth.getUser()
   const academiaId = user?.app_metadata?.academia_id
 
-  const now = ahoraAcademia()
+  const timezone = await obtenerTimezoneAcademia(supabase, academiaId)
+  const now = ahoraAcademia(timezone)
 
   const [alumnosRes, lotes, cobradoMes] = await Promise.all([
     // Alumnos activos y sus cargos pendientes para la deuda y estados
@@ -143,7 +145,7 @@ export default async function ReportesPage() {
       .eq('etiqueta', 'alumno')
       .eq('estado_registro', 'activo'),
     fetchLotesCargos(supabase, academiaId),
-    computarCobrado(supabase, academiaId, now),
+    computarCobrado(supabase, academiaId, now, timezone),
   ])
 
   // --- Estados financieros de alumnos activos ---

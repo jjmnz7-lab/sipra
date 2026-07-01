@@ -22,6 +22,7 @@ import { useAcademia } from '@/lib/contexts/academia-context'
 import { obtenerDatosCompartir } from '@/app/(app)/inicio/actions'
 import { cn } from '@/lib/utils'
 import { clasificarAlumno, type EstadoFinancieroAlumno } from '@/lib/constants/alumno-finanzas'
+import { ahoraAcademia, ACADEMIA_TZ_FALLBACK } from '@/lib/utils/fecha-academia'
 
 interface RecordatorioMensajeDrawerProps {
   telefono: string | null | undefined
@@ -41,7 +42,10 @@ type CargoRecordatorioConEstado = CargoRecordatorio & {
 }
 
 function getTonoPredeterminado(cargos: CargoRecordatorioConEstado[] | undefined): TonoRecordatorio {
-  const estado = clasificarAlumno(cargos ?? []) as EstadoFinancieroAlumno
+  // Este drawer es compartido y no conoce el timezone real de la academia
+  // (solo afecta el TONO por default sugerido, editable por el usuario antes
+  // de enviar) — cae al mismo fallback que el resto de la app.
+  const estado = clasificarAlumno(cargos ?? [], ahoraAcademia(ACADEMIA_TZ_FALLBACK)) as EstadoFinancieroAlumno
 
   switch (estado) {
     case 'urgente':

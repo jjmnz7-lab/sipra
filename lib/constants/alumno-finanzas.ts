@@ -1,5 +1,3 @@
-import { ahoraAcademia } from '@/lib/utils/fecha-academia'
-
 /**
  * Escala financiera del alumno usada en la vista /alumnos y en la
  * health strip global. Mantenida como constante reusable para que
@@ -40,8 +38,12 @@ type CargoLite = {
  *    fecha_vencimiento < hoy - 1 mes → urgente
  *  - >=1 cargo con estado_financiero === 'vencido' → atrasado
  *  - Resto (cargos pendiente/parcial sin vencer) → pendiente
+ *
+ * `hoy` debe venir de ahoraAcademia(timezone) con el timezone real de la
+ * academia (columna academia.timezone) — no todas las academias están en el
+ * mismo huso horario.
  */
-export function clasificarAlumno(cargos: CargoLite[], hoy: Date = ahoraAcademia()): EstadoFinancieroAlumno {
+export function clasificarAlumno(cargos: CargoLite[], hoy: Date): EstadoFinancieroAlumno {
   if (!cargos || cargos.length === 0) return 'al_dia'
 
   // hoy viene "falso-UTC" (ver zonedAcademia): siempre getUTC*(), nunca

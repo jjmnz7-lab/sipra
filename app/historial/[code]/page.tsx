@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { clasificarAlumno, type EstadoFinancieroAlumno } from '@/lib/constants/alumno-finanzas'
+import { ahoraAcademia, ACADEMIA_TZ_FALLBACK } from '@/lib/utils/fecha-academia'
 import { HistorialPublicoView, EnlaceNoDisponible, type MovimientoPublico } from './historial-publico-view'
 
 // Datos en vivo: cada visita consulta el estado actual del alumno (si el dueño
@@ -53,7 +54,10 @@ export default async function HistorialPublicoPage({
     return <EnlaceNoDisponible />
   }
 
-  const estado: EstadoFinancieroAlumno = clasificarAlumno(payload.cargos_activos ?? [])
+  // Página pública: el RPC no expone el timezone de la academia (no es
+  // sensible, pero tampoco vale la pena ampliar su contrato solo para esto).
+  // Cae al mismo fallback que el resto de la app cuando no hay timezone real.
+  const estado: EstadoFinancieroAlumno = clasificarAlumno(payload.cargos_activos ?? [], ahoraAcademia(ACADEMIA_TZ_FALLBACK))
 
   return (
     <HistorialPublicoView

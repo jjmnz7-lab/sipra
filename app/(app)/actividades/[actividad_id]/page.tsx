@@ -69,7 +69,7 @@ export default async function ActividadDetallePage({ params, searchParams }: { p
     .in('estado_financiero', ['vencido', 'pendiente', 'parcial']) as any
 
   // Clasificación del semáforo financiero (misma regla que Alumnos/Grupos).
-  const now = ahoraAcademia()
+  const now = ahoraAcademia(timezone)
   const cargosPorPersona: Record<string, any[]> = {}
   for (const c of (cargos ?? [])) {
     if (!c.persona_id) continue
