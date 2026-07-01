@@ -15,6 +15,7 @@ import {
   MessageSquare,
   StickyNote,
   Megaphone,
+  Tag,
   Circle,
   type LucideIcon,
 } from 'lucide-react'
@@ -110,6 +111,18 @@ export function configEvento(evento: Pick<EventoTimeline, 'tipo' | 'titulo'>): E
     // ── FINANZAS: pagos / abonos ────────────────────────────────────────────
     case 'PAGO_ABONO':
       return { Icon: Banknote, ...PAGO }
+
+    // ── FINANZAS: descuento informativo (beca / hermanos). No mueve saldo:
+    //    el cargo ya se generó por el neto, esta línea solo documenta el ajuste.
+    case 'DESCUENTO':
+      return {
+        Icon: Tag,
+        iconClass: 'text-[#22887c]',
+        borderClass: 'border-[#22887c]',
+        tituloClass: 'text-[#22887c]',
+        signo: null,
+        montoClass: 'text-[#22887c]',
+      }
 
     case 'PROMESA':
       return {

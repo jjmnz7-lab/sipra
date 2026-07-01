@@ -65,6 +65,7 @@ export function SeguimientoClientView({
   planesPorVisita = [],
   grupos = [],
   planes = [],
+  cobrosFrecuentes = [],
   multiPlanEnabled = false,
   currentGrupoId = null,
   currentPlanIds = [],
@@ -82,6 +83,7 @@ export function SeguimientoClientView({
   planesPorVisita?: PlanVisita[]
   grupos?: any[]
   planes?: any[]
+  cobrosFrecuentes?: { id: string; concepto: string; monto: number }[]
   multiPlanEnabled?: boolean
   currentGrupoId?: string | null
   currentPlanIds?: string[]
@@ -324,6 +326,10 @@ export function SeguimientoClientView({
           onOpenChange={setIsCargoOpen}
           origen="manual"
           tituloDrawer="Nuevo cargo"
+          becaActiva={persona.beca_activa}
+          becaPorcentaje={persona.beca_porcentaje}
+          cobros={cobrosFrecuentes}
+          onSuccess={showToast}
         />
 
         <AnularCargoDrawer
@@ -382,6 +388,10 @@ export function SeguimientoClientView({
             apellido: persona.apellido,
             telefono_whatsapp: persona.telefono_whatsapp,
             email: persona.email,
+            descuento_hermanos_activo: persona.descuento_hermanos_activo,
+            descuento_hermanos_monto: persona.descuento_hermanos_monto,
+            beca_activa: persona.beca_activa,
+            beca_porcentaje: persona.beca_porcentaje,
           }}
           grupos={grupos}
           planes={planes}

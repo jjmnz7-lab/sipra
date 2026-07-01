@@ -97,7 +97,7 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
   const { data: grupos } = await supabase
     .from('grupo')
     .select(`
-      id, nombre, plan_sugerido_id, cupo_maximo,
+      id, nombre, plan_sugerido_id, cupo_maximo, color, emoji,
       persona_grupo (estado)
     `)
     .eq('academia_id', persona.academia_id)
@@ -112,6 +112,14 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
     .eq('academia_id', persona.academia_id)
     .eq('activo', true)
     .order('nombre') as any
+
+  // 1e-bis. Catálogo de cobros frecuentes (para el combobox de concepto del cargo).
+  const { data: cobrosFrecuentes } = await supabase
+    .from('cobros_frecuentes')
+    .select('id, concepto, monto')
+    .eq('academia_id', persona.academia_id)
+    .eq('activo', true)
+    .order('concepto', { ascending: true }) as any
 
   // 1f. Planes actuales del alumno
   const { data: currentPlanesRel } = await supabase
@@ -168,6 +176,7 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
       planesPorVisita={planesPorVisita || []}
       grupos={grupos || []}
       planes={planes || []}
+      cobrosFrecuentes={cobrosFrecuentes || []}
       multiPlanEnabled={multiPlanEnabled}
       currentGrupoId={currentGrupoId}
       currentPlanIds={currentPlanIds}

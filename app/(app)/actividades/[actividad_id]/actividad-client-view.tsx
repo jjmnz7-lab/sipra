@@ -35,6 +35,7 @@ export function ActividadClientView({
   totalAlumnos,
   mapEstadoMiembro,
   alumnosDisponibles = [],
+  cobrosFrecuentes = [],
   abrirArchivar = false,
   timezone = 'America/Mexico_City',
 }: {
@@ -44,6 +45,8 @@ export function ActividadClientView({
   mapEstadoMiembro: Record<string, EstadoFinancieroAlumno>
   /** Alumnos activos NO inscritos a esta actividad (para el sheet Asignar alumno). */
   alumnosDisponibles?: AlumnoLite[]
+  /** Catálogo de cobros frecuentes (para el combobox de concepto del cargo). */
+  cobrosFrecuentes?: { id: string; concepto: string; monto: number }[]
   /** Si true, abre automáticamente el drawer de archivación. */
   abrirArchivar?: boolean
   timezone?: string
@@ -349,6 +352,7 @@ export function ActividadClientView({
         open={isCargoOpen}
         onOpenChange={setIsCargoOpen}
         onSuccess={showToast}
+        cobros={cobrosFrecuentes}
       />
       <AsignarAlumnoActividadSheet
         actividadId={actividad.id}

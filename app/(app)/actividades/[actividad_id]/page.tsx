@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import { ActividadClientView } from './actividad-client-view'
 import { clasificarAlumno, type EstadoFinancieroAlumno } from '@/lib/constants/alumno-finanzas'
+import { ahoraAcademia } from '@/lib/utils/fecha-academia'
 
 export default async function ActividadDetallePage({ params, searchParams }: { params: Promise<{ actividad_id: string }>; searchParams: Promise<Record<string, string>> }) {
   const { actividad_id } = await params
@@ -31,12 +32,20 @@ export default async function ActividadDetallePage({ params, searchParams }: { p
     .single() as any
   const timezone = academia?.timezone || 'America/Mexico_City'
 
+  // Catálogo de cobros frecuentes (para el combobox de concepto del cargo grupal).
+  const { data: cobrosFrecuentes } = await supabase
+    .from('cobros_frecuentes')
+    .select('id, concepto, monto')
+    .eq('academia_id', actividad.academia_id)
+    .eq('activo', true)
+    .order('concepto', { ascending: true }) as any
+
   // Fetch alumnos inscritos
   const { data: inscripciones } = await supabase
     .from('persona_grupo')
     .select(`
       id, estado, fecha_inscripcion,
-      persona (id, nombre, apellido, telefono_whatsapp, estado_registro)
+      persona (id, nombre, apellido, telefono_whatsapp, estado_registro, beca_activa, beca_porcentaje)
     `)
     .eq('grupo_id', actividad_id)
     .eq('estado', 'activo') as any
@@ -60,7 +69,7 @@ export default async function ActividadDetallePage({ params, searchParams }: { p
     .in('estado_financiero', ['vencido', 'pendiente', 'parcial']) as any
 
   // Clasificación del semáforo financiero (misma regla que Alumnos/Grupos).
-  const now = new Date()
+  const now = ahoraAcademia()
   const cargosPorPersona: Record<string, any[]> = {}
   for (const c of (cargos ?? [])) {
     if (!c.persona_id) continue
@@ -96,6 +105,7 @@ export default async function ActividadDetallePage({ params, searchParams }: { p
       totalAlumnos={totalAlumnos}
       mapEstadoMiembro={mapEstadoMiembro}
       alumnosDisponibles={alumnosDisponibles}
+      cobrosFrecuentes={cobrosFrecuentes || []}
       abrirArchivar={abrir_archiva === 'true'}
       timezone={timezone}
     />

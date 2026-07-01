@@ -27,6 +27,7 @@ const cargoIndividualSchema = z.object({
   concepto: z.string().min(2, { message: 'El concepto es requerido' }),
   monto: z.coerce.number().positive({ message: 'El monto debe ser mayor a 0' }),
   origen: z.string().default('manual'),
+  aplicar_beca: z.boolean().default(false),
 })
 
 const editarAlumnoSchema = z.object({
@@ -35,6 +36,15 @@ const editarAlumnoSchema = z.object({
   apellido: z.string().optional(),
   telefono_whatsapp: z.string().optional(),
   email: z.string().email({ message: 'Email inválido' }).optional().or(z.literal('')),
+  descuento_hermanos_activo: z.boolean().default(false),
+  descuento_hermanos_monto: z.coerce.number().int().min(0).default(0),
+  beca_activa: z.boolean().default(false),
+  beca_porcentaje: z.coerce.number().int().refine((v) => [0, 25, 50, 100].includes(v), {
+    message: 'Porcentaje de beca inválido',
+  }).default(0),
+}).refine((d) => !(d.descuento_hermanos_activo && d.beca_activa), {
+  message: 'Un alumno no puede tener descuento de Hermanos y Beca a la vez.',
+  path: ['beca_activa'],
 })
 
 const personaIdSchema = z.object({
@@ -160,6 +170,7 @@ export async function crearCargoIndividualAction(prevState: FormState, formData:
     concepto: formData.get('concepto') as string,
     monto: formData.get('monto'),
     origen: (formData.get('origen') as string) || 'manual',
+    aplicar_beca: formData.get('aplicar_beca') === 'true',
   }
 
   const validatedFields = cargoIndividualSchema.safeParse(payload)
@@ -186,6 +197,7 @@ export async function crearCargoIndividualAction(prevState: FormState, formData:
     p_concepto: validatedFields.data.concepto,
     p_monto: validatedFields.data.monto,
     p_origen: validatedFields.data.origen,
+    p_aplicar_beca: validatedFields.data.aplicar_beca,
   })
 
   if (error) {
@@ -267,6 +279,10 @@ export async function editarAlumnoAction(prevState: FormState, formData: FormDat
     apellido: (formData.get('apellido') as string) || '',
     telefono_whatsapp: (formData.get('telefono_whatsapp') as string) || '',
     email: (formData.get('email') as string) || '',
+    descuento_hermanos_activo: formData.get('descuento_hermanos_activo') === 'true',
+    descuento_hermanos_monto: Number(formData.get('descuento_hermanos_monto') || '0'),
+    beca_activa: formData.get('beca_activa') === 'true',
+    beca_porcentaje: Number(formData.get('beca_porcentaje') || '0'),
   }
 
   const validated = editarAlumnoSchema.safeParse(payload)
@@ -290,6 +306,11 @@ export async function editarAlumnoAction(prevState: FormState, formData: FormDat
       apellido: validated.data.apellido || null,
       telefono_whatsapp: validated.data.telefono_whatsapp || null,
       // El email ya no se edita desde el UI: se preserva el valor existente.
+      // Descuentos especiales (mutuamente excluyentes; ya validado arriba).
+      descuento_hermanos_activo: validated.data.descuento_hermanos_activo,
+      descuento_hermanos_monto: validated.data.descuento_hermanos_activo ? validated.data.descuento_hermanos_monto : 0,
+      beca_activa: validated.data.beca_activa,
+      beca_porcentaje: validated.data.beca_activa ? validated.data.beca_porcentaje : 0,
     })
     .eq('id', validated.data.persona_id)
     .eq('academia_id', academiaId)

@@ -17,8 +17,28 @@ import {
   DrawerTitle,
 } from '@/components/ui/drawer'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import { formatCurrencyCompact } from '@/lib/utils/currency'
+import { colorPorSlug } from '@/lib/constants/grupo-apariencia'
+import { normalizeWholeMoneyInput, preventMoneyWheel } from '@/lib/utils/money-input'
+import { Users, GraduationCap } from 'lucide-react'
+
+const BECA_OPCIONES = [25, 50, 100] as const
+
+/** Emoji del grupo dentro de un círculo con su color (igual que en la pantalla Grupos). */
+function GrupoEmojiCircle({ slug, emoji, className }: { slug?: string | null; emoji?: string | null; className?: string }) {
+  const c = colorPorSlug(slug)
+  return (
+    <div
+      className={cn('rounded-full flex items-center justify-center flex-shrink-0', className)}
+      style={{ backgroundColor: c.bg, border: `2px solid ${c.border}` }}
+      aria-hidden="true"
+    >
+      {emoji || ''}
+    </div>
+  )
+}
 
 const initialState: FormState = {}
 
@@ -39,19 +59,35 @@ function SubmitButton() {
   )
 }
 
-function CheckRow({ label, checked, onClick }: { label: string; checked: boolean; onClick: () => void }) {
+function CheckRow({
+  label,
+  checked,
+  onClick,
+  leftSlot,
+  labelStyle,
+}: {
+  label: string
+  checked: boolean
+  onClick: () => void
+  leftSlot?: React.ReactNode
+  labelStyle?: React.CSSProperties
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
         "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left",
-        checked 
-          ? "bg-primary/10 text-primary font-semibold" 
-          : "hover:bg-accent text-muted-foreground"
+        checked
+          ? "bg-primary/10 font-semibold"
+          : "hover:bg-accent",
+        !labelStyle && (checked ? "text-primary" : "text-muted-foreground"),
       )}
     >
-      <span>{label}</span>
+      <span className="flex items-center gap-2.5 min-w-0">
+        {leftSlot}
+        <span className="truncate" style={labelStyle}>{label}</span>
+      </span>
       {checked && <Check className="h-4 w-4 text-primary flex-shrink-0 ml-2" />}
     </button>
   )
@@ -65,12 +101,18 @@ type Props = {
     telefono_whatsapp: string | null
     /** Se conserva en el tipo por compatibilidad, pero el email ya no se edita en el UI. */
     email?: string | null
+    descuento_hermanos_activo?: boolean | null
+    descuento_hermanos_monto?: number | null
+    beca_activa?: boolean | null
+    beca_porcentaje?: number | null
   }
   grupos: {
     id: string
     nombre: string
     plan_sugerido_id?: string | null
     cupo_maximo?: number | null
+    color?: string | null
+    emoji?: string | null
     persona_grupo?: { estado: string }[] | null
   }[]
   planes: { id: string; nombre: string; monto: number; frecuencia: string }[]
@@ -114,6 +156,24 @@ export function EditarAlumnoDrawer({
   const [grupoIds, setGrupoIds] = useState<Set<string>>(new Set(currentGrupoId ? [currentGrupoId] : []))
   const [planIds, setPlanIds] = useState<Set<string>>(new Set(currentPlanIds))
 
+  // Descuentos especiales (Hermanos y Beca son mutuamente excluyentes).
+  const [hermanosActivo, setHermanosActivo] = useState(false)
+  const [hermanosMonto, setHermanosMonto] = useState('')
+  const [becaActiva, setBecaActiva] = useState(false)
+  const [becaPorcentaje, setBecaPorcentaje] = useState<number>(25)
+
+  const toggleHermanos = (on: boolean) => {
+    setHermanosActivo(on)
+    if (on) setBecaActiva(false)
+  }
+  const toggleBeca = (on: boolean) => {
+    setBecaActiva(on)
+    if (on) {
+      setHermanosActivo(false)
+      if (!BECA_OPCIONES.includes(becaPorcentaje as 25 | 50 | 100)) setBecaPorcentaje(25)
+    }
+  }
+
   const [localError, setLocalError] = useState<string | null>(null)
 
   const selectedGrupoSimple = grupos.find((g) => g.id === grupoId)
@@ -148,6 +208,10 @@ export function EditarAlumnoDrawer({
       setPlanId(currentPlanIds[0] ?? '')
       setGrupoIds(new Set(currentGrupoId ? [currentGrupoId] : []))
       setPlanIds(new Set(currentPlanIds))
+      setHermanosActivo(!!persona.descuento_hermanos_activo)
+      setHermanosMonto(persona.descuento_hermanos_monto ? String(persona.descuento_hermanos_monto) : '')
+      setBecaActiva(!!persona.beca_activa)
+      setBecaPorcentaje(persona.beca_porcentaje && persona.beca_porcentaje > 0 ? persona.beca_porcentaje : 25)
       setLocalError(null)
       
       if (initialFocus === 'telefono') {
@@ -226,6 +290,12 @@ export function EditarAlumnoDrawer({
     fd.set('grupo_ids', JSON.stringify(gruposSel))
     fd.set('plan_ids', JSON.stringify(planesSel))
 
+    // Descuentos especiales (mutuamente excluyentes; la UI ya lo garantiza).
+    fd.set('descuento_hermanos_activo', hermanosActivo ? 'true' : 'false')
+    fd.set('descuento_hermanos_monto', hermanosActivo ? String(Number(hermanosMonto || '0')) : '0')
+    fd.set('beca_activa', becaActiva ? 'true' : 'false')
+    fd.set('beca_porcentaje', becaActiva ? String(becaPorcentaje) : '0')
+
     React.startTransition(() => formAction(fd))
   }
 
@@ -279,7 +349,12 @@ export function EditarAlumnoDrawer({
                       </SelectTrigger>
                       <SelectContent>
                         {grupos.map((g) => (
-                          <SelectItem key={g.id} value={g.id}>{g.nombre}</SelectItem>
+                          <SelectItem key={g.id} value={g.id}>
+                            <span className="flex items-center gap-2.5 min-w-0">
+                              <GrupoEmojiCircle slug={g.color} emoji={g.emoji} className="h-6 w-6 text-sm" />
+                              <span className="truncate" style={{ color: colorPorSlug(g.color).textLight }}>{g.nombre}</span>
+                            </span>
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -325,6 +400,8 @@ export function EditarAlumnoDrawer({
                           label={g.nombre}
                           checked={grupoIds.has(g.id)}
                           onClick={() => toggleGrupoAvanzado(g)}
+                          leftSlot={<GrupoEmojiCircle slug={g.color} emoji={g.emoji} className="h-7 w-7 text-sm" />}
+                          labelStyle={{ color: colorPorSlug(g.color).textLight }}
                         />
                       ))}
                       {grupos.length === 0 && <p className="text-xs text-muted-foreground px-2 py-1">No hay grupos.</p>}
@@ -356,6 +433,75 @@ export function EditarAlumnoDrawer({
                   </div>
                 </>
               )}
+
+              {/* ---------------- DESCUENTOS ESPECIALES ---------------- */}
+              <div className="space-y-2 pt-2 border-t border-border/60">
+                <Label className="text-xs font-semibold text-muted-foreground tracking-wider">Descuentos especiales</Label>
+
+                {/* Toggle Hermanos */}
+                <div className="rounded-lg border border-border p-3 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Users className="h-4 w-4 text-primary flex-shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground">Hermanos</p>
+                        <p className="text-[11px] text-muted-foreground leading-snug">Descuento fijo en cada mensualidad.</p>
+                      </div>
+                    </div>
+                    <Switch checked={hermanosActivo} onCheckedChange={toggleHermanos} className="data-checked:!bg-primary" />
+                  </div>
+                  {hermanosActivo && (
+                    <div className="space-y-1">
+                      <Label htmlFor="edit-hermanos-monto" className="text-[11px] font-medium text-muted-foreground">Monto a descontar ($)</Label>
+                      <Input
+                        id="edit-hermanos-monto"
+                        type="number"
+                        step="1"
+                        min="1"
+                        inputMode="numeric"
+                        value={hermanosMonto}
+                        onWheel={preventMoneyWheel}
+                        onChange={(e) => setHermanosMonto(normalizeWholeMoneyInput(e.target.value))}
+                        placeholder="0"
+                        className="h-10"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Toggle Alumno becado */}
+                <div className="rounded-lg border border-border p-3 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <GraduationCap className="h-4 w-4 text-primary flex-shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground">Alumno becado</p>
+                        <p className="text-[11px] text-muted-foreground leading-snug">Descuento por porcentaje en cada mensualidad.</p>
+                      </div>
+                    </div>
+                    <Switch checked={becaActiva} onCheckedChange={toggleBeca} className="data-checked:!bg-primary" />
+                  </div>
+                  {becaActiva && (
+                    <div className="flex rounded-lg border border-border bg-muted/40 p-1 gap-1">
+                      {BECA_OPCIONES.map((pct) => (
+                        <button
+                          key={pct}
+                          type="button"
+                          onClick={() => setBecaPorcentaje(pct)}
+                          className={cn(
+                            'flex-1 h-9 rounded-md text-sm font-semibold transition-colors',
+                            becaPorcentaje === pct
+                              ? 'bg-primary text-primary-foreground shadow-sm'
+                              : 'text-muted-foreground hover:bg-accent',
+                          )}
+                        >
+                          {pct}%
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
 
               {localError && (
                 <div className="p-3 bg-red-50 text-red-700 text-sm rounded-md border border-red-200">

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { FabOperativo } from '@/components/layout/fab-operativo'
 import { InicioClientView, type AlumnoConDeuda } from './inicio-client-view'
 import { clasificarAlumno } from '@/lib/constants/alumno-finanzas'
+import { ahoraAcademia } from '@/lib/utils/fecha-academia'
 
 export default async function InicioPage() {
   const supabase = await createClient()
@@ -79,19 +80,33 @@ export default async function InicioPage() {
 
   const { data: pgMiembros } = await supabase
     .from('persona_grupo')
-    .select('grupo_id, persona ( id, nombre, apellido, estado_registro )')
+    .select('grupo_id, persona ( id, nombre, apellido, estado_registro, beca_activa, beca_porcentaje )')
     .eq('academia_id', academiaId)
     .eq('estado', 'activo') as any
 
   // Solo alumnos activos: a los suspendidos no se les pueden generar cargos.
-  const miembrosPorGrupo = new Map<string, { persona: { id: string; nombre: string; apellido: string | null } }[]>()
+  const miembrosPorGrupo = new Map<string, { persona: { id: string; nombre: string; apellido: string | null; beca_activa?: boolean; beca_porcentaje?: number } }[]>()
   for (const r of (pgMiembros ?? [])) {
     if (!r.grupo_id || !r.persona) continue
     if (r.persona.estado_registro !== 'activo') continue
     const arr = miembrosPorGrupo.get(r.grupo_id) ?? []
-    arr.push({ persona: { id: r.persona.id, nombre: r.persona.nombre, apellido: r.persona.apellido ?? '' } })
+    arr.push({ persona: {
+      id: r.persona.id,
+      nombre: r.persona.nombre,
+      apellido: r.persona.apellido ?? '',
+      beca_activa: !!r.persona.beca_activa,
+      beca_porcentaje: r.persona.beca_porcentaje ?? 0,
+    } })
     miembrosPorGrupo.set(r.grupo_id, arr)
   }
+
+  // Catálogo de cobros frecuentes (para el combobox de concepto en el FAB).
+  const { data: cobrosFrecuentes } = await supabase
+    .from('cobros_frecuentes')
+    .select('id, concepto, monto')
+    .eq('academia_id', academiaId)
+    .eq('activo', true)
+    .order('concepto', { ascending: true }) as any
 
   const gruposParaCargo = (gruposRaw ?? []).map((g: any) => ({
     id: g.id,
@@ -176,7 +191,7 @@ export default async function InicioPage() {
   }
 
   // 4. Clasificar con la misma escala financiera usada en /alumnos.
-  const now = new Date()
+  const now = ahoraAcademia()
   const alumnosConDeudaList: AlumnoConDeuda[] = Object.values(alumnosConDeudaMap).map((alumno) => {
     const estadoFinanciero = clasificarAlumno(alumno.cargos, now)
     alumno.estadoFinanciero = estadoFinanciero
@@ -225,6 +240,7 @@ export default async function InicioPage() {
         alumnos={alumnos || []}
         alumnosConDeuda={alumnosParaCobro}
         grupos={gruposParaCargo}
+        cobros={cobrosFrecuentes || []}
         planesPorVisita={planesPorVisita || []}
         allowPartial={allowPartial}
         allowOverpayment={allowOverpayment}

@@ -101,9 +101,9 @@ export function buildHistorialShareMensaje(params: {
 }): string {
   const { academia, alumno, link } = params
   return (
-    `Hola 😊, te compartimos el historial de pagos de *${alumno}* en ${academia}. ` +
+    `Hola, te compartimos el historial de pagos de *${alumno}* en ${academia}. ` +
     `Puedes consultarlo cuando quieras desde este enlace seguro:\n${link}\n\n` +
-    `¡Cualquier duda quedamos a tus órdenes! 🙌`
+    `¡Cualquier duda quedamos a tus órdenes!`
   )
 }
 

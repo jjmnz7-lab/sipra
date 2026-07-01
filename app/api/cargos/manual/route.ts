@@ -13,6 +13,7 @@ const payloadSchema = z.object({
   nota_modificacion: z.string().trim().min(1).max(500).optional(),
   fecha_vencimiento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   origen: z.enum(['manual', 'inscripcion', '1er mensualidad', 'ajuste', 'grupal']).optional(),
+  aplicar_beca: z.boolean().optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -49,6 +50,7 @@ export async function POST(req: NextRequest) {
     p_nota_modificacion: parsed.data.nota_modificacion ?? null,
     p_fecha_vencimiento: parsed.data.fecha_vencimiento ?? null,
     p_origen: parsed.data.origen ?? 'manual',
+    p_aplicar_beca: parsed.data.aplicar_beca ?? false,
   })
 
   if (error) {

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import { GrupoClientView } from './grupo-client-view'
 import { clasificarAlumno, type EstadoFinancieroAlumno } from '@/lib/constants/alumno-finanzas'
+import { ahoraAcademia } from '@/lib/utils/fecha-academia'
 
 export default async function GrupoDetallePage({ params, searchParams }: { params: Promise<{ grupo_id: string }>; searchParams: Promise<Record<string, string>> }) {
   const { grupo_id } = await params
@@ -43,6 +44,14 @@ export default async function GrupoDetallePage({ params, searchParams }: { param
   const cobrarInscripcionDefault = !!academia?.cobrar_inscripcion_default
   const timezone = academia?.timezone || 'America/Mexico_City'
 
+  // Catálogo de cobros frecuentes (para el combobox de concepto del cargo grupal).
+  const { data: cobrosFrecuentes } = await supabase
+    .from('cobros_frecuentes')
+    .select('id, concepto, monto')
+    .eq('academia_id', grupo.academia_id)
+    .eq('activo', true)
+    .order('concepto', { ascending: true }) as any
+
   // Otros grupos regulares activos (destino opcional al archivar este grupo;
   // las actividades no son destino válido)
   const { data: gruposDestino } = await supabase
@@ -59,7 +68,7 @@ export default async function GrupoDetallePage({ params, searchParams }: { param
     .from('persona_grupo')
     .select(`
       id, estado, fecha_inscripcion,
-      persona (id, nombre, apellido, telefono_whatsapp, estado_registro)
+      persona (id, nombre, apellido, telefono_whatsapp, estado_registro, beca_activa, beca_porcentaje)
     `)
     .eq('grupo_id', grupo_id)
     .eq('estado', 'activo') as any
@@ -84,7 +93,7 @@ export default async function GrupoDetallePage({ params, searchParams }: { param
 
   // Clasificación del semáforo financiero (4 estados estándar) usando la misma
   // función que la pantalla Alumnos, para mantener una única regla en todo el sistema.
-  const now = new Date()
+  const now = ahoraAcademia()
   const cargosPorPersona: Record<string, any[]> = {}
   for (const c of (cargos ?? [])) {
     if (!c.persona_id) continue
@@ -164,6 +173,7 @@ export default async function GrupoDetallePage({ params, searchParams }: { param
       mapEstadoMiembro={mapEstadoMiembro}
       planesPorAlumno={planesPorAlumno}
       alumnosDisponibles={alumnosDisponibles}
+      cobrosFrecuentes={cobrosFrecuentes || []}
       timezone={timezone}
       abrirArchivar={abrir_archiva === 'true'}
     />

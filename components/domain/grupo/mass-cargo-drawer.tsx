@@ -1,18 +1,19 @@
 'use client'
 
 import * as React from 'react'
-import { useActionState, useEffect, useState } from 'react'
+import { startTransition, useActionState, useEffect, useState } from 'react'
 import { crearCargoGrupalAction, type FormState } from '@/app/(app)/grupos/actions'
-import { useFormStatus } from 'react-dom'
+import { guardarCobroFrecuenteAction } from '@/app/(app)/configuracion/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Loader2, Banknote } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Loader2, Banknote, GraduationCap } from 'lucide-react'
 import { normalizeWholeMoneyInput, preventMoneyWheel } from '@/lib/utils/money-input'
+import { ConceptoCombobox, GuardarCatalogoToggle, useCobroConcepto, type CobroFrecuente } from '@/components/ui/concepto-combobox'
+import { cn } from '@/lib/utils'
 import {
   Drawer,
-  DrawerClose,
   DrawerContent,
   DrawerDescription,
   DrawerFooter,
@@ -23,62 +24,128 @@ import {
 
 const initialState: FormState = {}
 
-function SubmitButton() {
-  const { pending } = useFormStatus()
-  return (
-    <Button type="submit" className="w-full h-11" disabled={pending}>
-      {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-      {pending ? 'Procesando cargos...' : 'Generar Cargos'}
-    </Button>
-  )
+interface PersonaBeca {
+  id: string
+  nombre?: string
+  apellido?: string
+  beca_activa?: boolean
+  beca_porcentaje?: number
+}
+
+interface InscripcionConPersona {
+  persona: PersonaBeca
 }
 
 interface MassCargoDrawerProps {
   grupoId: string
-  inscripciones: any[]
+  inscripciones: InscripcionConPersona[]
   /** Controlado desde el padre (opcional). Si se omite, el drawer se autocontrola y renderiza su trigger por defecto. */
   open?: boolean
   onOpenChange?: (open: boolean) => void
   /** Se llama al generar los cargos con éxito (para mostrar un toast desde el padre). */
   onSuccess?: (msg: string) => void
+  /** Catálogo de cobros frecuentes (para el combobox del concepto). */
+  cobros?: CobroFrecuente[]
+  /** Título del drawer (default "Cargo grupal"). */
+  titulo?: string
 }
 
-export function MassCargoDrawer({ grupoId, inscripciones, open: controlledOpen, onOpenChange, onSuccess }: MassCargoDrawerProps) {
+export function MassCargoDrawer({
+  grupoId,
+  inscripciones,
+  open: controlledOpen,
+  onOpenChange,
+  onSuccess,
+  cobros = [],
+  titulo = 'Cargo grupal',
+}: MassCargoDrawerProps) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
   const isControlled = controlledOpen !== undefined
   const open = isControlled ? controlledOpen : uncontrolledOpen
   const setOpen = isControlled && onOpenChange ? onOpenChange : setUncontrolledOpen
-  const [state, formAction] = useActionState(crearCargoGrupalAction, initialState)
-  
-  // Por defecto todos los alumnos están marcados para el cobro
-  const allIds = inscripciones.map(i => i.persona.id)
+  const [state, formAction, isPending] = useActionState(crearCargoGrupalAction, initialState)
+
+  // Flujo de 2 pasos: 0 = concepto + monto, 1 = selección de alumnos.
+  const [step, setStep] = useState(0)
+  const [direction, setDirection] = useState<'forward' | 'back'>('forward')
+
+  const {
+    concepto, setConcepto, monto, setMonto,
+    guardarEnCatalogo, setGuardarEnCatalogo, mostrarGuardar, debeGuardarEnCatalogo,
+    onPick, onCreate, reset: resetCobro,
+    selectedItemId, setSelectedItemId,
+  } = useCobroConcepto(cobros)
+  const [cobroGuardadoConExito, setCobroGuardadoConExito] = useState(false)
+
+  // Por defecto todos los alumnos están marcados para el cobro.
+  const allIds = inscripciones.map((i) => i.persona.id)
   const [selectedIds, setSelectedIds] = useState<string[]>(allIds)
   const [idempotencyKey, setIdempotencyKey] = useState('')
+  const [aplicarBecas, setAplicarBecas] = useState(false)
 
   useEffect(() => {
     if (open) {
-      setSelectedIds(inscripciones.map(i => i.persona.id))
-      // Generar una llave de idempotencia nueva en cada apertura del cajón
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setStep(0)
+      setDirection('forward')
+      resetCobro()
+      setSelectedIds(inscripciones.map((i) => i.persona.id))
+      // Llave de idempotencia nueva en cada apertura del cajón.
       setIdempotencyKey(crypto.randomUUID())
+      setAplicarBecas(false)
+      setCobroGuardadoConExito(false)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, inscripciones])
+
+  // Alumnos becados entre los seleccionados (para la leyenda y el opt-in).
+  const becadosSeleccionados = inscripciones.filter(
+    (i) => selectedIds.includes(i.persona.id) && i.persona?.beca_activa && (i.persona?.beca_porcentaje ?? 0) > 0,
+  ).length
 
   useEffect(() => {
     if (!state.success) return
-    onSuccess?.(state.message ?? 'Cargos generados con éxito.')
+    const msg = state.message ?? 'Cargos generados con éxito.'
+    const finalMsg = cobroGuardadoConExito
+      ? `${msg} Y se guardó "${concepto.trim()}" en el catálogo.`
+      : msg
+    onSuccess?.(finalMsg)
     setOpen(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.success])
+  }, [state.success, cobroGuardadoConExito])
 
   const togglePersona = (id: string, isChecked: boolean) => {
-    if (isChecked) {
-      setSelectedIds(prev => [...prev, id])
-    } else {
-      setSelectedIds(prev => prev.filter(x => x !== id))
-    }
+    setSelectedIds((prev) => (isChecked ? [...prev, id] : prev.filter((x) => x !== id)))
   }
 
-  const excludedIds = allIds.filter(id => !selectedIds.includes(id))
+  const excludedIds = allIds.filter((id) => !selectedIds.includes(id))
+
+  const conceptoValido = concepto.trim().length >= 2
+  const montoValido = Number(monto) > 0
+  const puedeAvanzar = conceptoValido && montoValido
+
+  const goNext = () => { if (!puedeAvanzar) return; setDirection('forward'); setStep(1) }
+  const goBack = () => { setDirection('back'); setStep(0) }
+
+  const handleGenerar = async () => {
+    setCobroGuardadoConExito(false)
+    if (debeGuardarEnCatalogo) {
+      try {
+        const res = await guardarCobroFrecuenteAction({ id: null, concepto: concepto.trim(), monto: Number(monto) })
+        if (res.success) {
+          setCobroGuardadoConExito(true)
+        }
+      } catch { /* el cargo no se bloquea si falla guardar en catálogo */ }
+    }
+    const fd = new FormData()
+    fd.set('grupo_id', grupoId)
+    fd.set('concepto', concepto.trim())
+    fd.set('monto', String(Number(monto)))
+    fd.set('excluded_persona_ids', JSON.stringify(excludedIds))
+    fd.set('idempotency_key', idempotencyKey)
+    fd.set('aplicar_becas', becadosSeleccionados > 0 && aplicarBecas ? 'true' : 'false')
+    startTransition(() => formAction(fd))
+  }
 
   return (
     <Drawer open={open} onOpenChange={setOpen}>
@@ -92,89 +159,157 @@ export function MassCargoDrawer({ grupoId, inscripciones, open: controlledOpen, 
       )}
       <DrawerContent>
         <div className="mx-auto w-full max-w-sm">
-          <DrawerHeader>
-            <DrawerTitle>Cargo Masivo</DrawerTitle>
+          <DrawerHeader className="text-left">
+            <DrawerTitle>{titulo}</DrawerTitle>
             <DrawerDescription>
-              Aplica un cargo a todos los miembros seleccionados.
+              {step === 0 ? 'Define el concepto y el monto del cargo.' : 'Desmarca a quien no deba recibir el cargo.'}
             </DrawerDescription>
           </DrawerHeader>
-          
-          <form action={formAction}>
-            <input type="hidden" name="grupo_id" value={grupoId} />
-            <input type="hidden" name="excluded_persona_ids" value={JSON.stringify(excludedIds)} />
-            <input type="hidden" name="idempotency_key" value={idempotencyKey} />
 
-            <div className="p-4 pb-0 space-y-4 max-h-[60vh] overflow-y-auto">
-              <div className="space-y-2">
-                <Label htmlFor="concepto">Concepto</Label>
-                <Input
-                  id="concepto"
-                  name="concepto"
-                  placeholder="Ej. Inscripción torneo"
-                  required
-                  className="h-11"
-                />
-                {state?.errors?.concepto && (
-                  <p className="text-sm text-red-600">{state.errors.concepto[0]}</p>
-                )}
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="monto">Monto ($)</Label>
-                <Input
-                  id="monto"
-                  name="monto"
-                  type="number"
-                  step="1"
-                  min="1"
-                  placeholder="0"
-                  required
-                  onWheel={preventMoneyWheel}
-                  onChange={(e) => {
-                    e.currentTarget.value = normalizeWholeMoneyInput(e.currentTarget.value)
-                  }}
-                  className="h-11"
-                />
-                {state?.errors?.monto && (
-                  <p className="text-sm text-red-600">{state.errors.monto[0]}</p>
-                )}
-              </div>
-
-              <div className="mt-4 border-t pt-4">
-                <Label className="mb-2 block">Aplicar a ({selectedIds.length}/{allIds.length})</Label>
-                <div className="space-y-2">
-                  {inscripciones.map((ins) => (
-                    <div key={ins.persona.id} className="flex items-center space-x-2 bg-muted/30 border border-border p-2 rounded-md">
-                      <Checkbox 
-                        id={`chk-${ins.persona.id}`} 
-                        checked={selectedIds.includes(ins.persona.id)}
-                        onCheckedChange={(checked) => togglePersona(ins.persona.id, checked as boolean)}
+          {/* Cuerpo del paso (se desliza desde la derecha al avanzar) */}
+          <div className="relative overflow-hidden">
+            <div
+              key={step}
+              className={cn(
+                'px-4 max-h-[60vh] overflow-y-auto animate-in fade-in duration-300',
+                direction === 'back' ? 'slide-in-from-left-8' : 'slide-in-from-right-8',
+              )}
+            >
+              {/* Paso 0: concepto + monto */}
+              {step === 0 && (
+                <div className="space-y-4 pb-2">
+                  <div className="space-y-2">
+                    <ConceptoCombobox
+                      id="mc-concepto"
+                      value={concepto}
+                      onChange={setConcepto}
+                      catalogo={cobros}
+                      onPick={onPick}
+                      onCreate={onCreate}
+                      selectedItemId={selectedItemId}
+                      setSelectedItemId={setSelectedItemId}
+                      placeholder="Ej. Inscripción torneo"
+                      className="h-11"
+                      autoFocus
+                    />
+                  </div>
+                  {selectedItemId !== undefined && (
+                    <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                      <Label htmlFor="mc-monto">Monto ($)</Label>
+                      <Input
+                        id="mc-monto"
+                        type="number"
+                        step="1"
+                        min="1"
+                        inputMode="numeric"
+                        value={monto}
+                        onWheel={preventMoneyWheel}
+                        onChange={(e) => setMonto(normalizeWholeMoneyInput(e.target.value))}
+                        placeholder="0"
+                        className="h-11"
                       />
-                      <label 
-                        htmlFor={`chk-${ins.persona.id}`} 
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1 truncate cursor-pointer"
-                      >
-                        {ins.persona.nombre} {ins.persona.apellido}
+                    </div>
+                  )}
+                  <GuardarCatalogoToggle
+                    show={mostrarGuardar}
+                    checked={guardarEnCatalogo}
+                    onCheckedChange={setGuardarEnCatalogo}
+                  />
+                </div>
+              )}
+
+              {/* Paso 1: selección de alumnos + opt-in de becas */}
+              {step === 1 && (
+                <div className="space-y-4 pb-2">
+                  <div>
+                    <Label className="mb-2 block">Aplicar a ({selectedIds.length}/{allIds.length})</Label>
+                    <div className="space-y-2">
+                      {inscripciones.map((ins) => (
+                        <div key={ins.persona.id} className="flex items-center space-x-2 bg-muted/30 border border-border p-2 rounded-md">
+                          <Checkbox
+                            id={`chk-${ins.persona.id}`}
+                            checked={selectedIds.includes(ins.persona.id)}
+                            onCheckedChange={(checked) => togglePersona(ins.persona.id, checked as boolean)}
+                          />
+                          <label
+                            htmlFor={`chk-${ins.persona.id}`}
+                            className="text-sm font-medium leading-none flex-1 truncate cursor-pointer"
+                          >
+                            {ins.persona.nombre} {ins.persona.apellido}
+                          </label>
+                        </div>
+                      ))}
+                      {inscripciones.length === 0 && (
+                        <p className="text-sm text-muted-foreground py-6 text-center">Este grupo no tiene alumnos activos.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {becadosSeleccionados > 0 && (
+                    <div className="rounded-lg border border-[#22887c]/30 bg-[#22887c]/5 p-3 space-y-2">
+                      <div className="flex items-center gap-2 text-[#22887c]">
+                        <GraduationCap className="h-4 w-4 flex-shrink-0" />
+                        <span className="text-xs font-semibold">
+                          {becadosSeleccionados === 1 ? 'Hay 1 alumno con beca' : `Hay ${becadosSeleccionados} alumnos con beca`}
+                        </span>
+                      </div>
+                      <label className="flex items-start gap-2.5 cursor-pointer">
+                        <Checkbox
+                          checked={aplicarBecas}
+                          onCheckedChange={(c) => setAplicarBecas(c as boolean)}
+                          className="mt-0.5"
+                        />
+                        <span className="text-xs text-foreground">
+                          <span className="font-semibold">Aplicar becas a este cargo</span>
+                          <span className="block text-[11px] text-muted-foreground leading-snug">
+                            Si se activa, los alumnos con beca recibirán automáticamente el descuento de su porcentaje en este cobro.
+                          </span>
+                        </span>
                       </label>
                     </div>
-                  ))}
-                </div>
-              </div>
+                  )}
 
-              {state?.message && !state.success && (
-                <div className="p-3 bg-red-50 text-red-700 text-sm rounded-md border border-red-200">
-                  {state.message}
+                  {state?.message && !state.success && (
+                    <div className="p-3 bg-red-50 text-red-700 text-sm rounded-md border border-red-200">
+                      {state.message}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-            
-            <DrawerFooter className="mt-2">
-              <SubmitButton />
-              <DrawerClose asChild>
-                <Button variant="outline" className="h-11">Cancelar</Button>
-              </DrawerClose>
-            </DrawerFooter>
-          </form>
+          </div>
+
+          <DrawerFooter className="mt-2">
+            {step === 0 ? (
+              <Button type="button" className="w-full h-11" onClick={goNext} disabled={!puedeAvanzar}>
+                Siguiente
+                <ArrowRight className="ml-1 h-4 w-4" />
+              </Button>
+            ) : (
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" className="h-11" style={{ flex: '0 0 30%' }} onClick={goBack}>
+                  <ArrowLeft className="mr-1 h-4 w-4" />
+                  Atrás
+                </Button>
+                <Button
+                  type="button"
+                  className="h-11"
+                  style={{ flex: '0 0 70%' }}
+                  onClick={handleGenerar}
+                  disabled={isPending || selectedIds.length === 0}
+                >
+                  {isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Procesando cargos…
+                    </>
+                  ) : (
+                    'Generar cargos'
+                  )}
+                </Button>
+              </div>
+            )}
+          </DrawerFooter>
         </div>
       </DrawerContent>
     </Drawer>

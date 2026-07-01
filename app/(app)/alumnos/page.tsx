@@ -57,7 +57,7 @@ export default async function AlumnosPage() {
   const { data: grupos } = await supabase
     .from('grupo')
     .select(`
-      id, nombre, color, plan_sugerido_id, cupo_maximo,
+      id, nombre, color, emoji, plan_sugerido_id, cupo_maximo,
       persona_grupo (estado)
     `)
     .eq('estado', 'activo')
@@ -157,6 +157,7 @@ export default async function AlumnosPage() {
         id: g.id,
         nombre: g.nombre,
         color: g.color ?? null,
+        emoji: g.emoji ?? null,
         plan_sugerido_id: g.plan_sugerido_id ?? null,
         cupo_maximo: g.cupo_maximo ?? null,
         persona_grupo: g.persona_grupo || [],

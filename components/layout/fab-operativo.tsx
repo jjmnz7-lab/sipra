@@ -21,6 +21,7 @@ import {
 import { RegistrarPagoDrawer } from '@/components/domain/cargo/registrar-pago-drawer'
 import { CrearCargoIndividualDrawer } from '@/components/domain/cargo/crear-cargo-individual-drawer'
 import { CargoMasivoWizard, type GrupoCargoMasivo } from '@/components/domain/cargo/cargo-masivo-wizard'
+import { type CobroFrecuente } from '@/components/ui/concepto-combobox'
 import { useToast } from '@/components/ui/use-toast'
 
 type AlumnoDeuda = {
@@ -39,6 +40,7 @@ export function FabOperativo({
   alumnos,
   alumnosConDeuda = [],
   grupos = [],
+  cobros = [],
   planesPorVisita = [],
   allowPartial = true,
   allowOverpayment = true,
@@ -46,6 +48,7 @@ export function FabOperativo({
   alumnos: AlumnoLite[]
   alumnosConDeuda?: AlumnoDeuda[]
   grupos?: GrupoCargo[]
+  cobros?: CobroFrecuente[]
   planesPorVisita?: PlanVisita[]
   allowPartial?: boolean
   allowOverpayment?: boolean
@@ -218,6 +221,8 @@ export function FabOperativo({
           onOpenChange={setCargoOpen}
           personaId={cargoSel.id}
           tituloDrawer={`Nuevo cargo • ${cargoSel.nombre} ${cargoSel.apellido ?? ''}`.trim()}
+          cobros={cobros}
+          onSuccess={showToast}
         />
       )}
 
@@ -225,6 +230,7 @@ export function FabOperativo({
         open={masivoOpen}
         onOpenChange={setMasivoOpen}
         grupos={grupos}
+        cobros={cobros}
         onSuccess={showToast}
       />
 

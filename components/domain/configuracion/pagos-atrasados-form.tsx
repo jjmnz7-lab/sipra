@@ -174,7 +174,13 @@ export function RecargosBlock({ initialConfig }: { initialConfig: any }) {
             role="switch"
             aria-checked={marcarCritico.activo}
             aria-label='Marcar estado de alumno como "Crítico"'
-            onClick={() => setMarcarCritico({ ...marcarCritico, activo: !marcarCritico.activo })}
+            onClick={() =>
+              setMarcarCritico((current) => ({
+                ...current,
+                activo: !current.activo,
+                dia_umbral: current.dia_umbral || 15,
+              }))
+            }
             className={cn(
               'relative inline-flex h-[18.4px] w-[32px] mt-0.5 shrink-0 items-center rounded-full border border-transparent transition-colors',
               marcarCritico.activo ? 'bg-primary' : 'bg-input'
@@ -188,7 +194,7 @@ export function RecargosBlock({ initialConfig }: { initialConfig: any }) {
             />
           </button>
 
-          <div className={cn('flex items-center flex-wrap gap-x-1.5 gap-y-1 text-sm leading-relaxed', !marcarCritico.activo && 'opacity-40')}>
+          <div className="flex items-center flex-wrap gap-x-1.5 gap-y-1 text-sm leading-relaxed">
             <span className="text-foreground">Marcar estado de alumno como</span>
             <span className="inline-flex items-center gap-1 font-semibold text-foreground">
               <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CRITICO_HEX }} aria-hidden />
@@ -199,7 +205,12 @@ export function RecargosBlock({ initialConfig }: { initialConfig: any }) {
               type="button"
               disabled={!marcarCritico.activo}
               onClick={() => setCriticoSheetOpen(true)}
-              className="inline-flex items-center justify-center h-8 min-w-[2.75rem] px-2 rounded-md border border-input bg-background text-foreground text-sm font-medium hover:bg-muted/40 disabled:cursor-not-allowed"
+              className={cn(
+                'inline-flex items-center justify-center h-8 min-w-[2.75rem] px-2 rounded-md border text-sm font-medium transition-colors',
+                marcarCritico.activo
+                  ? 'border-input bg-background text-foreground hover:bg-muted/40'
+                  : 'border-dashed border-input bg-muted/40 text-muted-foreground cursor-not-allowed opacity-70'
+              )}
             >
               {marcarCritico.activo ? marcarCritico.dia_umbral : ''}
             </button>

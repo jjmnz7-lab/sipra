@@ -2,16 +2,18 @@
 
 import * as React from 'react'
 import { useActionState, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, ArrowRight, Loader2, Layers, Receipt, Users } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Loader2, Layers, Receipt, Users, GraduationCap } from 'lucide-react'
 import {
   crearCargoMasivoMultigrupoAction,
   type FormState,
 } from '@/app/(app)/grupos/actions'
+import { guardarCobroFrecuenteAction } from '@/app/(app)/configuracion/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Switch } from '@/components/ui/switch'
+import { ConceptoCombobox, GuardarCatalogoToggle, useCobroConcepto, type CobroFrecuente } from '@/components/ui/concepto-combobox'
 import {
   Drawer,
   DrawerContent,
@@ -29,31 +31,47 @@ export type GrupoCargoMasivo = {
   nombre: string
   color: string | null
   emoji: string | null
-  inscripciones: { persona: { id: string; nombre: string; apellido: string | null } }[]
+  inscripciones: {
+    persona: {
+      id: string
+      nombre: string
+      apellido: string | null
+      beca_activa?: boolean
+      beca_porcentaje?: number
+    }
+  }[]
 }
 
 interface CargoMasivoWizardProps {
   grupos: GrupoCargoMasivo[]
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** Catálogo de cobros frecuentes (para el combobox del concepto). */
+  cobros?: CobroFrecuente[]
   /** Se llama al generar los cargos con éxito (para mostrar un toast desde el padre). */
   onSuccess?: (msg: string) => void
 }
 
 const initialState: FormState = {}
 
-export function CargoMasivoWizard({ grupos, open, onOpenChange, onSuccess }: CargoMasivoWizardProps) {
+export function CargoMasivoWizard({ grupos, open, onOpenChange, cobros = [], onSuccess }: CargoMasivoWizardProps) {
   const [state, formAction, isPending] = useActionState(crearCargoMasivoMultigrupoAction, initialState)
 
   const [step, setStep] = useState(0)
   const [direction, setDirection] = useState<'forward' | 'back'>('forward')
-  const [concepto, setConcepto] = useState('')
-  const [monto, setMonto] = useState('')
+  const {
+    concepto, setConcepto, monto, setMonto,
+    guardarEnCatalogo, setGuardarEnCatalogo, mostrarGuardar, debeGuardarEnCatalogo,
+    onPick, onCreate, reset: resetCobro,
+    selectedItemId, setSelectedItemId,
+  } = useCobroConcepto(cobros)
+  const [cobroGuardadoConExito, setCobroGuardadoConExito] = useState(false)
   // Orden = orden de selección (define el "primer grupo" para de-duplicar).
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   // Exclusiones manuales por grupo (persona_ids quitados del cobro).
   const [excludedByGrupo, setExcludedByGrupo] = useState<Record<string, string[]>>({})
   const [duplicar, setDuplicar] = useState(false)
+  const [aplicarBecas, setAplicarBecas] = useState(false)
   const [loteId, setLoteId] = useState('')
   const [showConfirmation, setShowConfirmation] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
@@ -61,23 +79,30 @@ export function CargoMasivoWizard({ grupos, open, onOpenChange, onSuccess }: Car
   // Reset completo en cada apertura.
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStep(0)
       setDirection('forward')
-      setConcepto('')
-      setMonto('')
+      resetCobro()
       setSelectedIds([])
       setExcludedByGrupo({})
       setDuplicar(false)
+      setAplicarBecas(false)
       setLoteId(crypto.randomUUID())
+      setCobroGuardadoConExito(false)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   useEffect(() => {
     if (!state.success) return
-    onSuccess?.(state.message ?? 'Cargos generados con éxito.')
+    const msg = state.message ?? 'Cargos generados con éxito.'
+    const finalMsg = cobroGuardadoConExito
+      ? `${msg} Y se guardó "${concepto.trim()}" en el catálogo.`
+      : msg
+    onSuccess?.(finalMsg)
     onOpenChange(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.success])
+  }, [state.success, cobroGuardadoConExito])
 
   const selectedGrupos = useMemo(
     () => selectedIds.map((id) => grupos.find((g) => g.id === id)).filter(Boolean) as GrupoCargoMasivo[],
@@ -120,6 +145,23 @@ export function CargoMasivoWizard({ grupos, open, onOpenChange, onSuccess }: Car
     () => Array.from(includedCountPorPersona.values()).filter((n) => n >= 1).length,
     [includedCountPorPersona],
   )
+
+  // Becados entre los alumnos efectivamente incluidos (para la leyenda y el opt-in).
+  const becadosIncluidos = useMemo(() => {
+    const becaById = new Map<string, boolean>()
+    for (const g of selectedGrupos) {
+      for (const i of g.inscripciones) {
+        const p = i.persona
+        if (p?.beca_activa && (p?.beca_porcentaje ?? 0) > 0) becaById.set(p.id, true)
+      }
+    }
+    let n = 0
+    for (const pid of includedCountPorPersona.keys()) {
+      if (becaById.get(pid)) n++
+    }
+    return n
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedGrupos, includedCountPorPersona])
   const totalCargos = useMemo(
     () => Array.from(includedCountPorPersona.values()).reduce((acc, n) => acc + n, 0),
     [includedCountPorPersona],
@@ -238,31 +280,42 @@ export function CargoMasivoWizard({ grupos, open, onOpenChange, onSuccess }: Car
               {step === 0 && (
                 <div className="space-y-4 pb-2">
                   <div className="space-y-2">
-                    <Label htmlFor="cm-concepto">Concepto</Label>
-                    <Input
+                    <ConceptoCombobox
                       id="cm-concepto"
                       value={concepto}
-                      onChange={(e) => setConcepto(e.target.value)}
+                      onChange={setConcepto}
+                      catalogo={cobros}
+                      onPick={onPick}
+                      onCreate={onCreate}
+                      selectedItemId={selectedItemId}
+                      setSelectedItemId={setSelectedItemId}
                       placeholder="Ej. Inscripción torneo"
                       className="h-11"
                       autoFocus
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="cm-monto">Monto ($)</Label>
-                    <Input
-                      id="cm-monto"
-                      type="number"
-                      step="1"
-                      min="1"
-                      inputMode="numeric"
-                      value={monto}
-                      onWheel={preventMoneyWheel}
-                      onChange={(e) => setMonto(normalizeWholeMoneyInput(e.target.value))}
-                      placeholder="0"
-                      className="h-11"
-                    />
-                  </div>
+                  {selectedItemId !== undefined && (
+                    <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                      <Label htmlFor="cm-monto">Monto ($)</Label>
+                      <Input
+                        id="cm-monto"
+                        type="number"
+                        step="1"
+                        min="1"
+                        inputMode="numeric"
+                        value={monto}
+                        onWheel={preventMoneyWheel}
+                        onChange={(e) => setMonto(normalizeWholeMoneyInput(e.target.value))}
+                        placeholder="0"
+                        className="h-11"
+                      />
+                    </div>
+                  )}
+                  <GuardarCatalogoToggle
+                    show={mostrarGuardar}
+                    checked={guardarEnCatalogo}
+                    onCheckedChange={setGuardarEnCatalogo}
+                  />
                 </div>
               )}
 
@@ -436,6 +489,31 @@ export function CargoMasivoWizard({ grupos, open, onOpenChange, onSuccess }: Car
                     </div>
                   )}
 
+                  {/* Opt-in de becas (solo si hay becados entre los incluidos) */}
+                  {becadosIncluidos > 0 && (
+                    <div className="rounded-xl border border-[#22887c]/30 bg-[#22887c]/5 p-3 space-y-2">
+                      <div className="flex items-center gap-2 text-[#22887c]">
+                        <GraduationCap className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                        <span className="text-xs font-semibold">
+                          {becadosIncluidos === 1 ? 'Hay 1 alumno con beca' : `Hay ${becadosIncluidos} alumnos con beca`}
+                        </span>
+                      </div>
+                      <label className="flex items-start gap-2.5 cursor-pointer">
+                        <Checkbox
+                          checked={aplicarBecas}
+                          onCheckedChange={(c) => setAplicarBecas(c as boolean)}
+                          className="mt-0.5"
+                        />
+                        <span className="text-xs text-foreground">
+                          <span className="font-semibold">Aplicar becas a este cargo</span>
+                          <span className="block text-[11px] text-muted-foreground leading-snug">
+                            Si se activa, los alumnos con beca recibirán automáticamente el descuento de su porcentaje en este cobro.
+                          </span>
+                        </span>
+                      </label>
+                    </div>
+                  )}
+
                   {state?.message && !state.success && (
                     <div className="p-3 bg-red-50 text-red-700 text-sm rounded-md border border-red-200 dark:bg-red-900/25 dark:text-red-300 dark:border-red-800/50">
                       {state.message}
@@ -453,6 +531,7 @@ export function CargoMasivoWizard({ grupos, open, onOpenChange, onSuccess }: Car
               <input type="hidden" name="concepto" value={concepto} />
               <input type="hidden" name="monto" value={monto} />
               <input type="hidden" name="grupos" value={JSON.stringify(gruposPayload)} />
+              <input type="hidden" name="aplicar_becas" value={becadosIncluidos > 0 && aplicarBecas ? 'true' : 'false'} />
             </form>
           )}
 
@@ -503,7 +582,18 @@ export function CargoMasivoWizard({ grupos, open, onOpenChange, onSuccess }: Car
                     style={{ flex: '0 0 70%' }}
                     disabled={isPending || totalCargos === 0}
                     onClick={showConfirmation
-                      ? () => formRef.current?.requestSubmit()
+                      ? async () => {
+                          setCobroGuardadoConExito(false)
+                          if (debeGuardarEnCatalogo) {
+                            try {
+                              const res = await guardarCobroFrecuenteAction({ id: null, concepto: concepto.trim(), monto: Number(monto || '0') })
+                              if (res.success) {
+                                setCobroGuardadoConExito(true)
+                              }
+                            } catch { /* el cargo no se bloquea si falla guardar en catálogo */ }
+                          }
+                          formRef.current?.requestSubmit()
+                        }
                       : () => setShowConfirmation(true)
                     }
                   >

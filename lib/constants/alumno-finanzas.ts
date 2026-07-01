@@ -1,3 +1,5 @@
+import { ahoraAcademia } from '@/lib/utils/fecha-academia'
+
 /**
  * Escala financiera del alumno usada en la vista /alumnos y en la
  * health strip global. Mantenida como constante reusable para que
@@ -26,7 +28,7 @@ export function colorEstado(slug: EstadoFinancieroAlumno | string | null | undef
 
 type CargoLite = {
   concepto: string | null
-  estado_financiero: string | null
+  estado_financiero?: string | null
   fecha_vencimiento: string | null
 }
 
@@ -39,11 +41,12 @@ type CargoLite = {
  *  - >=1 cargo con estado_financiero === 'vencido' → atrasado
  *  - Resto (cargos pendiente/parcial sin vencer) → pendiente
  */
-export function clasificarAlumno(cargos: CargoLite[], hoy: Date = new Date()): EstadoFinancieroAlumno {
+export function clasificarAlumno(cargos: CargoLite[], hoy: Date = ahoraAcademia()): EstadoFinancieroAlumno {
   if (!cargos || cargos.length === 0) return 'al_dia'
 
-  const oneMonthAgo = new Date(hoy)
-  oneMonthAgo.setMonth(hoy.getMonth() - 1)
+  // hoy viene "falso-UTC" (ver zonedAcademia): siempre getUTC*(), nunca
+  // accesores locales, para no depender del huso del proceso que ejecuta esto.
+  const oneMonthAgo = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() - 1, hoy.getUTCDate()))
 
   const isMensualidad = (c: CargoLite) =>
     String(c.concepto ?? '').toLowerCase().includes('mensualidad')

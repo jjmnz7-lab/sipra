@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { ReportesClientView, type CobradoMes } from './reportes-client-view'
 import { clasificarAlumno } from '@/lib/constants/alumno-finanzas'
 import { fetchLotesCargos } from '@/lib/reportes/cargos-grupales'
+import { ahoraAcademia, zonedAcademia } from '@/lib/utils/fecha-academia'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,10 +21,12 @@ async function computarCobrado(
   academiaId: string,
   now: Date,
 ): Promise<CobradoMes> {
-  const y = now.getFullYear()
-  const m = now.getMonth()
-  const inicioMes = new Date(y, m, 1)
-  const inicioSerie = new Date(y, m - 11, 1) // últimos 12 meses, incluido el actual
+  // now viene "falso-UTC" (ver zonedAcademia): siempre getUTC*(), nunca
+  // accesores locales, para no depender del huso del proceso que ejecuta esto.
+  const y = now.getUTCFullYear()
+  const m = now.getUTCMonth()
+  const inicioMes = new Date(Date.UTC(y, m, 1))
+  const inicioSerie = new Date(Date.UTC(y, m - 11, 1)) // últimos 12 meses, incluido el actual
 
   const { data: eventosRes } = await supabase
     .from('evento_timeline')
@@ -35,7 +38,7 @@ async function computarCobrado(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const eventos = (eventosRes ?? []) as any[]
 
-  const claveMes = (d: Date) => `${d.getFullYear()}-${d.getMonth()}`
+  const claveMes = (d: Date) => `${d.getUTCFullYear()}-${d.getUTCMonth()}`
   const porMes = new Map<string, number>()
   const mesesConHistorial = new Set<string>()
 
@@ -51,7 +54,9 @@ async function computarCobrado(
     // Consumo de saldo a favor: no es dinero nuevo.
     if (e.tipo === 'PAGO_ABONO' && meta.tipo === 'saldo_a_favor') continue
 
-    const fecha = new Date(e.fecha_evento)
+    // fecha_evento es un instante real (timestamptz); se convierte al
+    // calendario de la academia antes de decidir a qué mes pertenece.
+    const fecha = zonedAcademia(new Date(e.fecha_evento))
     const k = claveMes(fecha)
     const signo = e.tipo === 'PAGO_ABONO' ? 1 : -1
     porMes.set(k, (porMes.get(k) ?? 0) + signo * monto)
@@ -93,12 +98,14 @@ async function computarCobrado(
   const meses: { label: string; total: number }[] = []
   let historiaIniciada = false
   for (let i = 11; i >= 0; i--) {
-    const d = new Date(y, m - i, 1)
+    const d = new Date(Date.UTC(y, m - i, 1))
     const k = claveMes(d)
     if (!historiaIniciada && !mesesConHistorial.has(k) && i > 0) continue
     historiaIniciada = true
-    const mesCorto = capitalizar(d.toLocaleDateString('es-MX', { month: 'short' }).replace('.', ''))
-    const label = d.getFullYear() !== y ? `${mesCorto} ${String(d.getFullYear()).slice(-2)}` : mesCorto
+    const mesCorto = capitalizar(
+      d.toLocaleDateString('es-MX', { month: 'short', timeZone: 'UTC' }).replace('.', ''),
+    )
+    const label = d.getUTCFullYear() !== y ? `${mesCorto} ${String(d.getUTCFullYear()).slice(-2)}` : mesCorto
     meses.push({ label, total: porMes.get(k) ?? 0 })
   }
 
@@ -115,7 +122,7 @@ async function computarCobrado(
   }
 
   // Más reciente primero (el mes en curso a la cabeza de la serie).
-  const mesLabel = capitalizar(now.toLocaleDateString('es-MX', { month: 'long' }))
+  const mesLabel = capitalizar(now.toLocaleDateString('es-MX', { month: 'long', timeZone: 'UTC' }))
   return { mesLabel, total: totalMes, metodos, serie: meses.reverse() }
 }
 
@@ -125,7 +132,7 @@ export default async function ReportesPage() {
   const { data: { user } } = await supabase.auth.getUser()
   const academiaId = user?.app_metadata?.academia_id
 
-  const now = new Date()
+  const now = ahoraAcademia()
 
   const [alumnosRes, lotes, cobradoMes] = await Promise.all([
     // Alumnos activos y sus cargos pendientes para la deuda y estados

@@ -21,13 +21,14 @@ import { buildRecordatorioConTono, buildWhatsAppUrl, formatDesgloseCargos, build
 import { useAcademia } from '@/lib/contexts/academia-context'
 import { obtenerDatosCompartir } from '@/app/(app)/inicio/actions'
 import { cn } from '@/lib/utils'
+import { clasificarAlumno, type EstadoFinancieroAlumno } from '@/lib/constants/alumno-finanzas'
 
 interface RecordatorioMensajeDrawerProps {
   telefono: string | null | undefined
   nombre: string
   monto: number
   concepto: string
-  cargosActivos?: CargoRecordatorio[]
+  cargosActivos?: CargoRecordatorioConEstado[]
   /** Habilita el toggle "Incluir enlace a historial" (requiere el id del alumno). */
   personaId?: string
   children?: React.ReactNode
@@ -35,16 +36,37 @@ interface RecordatorioMensajeDrawerProps {
   onOpenChange?: (open: boolean) => void
 }
 
-function esCritico(cargos: CargoRecordatorio[] | undefined): boolean {
-  if (!cargos || cargos.length === 0) return false
-  const oneMonthAgo = new Date()
-  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
-  const mensualidades = cargos.filter(c => c.concepto.toLowerCase().includes('mensualidad'))
-  const otrosAntiguos = cargos.filter(c => {
-    if (c.concepto.toLowerCase().includes('mensualidad')) return false
-    return new Date(c.fecha_vencimiento) < oneMonthAgo
-  })
-  return mensualidades.length >= 2 || otrosAntiguos.length >= 1
+type CargoRecordatorioConEstado = CargoRecordatorio & {
+  estado_financiero?: string | null
+}
+
+function getTonoPredeterminado(cargos: CargoRecordatorioConEstado[] | undefined): TonoRecordatorio {
+  const estado = clasificarAlumno(cargos ?? []) as EstadoFinancieroAlumno
+
+  switch (estado) {
+    case 'urgente':
+      return 'urgente'
+    case 'atrasado':
+      return 'formal'
+    case 'pendiente':
+    case 'al_dia':
+    default:
+      return 'amigable'
+  }
+}
+
+function getEtiquetaTonoSugerido(cargos: CargoRecordatorioConEstado[] | undefined): string {
+  const tono = getTonoPredeterminado(cargos)
+
+  switch (tono) {
+    case 'formal':
+      return 'Formal'
+    case 'urgente':
+      return 'Urgente'
+    case 'amigable':
+    default:
+      return 'Amigable'
+  }
 }
 
 const TONOS: { value: TonoRecordatorio; label: string; icon: React.ReactNode; description: string }[] = [
@@ -70,14 +92,14 @@ export function RecordatorioMensajeDrawer({
   const open = isControlled ? controlledOpen : uncontrolledOpen
   const setOpen = isControlled && onOpenChange ? onOpenChange : setUncontrolledOpen
 
-  const [tono, setTono] = useState<TonoRecordatorio>(() =>
-    esCritico(cargosActivos) ? 'urgente' : 'amigable'
-  )
+  const defaultTono = getTonoPredeterminado(cargosActivos)
+  const [tono, setTono] = useState<TonoRecordatorio>(defaultTono)
   const [mensaje, setMensaje] = useState('')
   const [editado, setEditado] = useState(false)
   const [incluirDesglose, setIncluirDesglose] = useState(true)
   const [incluirEnlace, setIncluirEnlace] = useState(false)
   const [shareCode, setShareCode] = useState<string | null>(null)
+  const tonoSugerido = getEtiquetaTonoSugerido(cargosActivos)
 
   // Carga perezosa del código al abrir (sólo si hay alumno asociado).
   useEffect(() => {
@@ -87,6 +109,13 @@ export function RecordatorioMensajeDrawer({
       })
     }
   }, [open, personaId, shareCode])
+
+  useEffect(() => {
+    if (open) {
+      setTono(getTonoPredeterminado(cargosActivos))
+      setEditado(false)
+    }
+  }, [open, cargosActivos])
 
   // Generar mensaje cuando cambia el tono, desglose, enlace o al abrir (salvo si fue editado manualmente)
   useEffect(() => {
@@ -136,7 +165,7 @@ export function RecordatorioMensajeDrawer({
     if (!isOpen) {
       // Reset al cerrar
       setEditado(false)
-      setTono(esCritico(cargosActivos) ? 'urgente' : 'amigable')
+      setTono(getTonoPredeterminado(cargosActivos))
       setIncluirDesglose(true)
       setIncluirEnlace(false)
     }
@@ -163,7 +192,12 @@ export function RecordatorioMensajeDrawer({
           <div className="p-4 space-y-4">
             {/* Selector de Tono */}
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground tracking-wider">Tono del mensaje</p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-semibold text-muted-foreground tracking-wider">Tono del mensaje</p>
+                <p className="text-[10px] font-medium text-muted-foreground">
+                  Sugerido: <span className="text-foreground">{tonoSugerido}</span>
+                </p>
+              </div>
               <div className="grid grid-cols-3 gap-2">
                 {TONOS.map((t) => (
                   <button

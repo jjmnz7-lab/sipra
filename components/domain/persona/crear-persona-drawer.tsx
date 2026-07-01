@@ -7,7 +7,7 @@ import { crearPersonaAction, type FormState } from '@/app/(app)/grupos/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Loader2, UserPlus, Info, CheckCircle2, Check } from 'lucide-react'
+import { Loader2, UserPlus, Info, CheckCircle2, Check, Users, GraduationCap } from 'lucide-react'
 import {
   Drawer,
   DrawerClose,
@@ -18,10 +18,29 @@ import {
   DrawerTrigger,
 } from '@/components/ui/drawer'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import { formatCurrencyCompact } from '@/lib/utils/currency'
+import { colorPorSlug } from '@/lib/constants/grupo-apariencia'
+import { normalizeWholeMoneyInput, preventMoneyWheel } from '@/lib/utils/money-input'
 
 const initialState: FormState = {}
+
+const BECA_OPCIONES = [25, 50, 100] as const
+
+/** Emoji del grupo dentro de un círculo con su color (igual que en la pantalla Grupos). */
+function GrupoEmojiCircle({ slug, emoji, className }: { slug?: string | null; emoji?: string | null; className?: string }) {
+  const c = colorPorSlug(slug)
+  return (
+    <div
+      className={cn('rounded-full flex items-center justify-center flex-shrink-0', className)}
+      style={{ backgroundColor: c.bg, border: `2px solid ${c.border}` }}
+      aria-hidden="true"
+    >
+      {emoji || ''}
+    </div>
+  )
+}
 
 type Grupo = {
   id: string
@@ -29,6 +48,8 @@ type Grupo = {
   /** Plan que dicta el precio de este grupo (academias estilo fútbol). */
   plan_sugerido_id?: string | null
   cupo_maximo?: number | null
+  color?: string | null
+  emoji?: string | null
   persona_grupo?: { estado: string }[] | null
 }
 
@@ -133,6 +154,24 @@ export function CrearPersonaDrawer({
   const [grupoIds, setGrupoIds] = useState<Set<string>>(new Set(defaultGrupoId ? [defaultGrupoId] : []))
   const [planIds, setPlanIds] = useState<Set<string>>(new Set())
 
+  // Descuentos especiales (Hermanos y Beca son mutuamente excluyentes).
+  const [hermanosActivo, setHermanosActivo] = useState(false)
+  const [hermanosMonto, setHermanosMonto] = useState('')
+  const [becaActiva, setBecaActiva] = useState(false)
+  const [becaPorcentaje, setBecaPorcentaje] = useState<number>(25)
+
+  const toggleHermanos = (on: boolean) => {
+    setHermanosActivo(on)
+    if (on) setBecaActiva(false)
+  }
+  const toggleBeca = (on: boolean) => {
+    setBecaActiva(on)
+    if (on) {
+      setHermanosActivo(false)
+      if (!BECA_OPCIONES.includes(becaPorcentaje as 25 | 50 | 100)) setBecaPorcentaje(25)
+    }
+  }
+
   // Inscripción (rastro de auditoría)
   const [cobrarInscripcion, setCobrarInscripcion] = useState(cobrarInscripcionDefault)
   const [montoInscripcion, setMontoInscripcion] = useState(String(Math.round(montoInscripcionDefault)))
@@ -202,12 +241,16 @@ export function CrearPersonaDrawer({
     setCondonar(false)
   }, [preview.monto, open])
 
-  // Reinicia los campos de inscripción al abrir el drawer.
+  // Reinicia los campos de inscripción y descuentos al abrir el drawer.
   useEffect(() => {
     if (open) {
       setCobrarInscripcion(cobrarInscripcionDefault)
       setMontoInscripcion(String(Math.round(montoInscripcionDefault)))
       setMotivoInscripcion('')
+      setHermanosActivo(false)
+      setHermanosMonto('')
+      setBecaActiva(false)
+      setBecaPorcentaje(25)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -322,6 +365,11 @@ export function CrearPersonaDrawer({
     fd.set('plan_ids', JSON.stringify(planesSel))
     // El monto editable solo aplica al modo simple (1 plan).
     if (!multiPlanEnabled) fd.set('monto', String(montoFinal))
+    // Descuentos especiales (mutuamente excluyentes; la UI ya lo garantiza).
+    fd.set('descuento_hermanos_activo', hermanosActivo ? 'true' : 'false')
+    fd.set('descuento_hermanos_monto', hermanosActivo ? String(Number(hermanosMonto || '0')) : '0')
+    fd.set('beca_activa', becaActiva ? 'true' : 'false')
+    fd.set('beca_porcentaje', becaActiva ? String(becaPorcentaje) : '0')
     // React 19: el action devuelto por useActionState debe invocarse dentro de una transición.
     startTransition(() => formAction(fd))
   }
@@ -373,7 +421,12 @@ export function CrearPersonaDrawer({
                       </SelectTrigger>
                       <SelectContent>
                         {grupos.map((g) => (
-                          <SelectItem key={g.id} value={g.id}>{g.nombre}</SelectItem>
+                          <SelectItem key={g.id} value={g.id}>
+                            <span className="flex items-center gap-2.5 min-w-0">
+                              <GrupoEmojiCircle slug={g.color} emoji={g.emoji} className="h-6 w-6 text-sm" />
+                              <span className="truncate" style={{ color: colorPorSlug(g.color).textLight }}>{g.nombre}</span>
+                            </span>
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -440,6 +493,8 @@ export function CrearPersonaDrawer({
                           label={g.nombre}
                           checked={grupoIds.has(g.id)}
                           onClick={() => toggleGrupoAvanzado(g)}
+                          leftSlot={<GrupoEmojiCircle slug={g.color} emoji={g.emoji} className="h-7 w-7 text-sm" />}
+                          labelStyle={{ color: colorPorSlug(g.color).textLight }}
                         />
                       ))}
                       {grupos.length === 0 && <p className="text-xs text-muted-foreground px-2 py-1">No hay grupos.</p>}
@@ -472,6 +527,75 @@ export function CrearPersonaDrawer({
                   </div>
                 </>
               )}
+
+              {/* ---------------- DESCUENTOS ESPECIALES ---------------- */}
+              <div className="space-y-2 pt-2 border-t border-border/60">
+                <Label className="text-xs font-semibold text-muted-foreground tracking-wider">Descuentos especiales</Label>
+
+                {/* Toggle Hermanos */}
+                <div className="rounded-lg border border-border p-3 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Users className="h-4 w-4 text-primary flex-shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground">Hermanos</p>
+                        <p className="text-[11px] text-muted-foreground leading-snug">Descuento fijo en cada mensualidad.</p>
+                      </div>
+                    </div>
+                    <Switch checked={hermanosActivo} onCheckedChange={toggleHermanos} className="data-checked:!bg-primary" />
+                  </div>
+                  {hermanosActivo && (
+                    <div className="space-y-1">
+                      <Label htmlFor="crear-hermanos-monto" className="text-[11px] font-medium text-muted-foreground">Monto a descontar ($)</Label>
+                      <Input
+                        id="crear-hermanos-monto"
+                        type="number"
+                        step="1"
+                        min="1"
+                        inputMode="numeric"
+                        value={hermanosMonto}
+                        onWheel={preventMoneyWheel}
+                        onChange={(e) => setHermanosMonto(normalizeWholeMoneyInput(e.target.value))}
+                        placeholder="0"
+                        className="h-10"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Toggle Alumno becado */}
+                <div className="rounded-lg border border-border p-3 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <GraduationCap className="h-4 w-4 text-primary flex-shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground">Alumno becado</p>
+                        <p className="text-[11px] text-muted-foreground leading-snug">Descuento por porcentaje en cada mensualidad.</p>
+                      </div>
+                    </div>
+                    <Switch checked={becaActiva} onCheckedChange={toggleBeca} className="data-checked:!bg-primary" />
+                  </div>
+                  {becaActiva && (
+                    <div className="flex rounded-lg border border-border bg-muted/40 p-1 gap-1">
+                      {BECA_OPCIONES.map((pct) => (
+                        <button
+                          key={pct}
+                          type="button"
+                          onClick={() => setBecaPorcentaje(pct)}
+                          className={cn(
+                            'flex-1 h-9 rounded-md text-sm font-semibold transition-colors',
+                            becaPorcentaje === pct
+                              ? 'bg-primary text-primary-foreground shadow-sm'
+                              : 'text-muted-foreground hover:bg-accent',
+                          )}
+                        >
+                          {pct}%
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
 
               {/* ---------------- INSCRIPCIÓN (rastro de auditoría) ---------------- */}
               {inscripcionAplica && (
@@ -551,7 +675,19 @@ export function CrearPersonaDrawer({
   )
 }
 
-function CheckRow({ label, checked, onClick }: { label: string; checked: boolean; onClick: () => void }) {
+function CheckRow({
+  label,
+  checked,
+  onClick,
+  leftSlot,
+  labelStyle,
+}: {
+  label: string
+  checked: boolean
+  onClick: () => void
+  leftSlot?: React.ReactNode
+  labelStyle?: React.CSSProperties
+}) {
   return (
     <button
       type="button"
@@ -561,7 +697,15 @@ function CheckRow({ label, checked, onClick }: { label: string; checked: boolean
         checked ? 'bg-primary/5' : 'hover:bg-accent',
       )}
     >
-      <span className={cn('text-sm truncate', checked ? 'text-foreground font-medium' : 'text-foreground/90')}>{label}</span>
+      <span className="flex items-center gap-2.5 min-w-0">
+        {leftSlot}
+        <span
+          className={cn('text-sm truncate', !labelStyle && (checked ? 'text-foreground font-medium' : 'text-foreground/90'))}
+          style={labelStyle}
+        >
+          {label}
+        </span>
+      </span>
       <span
         className={cn(
           'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border',

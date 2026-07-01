@@ -47,11 +47,13 @@ export function GrupoClientView({
   mapEstadoMiembro,
   planesPorAlumno = {},
   alumnosDisponibles = [],
+  cobrosFrecuentes = [],
   abrirArchivar = false,
 }: {
   grupo: any
   inscripciones: any[]
   cargos?: any[]
+  cobrosFrecuentes?: { id: string; concepto: string; monto: number }[]
   planes?: PlanLite[]
   modoProrrateo?: 'proporcional' | 'completo'
   multiPlanEnabled?: boolean
@@ -227,7 +229,7 @@ export function GrupoClientView({
         {(!alumnosActivos || alumnosActivos.length === 0) && (
           <div className="text-center py-8 px-4 border border-dashed border-border rounded-xl bg-muted/20">
             <p className="text-sm text-muted-foreground">
-              AÃºn no hay alumnos activos en este grupo. Toca el botÃ³n + para asignar al primero.
+              Aún no hay alumnos activos en este grupo. Toca el botón + para asignar al primero.
             </p>
           </div>
         )}
@@ -344,6 +346,7 @@ export function GrupoClientView({
         open={isCargoOpen}
         onOpenChange={setIsCargoOpen}
         onSuccess={showToast}
+        cobros={cobrosFrecuentes}
       />
       <AsignarAlumnoSheet
         grupoId={grupo.id}

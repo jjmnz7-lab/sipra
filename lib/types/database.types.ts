@@ -633,8 +633,12 @@ export type Database = {
         Row: {
           academia_id: string
           apellido: string | null
+          beca_activa: boolean
+          beca_porcentaje: number
           created_at: string
           created_by: string | null
+          descuento_hermanos_activo: boolean
+          descuento_hermanos_monto: number
           email: string | null
           estado_global: string
           estado_registro: string
@@ -657,8 +661,12 @@ export type Database = {
         Insert: {
           academia_id: string
           apellido?: string | null
+          beca_activa?: boolean
+          beca_porcentaje?: number
           created_at?: string
           created_by?: string | null
+          descuento_hermanos_activo?: boolean
+          descuento_hermanos_monto?: number
           email?: string | null
           estado_global?: string
           estado_registro?: string
@@ -681,8 +689,12 @@ export type Database = {
         Update: {
           academia_id?: string
           apellido?: string | null
+          beca_activa?: boolean
+          beca_porcentaje?: number
           created_at?: string
           created_by?: string | null
+          descuento_hermanos_activo?: boolean
+          descuento_hermanos_monto?: number
           email?: string | null
           estado_global?: string
           estado_registro?: string

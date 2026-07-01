@@ -50,6 +50,16 @@ const personaSchema = z.object({
   plan_ids: z.array(z.string().uuid()).default([]),
   // Monto inicial editable (solo modo simple, 1 plan). En avanzado se usa el monto del plan.
   monto: z.coerce.number().nonnegative().optional(),
+  // Descuentos especiales (mutuamente excluyentes).
+  descuento_hermanos_activo: z.boolean().default(false),
+  descuento_hermanos_monto: z.coerce.number().int().min(0).default(0),
+  beca_activa: z.boolean().default(false),
+  beca_porcentaje: z.coerce.number().int().refine((v) => [0, 25, 50, 100].includes(v), {
+    message: 'Porcentaje de beca inválido',
+  }).default(0),
+}).refine((d) => !(d.descuento_hermanos_activo && d.beca_activa), {
+  message: 'Un alumno no puede tener descuento de Hermanos y Beca a la vez.',
+  path: ['beca_activa'],
 })
 
 function parseIdArray(raw: FormDataEntryValue | null): string[] {
@@ -234,6 +244,10 @@ export async function crearPersonaAction(prevState: FormState, formData: FormDat
     grupo_ids: parseIdArray(formData.get('grupo_ids')),
     plan_ids: parseIdArray(formData.get('plan_ids')),
     monto: formData.get('monto') != null && formData.get('monto') !== '' ? Number(formData.get('monto')) : undefined,
+    descuento_hermanos_activo: formData.get('descuento_hermanos_activo') === 'true',
+    descuento_hermanos_monto: Number(formData.get('descuento_hermanos_monto') || '0'),
+    beca_activa: formData.get('beca_activa') === 'true',
+    beca_porcentaje: Number(formData.get('beca_porcentaje') || '0'),
   }
 
   const validatedFields = personaSchema.safeParse(payload)
@@ -261,6 +275,11 @@ export async function crearPersonaAction(prevState: FormState, formData: FormDat
     apellido: validatedFields.data.apellido || null,
     telefono_whatsapp: validatedFields.data.telefono_whatsapp || null,
     email: validatedFields.data.email || null,
+    // Descuentos especiales (mutuamente excluyentes; ya validado en el schema).
+    descuento_hermanos_activo: validatedFields.data.descuento_hermanos_activo,
+    descuento_hermanos_monto: validatedFields.data.descuento_hermanos_activo ? validatedFields.data.descuento_hermanos_monto : 0,
+    beca_activa: validatedFields.data.beca_activa,
+    beca_porcentaje: validatedFields.data.beca_activa ? validatedFields.data.beca_porcentaje : 0,
   } as any).select('id').single() as any
 
   if (personaError || !personaData) {
@@ -362,6 +381,7 @@ const cargoGrupalSchema = z.object({
   monto: z.coerce.number().positive({ message: 'El monto debe ser mayor a 0' }),
   excluded_persona_ids: z.array(z.string().uuid()).default([]),
   idempotency_key: z.string().uuid(),
+  aplicar_becas: z.boolean().default(false),
 })
 
 export async function crearCargoGrupalAction(prevState: FormState, formData: FormData): Promise<FormState> {
@@ -371,6 +391,7 @@ export async function crearCargoGrupalAction(prevState: FormState, formData: For
     monto: formData.get('monto'),
     excluded_persona_ids: JSON.parse((formData.get('excluded_persona_ids') as string) || '[]'),
     idempotency_key: formData.get('idempotency_key') as string,
+    aplicar_becas: formData.get('aplicar_becas') === 'true',
   }
 
   const validatedFields = cargoGrupalSchema.safeParse(payload)
@@ -413,6 +434,7 @@ export async function crearCargoGrupalAction(prevState: FormState, formData: For
       p_monto: number
       p_excluded_persona_ids: string[]
       p_idempotency_key: string
+      p_aplicar_becas: boolean
     }
   ) => Promise<{
     data: { idempotent_hit: boolean; cargos_creados: number } | null
@@ -427,6 +449,7 @@ export async function crearCargoGrupalAction(prevState: FormState, formData: For
     p_monto: validatedFields.data.monto,
     p_excluded_persona_ids: excluidosFinal,
     p_idempotency_key: validatedFields.data.idempotency_key,
+    p_aplicar_becas: validatedFields.data.aplicar_becas,
   })
 
   if (error) {
@@ -471,6 +494,7 @@ const cargoMasivoMultigrupoSchema = z.object({
   concepto: z.string().min(2, { message: 'El concepto es muy corto' }),
   monto: z.coerce.number().positive({ message: 'El monto debe ser mayor a 0' }),
   grupos: z.array(cargoMasivoGrupoSchema).min(1, { message: 'Selecciona al menos un grupo' }),
+  aplicar_becas: z.boolean().default(false),
 })
 
 export async function crearCargoMasivoMultigrupoAction(prevState: FormState, formData: FormData): Promise<FormState> {
@@ -486,6 +510,7 @@ export async function crearCargoMasivoMultigrupoAction(prevState: FormState, for
     concepto: formData.get('concepto') as string,
     monto: formData.get('monto'),
     grupos: gruposParsed,
+    aplicar_becas: formData.get('aplicar_becas') === 'true',
   }
 
   const validated = cargoMasivoMultigrupoSchema.safeParse(payload)
@@ -512,6 +537,7 @@ export async function crearCargoMasivoMultigrupoAction(prevState: FormState, for
       p_excluded_persona_ids: string[]
       p_idempotency_key: string
       p_lote_id: string
+      p_aplicar_becas: boolean
     }
   ) => Promise<{
     data: { idempotent_hit: boolean; cargos_creados: number } | null
@@ -519,7 +545,7 @@ export async function crearCargoMasivoMultigrupoAction(prevState: FormState, for
   }>
 
   const rpcCrearCargo = supabase.rpc.bind(supabase) as unknown as CrearCargoGrupalRpc
-  const { lote_id, concepto, monto, grupos } = validated.data
+  const { lote_id, concepto, monto, grupos, aplicar_becas } = validated.data
 
   let totalCreados = 0
   let huboCreacion = false
@@ -533,6 +559,7 @@ export async function crearCargoMasivoMultigrupoAction(prevState: FormState, for
       // Llave estable por lote+grupo: reenviar la operación no duplica cargos.
       p_idempotency_key: `${lote_id}_${g.grupo_id}`,
       p_lote_id: lote_id,
+      p_aplicar_becas: aplicar_becas,
     })
     if (error) return { message: translateRpcError(error), success: false }
     totalCreados += data?.cargos_creados ?? 0
