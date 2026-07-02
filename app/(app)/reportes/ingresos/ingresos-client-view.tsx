@@ -11,9 +11,11 @@ import { listarMovimientosIngresosAction, type MovimientoIngreso } from '../acti
 export function IngresosClientView({
   movimientosIniciales,
   hasMoreInicial,
+  timezone,
 }: {
   movimientosIniciales: MovimientoIngreso[]
   hasMoreInicial: boolean
+  timezone: string
 }) {
   const router = useRouter()
 
@@ -60,14 +62,36 @@ export function IngresosClientView({
   const movimientosAgrupados = useMemo(() => {
     const groups: Record<string, MovimientoIngreso[]> = {}
     for (const m of movimientos) {
-      const dateKey = m.fecha_pago ? m.fecha_pago.split('T')[0] : 'sin-fecha'
+      let dateKey = 'sin-fecha'
+      if (m.fecha_pago) {
+        try {
+          const date = new Date(m.fecha_pago)
+          const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: timezone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          })
+          const parts = formatter.formatToParts(date)
+          const year = parts.find((p) => p.type === 'year')?.value
+          const month = parts.find((p) => p.type === 'month')?.value
+          const day = parts.find((p) => p.type === 'day')?.value
+          if (year && month && day) {
+            dateKey = `${year}-${month}-${day}`
+          } else {
+            dateKey = m.fecha_pago.split('T')[0] || 'sin-fecha'
+          }
+        } catch {
+          dateKey = m.fecha_pago.split('T')[0] || 'sin-fecha'
+        }
+      }
       if (!groups[dateKey]) {
         groups[dateKey] = []
       }
       groups[dateKey].push(m)
     }
     return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]))
-  }, [movimientos])
+  }, [movimientos, timezone])
 
   const formatGrupoFecha = (dateStr: string) => {
     if (dateStr === 'sin-fecha') return 'Sin fecha'
@@ -85,7 +109,12 @@ export function IngresosClientView({
   const formatMovimientoHora = (fechaIso: string) => {
     if (!fechaIso) return ''
     const date = new Date(fechaIso)
-    return date.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true })
+    return date.toLocaleTimeString('es-MX', {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    })
   }
 
   return (
