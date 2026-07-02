@@ -30,6 +30,13 @@ const cargoIndividualSchema = z.object({
   aplicar_beca: z.boolean().default(false),
 })
 
+const cargoYCobrarSchema = cargoIndividualSchema.extend({
+  // "Cargar y cobrar ahora" → cobrar=true; "Solo cargar a cuenta" → cobrar=false.
+  cobrar: z.boolean().default(false),
+  metodo_pago: z.string().default('efectivo'),
+  idempotency_key: z.string().uuid().optional(),
+})
+
 const editarAlumnoSchema = z.object({
   persona_id: z.string().uuid({ message: 'Persona inválida' }),
   nombre: z.string().min(2, { message: 'El nombre es requerido' }),
@@ -207,6 +214,71 @@ export async function crearCargoIndividualAction(prevState: FormState, formData:
   revalidatePath('/seguimiento/[persona_id]', 'page')
   revalidatePath('/inicio')
   return { success: true, message: 'Cargo generado con éxito.' }
+}
+
+// Motor único del bottom sheet "Nuevo cargo": crea el cargo y, si cobrar=true,
+// registra el pago completo en la misma transacción (RPC crear_cargo_y_cobrar_v1).
+export async function crearCargoYCobrarAction(prevState: FormState, formData: FormData): Promise<FormState> {
+  const payload = {
+    persona_id: formData.get('persona_id') as string,
+    concepto: formData.get('concepto') as string,
+    monto: formData.get('monto'),
+    origen: (formData.get('origen') as string) || 'manual',
+    aplicar_beca: formData.get('aplicar_beca') === 'true',
+    cobrar: formData.get('cobrar') === 'true',
+    metodo_pago: (formData.get('metodo_pago') as string) || 'efectivo',
+    idempotency_key: (formData.get('idempotency_key') as string) || undefined,
+  }
+
+  const validated = cargoYCobrarSchema.safeParse(payload)
+  if (!validated.success) {
+    return {
+      errors: validated.error.flatten().fieldErrors,
+      message: 'Revisa los campos requeridos.',
+      success: false,
+    }
+  }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const academiaId = user?.app_metadata?.academia_id
+  if (!academiaId) return { message: 'Academia no encontrada', success: false }
+
+  if (await alumnoSuspendido(supabase, academiaId, validated.data.persona_id)) {
+    return { message: MSG_ALUMNO_SUSPENDIDO, success: false }
+  }
+
+  // "Cargar y cobrar" exige idempotency_key (protege el movimiento contra doble cobro).
+  if (validated.data.cobrar && !validated.data.idempotency_key) {
+    return { message: 'Falta la clave de idempotencia del cobro.', success: false }
+  }
+
+  const { data, error } = await (supabase as any).rpc('crear_cargo_y_cobrar_v1', {
+    p_academia_id: academiaId,
+    p_persona_id: validated.data.persona_id,
+    p_concepto: validated.data.concepto,
+    p_monto: validated.data.monto,
+    p_origen: validated.data.origen,
+    p_aplicar_beca: validated.data.aplicar_beca,
+    p_cobrar: validated.data.cobrar,
+    p_metodo_pago: validated.data.metodo_pago,
+    p_idempotency_key: validated.data.idempotency_key ?? null,
+  })
+
+  if (error) {
+    return { message: translateRpcError(error), success: false }
+  }
+
+  revalidatePath('/seguimiento/[persona_id]', 'page')
+  revalidatePath('/inicio')
+
+  const exento = (data as { exento?: boolean } | null)?.exento === true
+  const message = exento
+    ? 'Alumno exento por beca: no se generó cargo.'
+    : validated.data.cobrar
+      ? 'Cargo generado y cobrado.'
+      : 'Cargo generado con éxito.'
+  return { success: true, message }
 }
 
 export async function crearPromesaAction(prevState: FormState, formData: FormData): Promise<FormState> {

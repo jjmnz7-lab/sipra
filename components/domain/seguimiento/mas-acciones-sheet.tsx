@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { Button } from '@/components/ui/button'
-import { CalendarClock, XCircle, Ticket, Receipt } from 'lucide-react'
+import { CalendarClock, XCircle, Receipt } from 'lucide-react'
 import { WhatsappLinkIcon } from '@/components/ui/whatsapp-link-icon'
 import {
   Drawer,
@@ -19,13 +19,12 @@ type Props = {
   onAgregarCargo: () => void
   onRegistrarPromesa: () => void
   onAnularCargo: () => void
-  onRegistrarVisita: () => void
   onEnviarEnlace: () => void
   /** Si el alumno está suspendido, se deshabilitan las acciones que generan cargos $. */
   suspendido?: boolean
 }
 
-export function MasAccionesSheet({ open, onOpenChange, onAgregarCargo, onRegistrarPromesa, onAnularCargo, onRegistrarVisita, onEnviarEnlace, suspendido = false }: Props) {
+export function MasAccionesSheet({ open, onOpenChange, onAgregarCargo, onRegistrarPromesa, onAnularCargo, onEnviarEnlace, suspendido = false }: Props) {
   const handle = (cb: () => void) => {
     onOpenChange(false)
     setTimeout(cb, 200)
@@ -50,21 +49,12 @@ export function MasAccionesSheet({ open, onOpenChange, onAgregarCargo, onRegistr
  
           <div className="px-4 pb-2 space-y-1.5">
             <button
-              onClick={() => handle(onRegistrarVisita)}
-              disabled={suspendido}
-              className={cargoBtnClass}
-            >
-              <Ticket className="h-5 w-5 text-[#15435a] flex-shrink-0" />
-              <span className="text-sm font-medium text-foreground">Registrar visita</span>
-            </button>
- 
-            <button
               onClick={() => handle(onAgregarCargo)}
               disabled={suspendido}
               className={cargoBtnClass}
             >
               <Receipt className="h-5 w-5 text-[#22887c] flex-shrink-0" />
-              <span className="text-sm font-medium text-foreground">Agregar cargo extra</span>
+              <span className="text-sm font-medium text-foreground">Agregar Cargo</span>
             </button>
 
             <button

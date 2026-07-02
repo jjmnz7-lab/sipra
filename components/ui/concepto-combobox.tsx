@@ -37,10 +37,14 @@ export function GuardarCatalogoToggle({
 const norm = (s: string) => s.trim().toLowerCase()
 
 /**
- * Componente que muestra una lista scrollable de cobros frecuentes (máx 5 elementos visibles).
- * El primer elemento es siempre "Crear nuevo".
- * Los inputs de Concepto y Monto se muestran abajo solo después de seleccionar una opción.
+ * Componente que muestra la lista de cobros frecuentes. El primer elemento es
+ * siempre "Crear nuevo"; debajo va el catálogo. El alto se ajusta a la cantidad
+ * de filas (incluyendo "Crear nuevo") hasta un máximo de 5; a partir de ahí la
+ * lista se vuelve scrollable. Los inputs de Concepto y Monto se muestran abajo
+ * solo después de seleccionar una opción.
  */
+const ROW_H = 38 // alto de cada fila (coincide con h-[38px] de los items)
+const MAX_ROWS = 5 // a partir de aquí la lista scrollea
 export function ConceptoCombobox({
   id,
   value,
@@ -73,9 +77,16 @@ export function ConceptoCombobox({
     onPick(item)
   }
 
+  // Filas totales = "Crear nuevo" (1) + catálogo. El alto se ajusta a esa
+  // cantidad hasta MAX_ROWS; con más, queda fijo y scrollea.
+  const alturaLista = Math.min(1 + catalogo.length, MAX_ROWS) * ROW_H
+
   return (
     <div className="w-full flex flex-col gap-2">
-      <div className="border border-border rounded-xl overflow-y-auto h-[190px] bg-muted/10">
+      <div
+        className="border border-border rounded-xl overflow-y-auto bg-muted/10"
+        style={{ height: alturaLista }}
+      >
         {/* Item: Crear nuevo */}
         <button
           type="button"

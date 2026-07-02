@@ -2,13 +2,13 @@
 
 import * as React from 'react'
 import { startTransition, useActionState, useEffect, useState } from 'react'
-import { crearCargoIndividualAction, type FormState } from '@/app/(app)/seguimiento/actions'
+import { crearCargoYCobrarAction, type FormState } from '@/app/(app)/seguimiento/actions'
 import { guardarCobroFrecuenteAction } from '@/app/(app)/configuracion/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Loader2, GraduationCap } from 'lucide-react'
+import { Loader2, GraduationCap, FileText, CreditCard } from 'lucide-react'
 import { normalizeWholeMoneyInput, preventMoneyWheel } from '@/lib/utils/money-input'
 import { ConceptoCombobox, GuardarCatalogoToggle, useCobroConcepto, type CobroFrecuente } from '@/components/ui/concepto-combobox'
 import {
@@ -76,13 +76,14 @@ export function CrearCargoIndividualDrawer({
     selectedItemId, setSelectedItemId,
   } = useCobroConcepto(cobros)
 
-  const [state, formAction, isPending] = useActionState(crearCargoIndividualAction, initialState)
+  const [state, formAction, isPending] = useActionState(crearCargoYCobrarAction, initialState)
   const [localError, setLocalError] = useState<string | null>(null)
   const [cobroGuardadoConExito, setCobroGuardadoConExito] = useState(false)
 
-  useEffect(() => {
+  const [prevOpen, setPrevOpen] = useState(open)
+  if (open !== prevOpen) {
+    setPrevOpen(open)
     if (open) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAplicarBeca(false)
       setLocalError(null)
       setCobroGuardadoConExito(false)
@@ -92,8 +93,7 @@ export function CrearCargoIndividualDrawer({
         resetCobro()
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+  }
 
   useEffect(() => {
     if (state.success) {
@@ -102,14 +102,15 @@ export function CrearCargoIndividualDrawer({
         ? `${msg} Y se guardó "${concepto.trim()}" en el catálogo.` 
         : msg
       onSuccess?.(finalMsg)
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setOpen(false)
+      setTimeout(() => {
+        setOpen(false)
+      }, 0)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.success, cobroGuardadoConExito])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // cobrar=false → "Solo cargar a cuenta"; cobrar=true → "Cargar y cobrar ahora".
+  const enviar = async (cobrar: boolean) => {
     setLocalError(null)
     setCobroGuardadoConExito(false)
     if (concepto.trim().length < 2) { setLocalError('El concepto es requerido.'); return }
@@ -130,6 +131,12 @@ export function CrearCargoIndividualDrawer({
     fd.set('concepto', concepto.trim())
     fd.set('monto', String(Number(monto)))
     fd.set('aplicar_beca', tieneBeca && aplicarBeca ? 'true' : 'false')
+    fd.set('cobrar', cobrar ? 'true' : 'false')
+    if (cobrar) {
+      // Pago completo en efectivo, atómico con el cargo (misma lógica que Visita).
+      fd.set('metodo_pago', 'efectivo')
+      fd.set('idempotency_key', crypto.randomUUID())
+    }
     startTransition(() => formAction(fd))
   }
 
@@ -141,11 +148,11 @@ export function CrearCargoIndividualDrawer({
           <DrawerHeader>
             <DrawerTitle>{tituloDrawer}</DrawerTitle>
             <DrawerDescription>
-              Generará un cargo individual para este alumno.
+              Genera el cargo del alumno y, si quieres, cóbralo en el momento.
             </DrawerDescription>
           </DrawerHeader>
 
-          <form onSubmit={handleSubmit}>
+          <div>
             <div className="p-4 pb-0 space-y-4">
               <div className="space-y-2">
                 <ConceptoCombobox
@@ -221,15 +228,30 @@ export function CrearCargoIndividualDrawer({
             </div>
 
             <DrawerFooter>
-              <Button type="submit" className="w-full h-11" disabled={isPending}>
-                {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {isPending ? 'Generando...' : 'Generar cargo'}
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-11 font-semibold"
+                disabled={isPending}
+                onClick={() => enviar(false)}
+              >
+                {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+                Solo cargar a cuenta
+              </Button>
+              <Button
+                type="button"
+                className="w-full h-11 font-bold bg-[#22887c] hover:bg-[#1a6b62]"
+                disabled={isPending}
+                onClick={() => enviar(true)}
+              >
+                {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CreditCard className="mr-2 h-4 w-4" />}
+                Cargar y cobrar ahora
               </Button>
               <DrawerClose asChild>
-                <Button type="button" variant="outline" className="h-11">Cancelar</Button>
+                <Button type="button" variant="ghost" className="h-11 text-muted-foreground">Cancelar</Button>
               </DrawerClose>
             </DrawerFooter>
-          </form>
+          </div>
         </div>
       </DrawerContent>
     </Drawer>

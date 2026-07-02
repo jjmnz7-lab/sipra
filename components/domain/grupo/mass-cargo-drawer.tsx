@@ -83,9 +83,10 @@ export function MassCargoDrawer({
   const [idempotencyKey, setIdempotencyKey] = useState('')
   const [aplicarBecas, setAplicarBecas] = useState(false)
 
-  useEffect(() => {
+  const [prevOpen, setPrevOpen] = useState(open)
+  if (open !== prevOpen) {
+    setPrevOpen(open)
     if (open) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStep(0)
       setDirection('forward')
       resetCobro()
@@ -95,8 +96,7 @@ export function MassCargoDrawer({
       setAplicarBecas(false)
       setCobroGuardadoConExito(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, inscripciones])
+  }
 
   // Alumnos becados entre los seleccionados (para la leyenda y el opt-in).
   const becadosSeleccionados = inscripciones.filter(
@@ -110,7 +110,9 @@ export function MassCargoDrawer({
       ? `${msg} Y se guardó "${concepto.trim()}" en el catálogo.`
       : msg
     onSuccess?.(finalMsg)
-    setOpen(false)
+    setTimeout(() => {
+      setOpen(false)
+    }, 0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.success, cobroGuardadoConExito])
 

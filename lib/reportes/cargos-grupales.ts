@@ -6,7 +6,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  *
  * Familias y llave de agrupación (lote):
  *  - mensualidad: cargos origen='recurrente' con frecuencia mensual,
- *    agrupados por (plan_id, periodo). Una tarjeta por plan y mes.
+ *    agrupados SOLO por periodo. Una tarjeta por mes, aunque existan varios
+ *    esquemas/planes de mensualidad (ej. "1 día"/"5 días", o "Diablos"/
+ *    "Hermanos"): el detalle del lote permite filtrar por esquema.
  *  - grupal: cargos origen='grupal' (a grupos o actividades), agrupados por
  *    el idempotency_key de la generación.
  *  - actividad: cargos de inscripción a una actividad (origen='actividad'),
@@ -24,9 +26,22 @@ export type GrupoMeta = {
   emoji: string | null
 }
 
+/** Esquema (plan de cobro) incluido en un lote de mensualidad (para filtros del detalle). */
+export type EsquemaMeta = {
+  id: string
+  nombre: string
+}
+
 /** Desglose del adeudo de un alumno dentro de un grupo concreto del lote. */
 export type AlumnoGrupoEnLote = {
   grupoId: string
+  montoOriginal: number
+  saldoPendiente: number
+}
+
+/** Desglose del adeudo de un alumno dentro de un esquema concreto del lote (mensualidad). */
+export type AlumnoEsquemaEnLote = {
+  esquemaId: string
   montoOriginal: number
   saldoPendiente: number
 }
@@ -39,15 +54,22 @@ export type AlumnoEnLote = {
   estadoRegistro: string
   montoOriginal: number
   saldoPendiente: number
-  /** Desglose por grupo (solo lotes grupales). Permite filtrar el detalle por grupo. */
+  /**
+   * Desglose por grupo. En lotes grupales es un split real (cada grupo tiene
+   * su propio cargo). En lotes de mensualidad NO es un split — cada entrada
+   * repite el monto TOTAL del alumno, solo para "etiquetar" a qué grupo(s)
+   * pertenece hoy (la mensualidad no se reparte por grupo).
+   */
   grupos: AlumnoGrupoEnLote[]
+  /** Desglose por esquema/plan (solo lotes de mensualidad). Split real: cada esquema es un cargo distinto. */
+  esquemas: AlumnoEsquemaEnLote[]
 }
 
 export type LoteCargos = {
   clave: string
   familia: FamiliaLote
   titulo: string
-  /** Contexto secundario: grupo/actividad del cargo o plan de la mensualidad. */
+  /** Contexto secundario: grupo/actividad del cargo, o esquema(s) de la mensualidad. */
   contexto: string | null
   total: number
   cobrado: number
@@ -58,8 +80,14 @@ export type LoteCargos = {
   fechaLote: string
   visibilidad: VisibilidadLote
   alumnos: AlumnoEnLote[]
-  /** Grupos incluidos (lotes grupales). >1 ⇒ cargo masivo multi-grupo. */
+  /**
+   * Grupos incluidos (lotes grupales: grupos realmente cobrados; lotes de
+   * mensualidad: unión de grupos actuales de los alumnos del lote). >1 ⇒
+   * aparece el filtro por grupo en el detalle.
+   */
   grupos: GrupoMeta[]
+  /** Esquemas/planes incluidos (solo mensualidad). >1 ⇒ aparece el filtro por esquema. */
+  esquemas: EsquemaMeta[]
 }
 
 type CargoRow = {
@@ -98,11 +126,17 @@ function addDays(iso: string, dias: number): Date {
  *  - Con deuda pero sin deudores activos (solo suspendidos) → archivado.
  *  - Con deudores activos y más de 3 meses de antigüedad → archivado.
  *  - Con deudores activos dentro de los últimos 3 meses → visible.
+ *
+ * @param personaGruposActuales Grupos regulares ACTUALES de cada alumno
+ *   (persona_id → grupos). Solo se usa para etiquetar por grupo los lotes de
+ *   mensualidad (esos cargos no guardan grupo_id); no afecta a los grupales,
+ *   que ya traen su propio grupo_id en cada cargo.
  */
 export function agruparLotesCargos(
   cargos: CargoRow[],
   grupos: GrupoMeta[],
   planes: GrupoLite[] = [],
+  personaGruposActuales: Map<string, GrupoMeta[]> = new Map(),
   ahora: Date = new Date(),
 ): LoteCargos[] {
   const grupoById = new Map(grupos.map((g) => [g.id, g.nombre]))
@@ -130,8 +164,10 @@ export function agruparLotesCargos(
       if (meta.frecuencia === 'semanal' || periodo.startsWith('W')) continue
       if (!meta.plan_id) continue
       // Cargos históricos sin metadata.periodo: el concepto ya identifica el mes.
+      // Clave SOLO por periodo (no por plan): todos los esquemas del mes
+      // colapsan en una sola tarjeta; el detalle permite filtrar por esquema.
       const clavePeriodo = periodo || c.concepto.toLowerCase().trim().replace(/\s+/g, '-')
-      clave = `m_${meta.plan_id}_${clavePeriodo}`
+      clave = `m_${clavePeriodo}`
       familia = 'mensualidad'
       contexto = meta.plan_nombre ?? planById.get(meta.plan_id) ?? null
     } else if (c.origen === 'grupal') {
@@ -174,6 +210,7 @@ export function agruparLotesCargos(
     let ultimoMovimiento = ''
     const porPersona = new Map<string, AlumnoEnLote>()
     const grupoIds = new Set<string>()
+    const esquemaIds = new Set<string>()
 
     for (const c of acc.cargos) {
       const monto = Number(c.monto_original)
@@ -185,6 +222,8 @@ export function agruparLotesCargos(
 
       const grupoId: string | null = (c.metadata?.grupo_id as string | undefined) ?? c.grupo_id_origen ?? null
       if (grupoId) grupoIds.add(grupoId)
+      const esquemaId: string | null = (c.metadata?.plan_id as string | undefined) ?? null
+      if (esquemaId) esquemaIds.add(esquemaId)
 
       let alumno = porPersona.get(c.persona_id)
       if (alumno) {
@@ -199,11 +238,12 @@ export function agruparLotesCargos(
           montoOriginal: monto,
           saldoPendiente: saldo,
           grupos: [],
+          esquemas: [],
         }
         porPersona.set(c.persona_id, alumno)
       }
 
-      // Desglose por grupo (para filtros del detalle en lotes multi-grupo).
+      // Desglose por grupo (para filtros del detalle en lotes grupales multi-grupo).
       if (grupoId) {
         const gb = alumno.grupos.find((x) => x.grupoId === grupoId)
         if (gb) {
@@ -211,6 +251,30 @@ export function agruparLotesCargos(
           gb.saldoPendiente += saldo
         } else {
           alumno.grupos.push({ grupoId, montoOriginal: monto, saldoPendiente: saldo })
+        }
+      }
+
+      // Desglose por esquema (para filtros del detalle en lotes de mensualidad multi-esquema).
+      if (esquemaId) {
+        const eb = alumno.esquemas.find((x) => x.esquemaId === esquemaId)
+        if (eb) {
+          eb.montoOriginal += monto
+          eb.saldoPendiente += saldo
+        } else {
+          alumno.esquemas.push({ esquemaId, montoOriginal: monto, saldoPendiente: saldo })
+        }
+      }
+    }
+
+    // Mensualidad: el cargo no guarda grupo_id (no se reparte por grupo), así
+    // que se etiqueta cada alumno con sus grupos ACTUALES. No es un split: se
+    // repite el total del alumno en cada grupo al que pertenece hoy.
+    if (acc.familia === 'mensualidad') {
+      for (const alumno of porPersona.values()) {
+        const gruposDelAlumno = personaGruposActuales.get(alumno.personaId) ?? []
+        for (const g of gruposDelAlumno) {
+          grupoIds.add(g.id)
+          alumno.grupos.push({ grupoId: g.id, montoOriginal: alumno.montoOriginal, saldoPendiente: alumno.saldoPendiente })
         }
       }
     }
@@ -236,21 +300,35 @@ export function agruparLotesCargos(
       `${a.nombre} ${a.apellido ?? ''}`.localeCompare(`${b.nombre} ${b.apellido ?? ''}`, 'es'),
     )
 
-    // Grupos del lote (solo grupal). Orden estable por nombre.
+    // Grupos del lote (grupal: grupos realmente cobrados; mensualidad: unión
+    // de grupos actuales de sus alumnos). Orden estable por nombre.
     const gruposLote: GrupoMeta[] =
-      acc.familia === 'grupal'
+      acc.familia === 'grupal' || acc.familia === 'mensualidad'
         ? Array.from(grupoIds)
             .map((id) => grupoMetaById.get(id) ?? { id, nombre: grupoById.get(id) ?? 'Grupo', color: null, emoji: null })
             .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
         : []
 
-    // Contexto: para grupal multi-grupo, "N grupos"; un solo grupo, su nombre.
+    // Esquemas del lote (solo mensualidad). Orden estable por nombre.
+    const esquemasLote: EsquemaMeta[] =
+      acc.familia === 'mensualidad'
+        ? Array.from(esquemaIds)
+            .map((id) => ({ id, nombre: planById.get(id) ?? 'Esquema' }))
+            .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+        : []
+
+    // Contexto: para grupal multi-grupo, "N grupos"; mensualidad multi-esquema,
+    // "N esquemas"; con uno solo, su nombre.
     const contexto =
       acc.familia === 'grupal'
         ? gruposLote.length > 1
           ? `${gruposLote.length} grupos`
           : (gruposLote[0]?.nombre ?? acc.contexto)
-        : acc.contexto
+        : acc.familia === 'mensualidad'
+          ? esquemasLote.length > 1
+            ? `${esquemasLote.length} esquemas`
+            : (esquemasLote[0]?.nombre ?? acc.contexto)
+          : acc.contexto
 
     resultado.push({
       clave,
@@ -265,11 +343,14 @@ export function agruparLotesCargos(
       visibilidad,
       alumnos,
       grupos: gruposLote,
+      esquemas: esquemasLote,
     })
   }
 
   return resultado
 }
+
+type PersonaGrupoRow = { persona_id: string; grupo: { id: string; nombre: string; color: string | null; emoji: string | null; es_temporal: boolean } | null }
 
 /** Trae los cargos masivos de la academia y los devuelve agrupados en lotes. */
 export async function fetchLotesCargos(
@@ -277,7 +358,7 @@ export async function fetchLotesCargos(
   supabase: SupabaseClient<any>,
   academiaId: string,
 ): Promise<LoteCargos[]> {
-  const [cargosRes, gruposRes, planesRes] = await Promise.all([
+  const [cargosRes, gruposRes, planesRes, personaGruposRes] = await Promise.all([
     supabase
       .from('cargo')
       .select(
@@ -288,10 +369,27 @@ export async function fetchLotesCargos(
       .neq('estado_financiero', 'anulado'),
     supabase.from('grupo').select('id, nombre, color, emoji').eq('academia_id', academiaId),
     supabase.from('planes_cobro').select('id, nombre').eq('academia_id', academiaId),
+    // Membresía ACTUAL de grupo por alumno (solo grupos regulares, no actividades),
+    // usada para etiquetar por grupo los lotes de mensualidad.
+    supabase
+      .from('persona_grupo')
+      .select('persona_id, grupo:grupo_id (id, nombre, color, emoji, es_temporal)')
+      .eq('academia_id', academiaId)
+      .eq('estado', 'activo'),
   ])
 
   const cargos = (cargosRes.data ?? []) as unknown as CargoRow[]
   const grupos = (gruposRes.data ?? []) as GrupoMeta[]
   const planes = (planesRes.data ?? []) as GrupoLite[]
-  return agruparLotesCargos(cargos, grupos, planes)
+
+  const personaGruposActuales = new Map<string, GrupoMeta[]>()
+  for (const row of (personaGruposRes.data ?? []) as unknown as PersonaGrupoRow[]) {
+    const g = row.grupo
+    if (!g || g.es_temporal) continue // solo grupos regulares (mismo criterio que el resto de la app)
+    const arr = personaGruposActuales.get(row.persona_id) ?? []
+    arr.push({ id: g.id, nombre: g.nombre, color: g.color, emoji: g.emoji })
+    personaGruposActuales.set(row.persona_id, arr)
+  }
+
+  return agruparLotesCargos(cargos, grupos, planes, personaGruposActuales)
 }

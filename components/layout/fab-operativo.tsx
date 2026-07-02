@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import {
-  Plus, Search, ChevronRight, ArrowLeft, FileText, Users, Ticket,
+  Plus, Search, ChevronRight, ArrowLeft, FileText, Users,
 } from 'lucide-react'
 import {
   Drawer,
@@ -13,16 +13,13 @@ import {
 import { Input } from '@/components/ui/input'
 import { BilleteDollarIcon } from '@/components/ui/billete-dollar-icon'
 import { formatCurrency } from '@/lib/utils/currency'
-import {
-  VisitaExpressDrawer,
-  type AlumnoLite,
-  type PlanVisita,
-} from '@/components/domain/cargo/visita-express-drawer'
 import { RegistrarPagoDrawer } from '@/components/domain/cargo/registrar-pago-drawer'
 import { CrearCargoIndividualDrawer } from '@/components/domain/cargo/crear-cargo-individual-drawer'
 import { CargoMasivoWizard, type GrupoCargoMasivo } from '@/components/domain/cargo/cargo-masivo-wizard'
 import { type CobroFrecuente } from '@/components/ui/concepto-combobox'
 import { useToast } from '@/components/ui/use-toast'
+
+type AlumnoLite = { id: string; nombre: string; apellido?: string | null }
 
 type AlumnoDeuda = {
   persona_id: string
@@ -41,7 +38,6 @@ export function FabOperativo({
   alumnosConDeuda = [],
   grupos = [],
   cobros = [],
-  planesPorVisita = [],
   allowPartial = true,
   allowOverpayment = true,
 }: {
@@ -49,7 +45,6 @@ export function FabOperativo({
   alumnosConDeuda?: AlumnoDeuda[]
   grupos?: GrupoCargo[]
   cobros?: CobroFrecuente[]
-  planesPorVisita?: PlanVisita[]
   allowPartial?: boolean
   allowOverpayment?: boolean
 }) {
@@ -63,7 +58,6 @@ export function FabOperativo({
   const [cargoSel, setCargoSel] = useState<AlumnoLite | null>(null)
   const [cargoOpen, setCargoOpen] = useState(false)
   const [masivoOpen, setMasivoOpen] = useState(false)
-  const [visitaOpen, setVisitaOpen] = useState(false)
 
   const abrirMenu = () => { setStep('menu'); setSheetOpen(true) }
 
@@ -98,14 +92,6 @@ export function FabOperativo({
       titulo: 'Cargo masivo',
       desc: 'Asigna un cargo a uno o varios grupos.',
       onClick: () => { setSheetOpen(false); setMasivoOpen(true) },
-    },
-    {
-      key: 'visita' as const,
-      icon: <Ticket className="h-5 w-5" />,
-      color: '#22887c',
-      titulo: 'Registrar visita',
-      desc: 'Carga y cobra un pago por visita.',
-      onClick: () => { setSheetOpen(false); setVisitaOpen(true) },
     },
   ]
 
@@ -232,13 +218,6 @@ export function FabOperativo({
         grupos={grupos}
         cobros={cobros}
         onSuccess={showToast}
-      />
-
-      <VisitaExpressDrawer
-        open={visitaOpen}
-        onOpenChange={setVisitaOpen}
-        alumnos={alumnos}
-        planesPorVisita={planesPorVisita}
       />
 
       {toast}

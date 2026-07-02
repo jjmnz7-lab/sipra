@@ -3,12 +3,13 @@
 import { useMemo, useRef, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Search, X, Filter, ArrowUpDown, Tag, AlertTriangle, ChevronRight, RefreshCw } from 'lucide-react'
+import { Search, X, Filter, ArrowUpDown, Tag, AlertTriangle, ChevronRight, RefreshCw, Users, GraduationCap } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils/currency'
 import { cn } from '@/lib/utils'
 import {
   ESTADOS_FINANCIEROS,
   colorEstado,
+  descuentoEspecialBadge,
   type EstadoFinancieroAlumno,
   type EstadoFinancieroDef,
 } from '@/lib/constants/alumno-finanzas'
@@ -434,6 +435,7 @@ function AlumnoCard({ a, multiPlanEnabled }: { a: AlumnoListItem; multiPlanEnabl
   const suspendido = a.estado_registro !== 'activo'
   const planPrincipal = a.planes[0]
   const planesExtra = a.planes.length - 1
+  const descuento = descuentoEspecialBadge(a.descuentoHermanosActivo, a.becaActiva, a.becaPorcentaje)
 
   return (
     <Link href={`/seguimiento/${a.id}?from=alumnos`} className="block">
@@ -515,6 +517,22 @@ function AlumnoCard({ a, multiPlanEnabled }: { a: AlumnoListItem; multiPlanEnabl
                {planesExtra > 0 && <span className="flex-shrink-0">, +{planesExtra}</span>}
              </span>
           ) : null}
+
+          {/* Badge de descuento especial (solo si hay uno activo). Mismos colores
+              que el badge de esquema de cobro. */}
+          {descuento && (
+            <span
+              className="inline-flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-muted/80 text-muted-foreground flex-shrink-0 whitespace-nowrap"
+              title={descuento.label}
+            >
+              {descuento.tipo === 'beca' ? (
+                <GraduationCap className="h-3 w-3 flex-shrink-0" />
+              ) : (
+                <Users className="h-3 w-3 flex-shrink-0" />
+              )}
+              <span>{descuento.label}</span>
+            </span>
+          )}
         </div>
       </div>
     </Link>

@@ -77,9 +77,10 @@ export function CargoMasivoWizard({ grupos, open, onOpenChange, cobros = [], onS
   const formRef = useRef<HTMLFormElement>(null)
 
   // Reset completo en cada apertura.
-  useEffect(() => {
+  const [prevOpen, setPrevOpen] = useState(open)
+  if (open !== prevOpen) {
+    setPrevOpen(open)
     if (open) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStep(0)
       setDirection('forward')
       resetCobro()
@@ -90,8 +91,7 @@ export function CargoMasivoWizard({ grupos, open, onOpenChange, cobros = [], onS
       setLoteId(crypto.randomUUID())
       setCobroGuardadoConExito(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+  }
 
   useEffect(() => {
     if (!state.success) return
@@ -100,7 +100,9 @@ export function CargoMasivoWizard({ grupos, open, onOpenChange, cobros = [], onS
       ? `${msg} Y se guardó "${concepto.trim()}" en el catálogo.`
       : msg
     onSuccess?.(finalMsg)
-    onOpenChange(false)
+    setTimeout(() => {
+      onOpenChange(false)
+    }, 0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.success, cobroGuardadoConExito])
 
@@ -160,7 +162,6 @@ export function CargoMasivoWizard({ grupos, open, onOpenChange, cobros = [], onS
       if (becaById.get(pid)) n++
     }
     return n
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedGrupos, includedCountPorPersona])
   const totalCargos = useMemo(
     () => Array.from(includedCountPorPersona.values()).reduce((acc, n) => acc + n, 0),

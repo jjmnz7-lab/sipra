@@ -21,6 +21,7 @@ import {
   X,
   ChevronDown,
   ChevronRight,
+  GraduationCap,
 } from 'lucide-react'
 import {
   Drawer,
@@ -28,14 +29,13 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from '@/components/ui/drawer'
-import { colorEstado, type EstadoFinancieroAlumno } from '@/lib/constants/alumno-finanzas'
+import { colorEstado, descuentoEspecialBadge, type EstadoFinancieroAlumno } from '@/lib/constants/alumno-finanzas'
 
 import { RegistrarPagoDrawer } from '@/components/domain/cargo/registrar-pago-drawer'
 import { RecordatorioMensajeDrawer } from '@/components/domain/envio/recordatorio-mensaje-drawer'
 import { CrearPromesaDrawer } from '@/components/domain/timeline/crear-promesa-drawer'
 import { CrearCargoIndividualDrawer } from '@/components/domain/cargo/crear-cargo-individual-drawer'
 import { AnularCargoDrawer } from '@/components/domain/cargo/anular-cargo-drawer'
-import { VisitaExpressDrawer, type PlanVisita } from '@/components/domain/cargo/visita-express-drawer'
 import { AccionesAlumnoSheet } from '@/components/domain/persona/acciones-alumno-sheet'
 import { EnviarEnlaceHistorialSheet } from '@/components/domain/envio/enviar-enlace-historial-sheet'
 import { EditarAlumnoDrawer } from '@/components/domain/persona/editar-alumno-drawer'
@@ -63,7 +63,6 @@ export function SeguimientoClientView({
   timeline,
   allowPartial = true,
   allowOverpayment = true,
-  planesPorVisita = [],
   grupos = [],
   planes = [],
   cobrosFrecuentes = [],
@@ -82,7 +81,6 @@ export function SeguimientoClientView({
   timeline: any[]
   allowPartial?: boolean
   allowOverpayment?: boolean
-  planesPorVisita?: PlanVisita[]
   grupos?: any[]
   planes?: any[]
   cobrosFrecuentes?: { id: string; concepto: string; monto: number }[]
@@ -99,7 +97,6 @@ export function SeguimientoClientView({
   const [isCargoOpen, setIsCargoOpen] = useState(false)
   const [isAnularCargoOpen, setIsAnularCargoOpen] = useState(false)
   const [isMasAccionesOpen, setIsMasAccionesOpen] = useState(false)
-  const [isVisitaOpen, setIsVisitaOpen] = useState(false)
   const [isKebabOpen, setIsKebabOpen] = useState(false)
   const [isEnviarEnlaceOpen, setIsEnviarEnlaceOpen] = useState(false)
   const [isEditarOpen, setIsEditarOpen] = useState(false)
@@ -127,6 +124,7 @@ export function SeguimientoClientView({
 
   const suspendido = persona.estado_registro !== 'activo'
   const tieneHistorial = (timeline?.length ?? 0) > 0
+  const descuento = descuentoEspecialBadge(persona.descuento_hermanos_activo, persona.beca_activa, persona.beca_porcentaje)
   const iniciales = getIniciales(persona.nombre, persona.apellido)
   const eventosPreview = timeline.slice(0, TIMELINE_PREVIEW)
   const nombreCompleto = `${persona.nombre} ${persona.apellido ?? ''}`.trim()
@@ -263,6 +261,14 @@ export function SeguimientoClientView({
               )}
             </ListonBadge>
           )}
+
+          {/* Badge de descuento especial (solo si hay uno activo). Mismos colores
+              que el badge de esquema de cobro (ListonBadge neutro). */}
+          {descuento && (
+            <ListonBadge icon={descuento.tipo === 'beca' ? <GraduationCap className="h-3 w-3" /> : <Users className="h-3 w-3" />}>
+              {descuento.label}
+            </ListonBadge>
+          )}
         </div>
       </div>
 
@@ -345,17 +351,8 @@ export function SeguimientoClientView({
           onAgregarCargo={() => setIsCargoOpen(true)}
           onRegistrarPromesa={() => setIsPromesaOpen(true)}
           onAnularCargo={() => setIsAnularCargoOpen(true)}
-          onRegistrarVisita={() => setIsVisitaOpen(true)}
           onEnviarEnlace={() => setIsEnviarEnlaceOpen(true)}
           suspendido={suspendido}
-        />
-
-        <VisitaExpressDrawer
-          open={isVisitaOpen}
-          onOpenChange={setIsVisitaOpen}
-          alumnos={[]}
-          planesPorVisita={planesPorVisita}
-          alumnoFijo={{ id: persona.id, nombre: persona.nombre, apellido: persona.apellido }}
         />
 
         <AccionesAlumnoSheet

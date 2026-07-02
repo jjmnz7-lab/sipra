@@ -24,6 +24,28 @@ export function colorEstado(slug: EstadoFinancieroAlumno | string | null | undef
   return ESTADOS_FINANCIEROS.find(e => e.slug === slug) ?? ESTADOS_FINANCIEROS[0]
 }
 
+/**
+ * Descuento especial ACTIVO de un alumno, para el badge de la lista/detalle.
+ * Hermanos y Beca son mutuamente excluyentes (CHECK en BD), así que hay a lo
+ * sumo uno. `tipo` decide el ícono en cada pantalla (hermanos → Users,
+ * beca → GraduationCap). Devuelve null si no hay descuento activo.
+ */
+export type DescuentoEspecialInfo = { tipo: 'hermanos' | 'beca'; label: string }
+
+export function descuentoEspecialBadge(
+  hermanosActivo: boolean | null | undefined,
+  becaActiva: boolean | null | undefined,
+  becaPorcentaje: number | null | undefined,
+): DescuentoEspecialInfo | null {
+  if (becaActiva && (becaPorcentaje ?? 0) > 0) {
+    return { tipo: 'beca', label: `Beca ${becaPorcentaje}%` }
+  }
+  if (hermanosActivo) {
+    return { tipo: 'hermanos', label: 'Descto. hermanos' }
+  }
+  return null
+}
+
 type CargoLite = {
   concepto: string | null
   estado_financiero?: string | null

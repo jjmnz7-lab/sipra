@@ -28,15 +28,6 @@ export default async function InicioPage() {
     .eq('estado_registro', 'activo')
     .order('nombre') as any
 
-  // 1b. Planes por visita (catálogo de "clases" para el modal de Visita Express)
-  const { data: planesPorVisita } = await supabase
-    .from('planes_cobro')
-    .select('id, nombre, monto')
-    .eq('academia_id', academiaId)
-    .eq('activo', true)
-    .eq('frecuencia', 'por_visita')
-    .order('nombre') as any
-
   // 1c. Grupos regulares activos + miembros (para el FAB: cargo masivo).
   // Las actividades se gestionan desde su propia pantalla.
   const { data: gruposRaw } = await supabase
@@ -242,7 +233,6 @@ export default async function InicioPage() {
         alumnosConDeuda={alumnosParaCobro}
         grupos={gruposParaCargo}
         cobros={cobrosFrecuentes || []}
-        planesPorVisita={planesPorVisita || []}
         allowPartial={allowPartial}
         allowOverpayment={allowOverpayment}
       />

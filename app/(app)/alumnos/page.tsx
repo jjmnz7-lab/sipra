@@ -21,6 +21,10 @@ export type AlumnoListItem = {
   esHuerfano: boolean
   estadoFinanciero: EstadoFinancieroAlumno
   saldoTotal: number
+  /** Descuento especial (Hermanos/Beca) para el badge; mutuamente excluyentes. */
+  descuentoHermanosActivo: boolean
+  becaActiva: boolean
+  becaPorcentaje: number
 }
 
 export type GrupoFiltro = {
@@ -79,6 +83,7 @@ export default async function AlumnosPage() {
     .from('persona')
     .select(`
       id, nombre, apellido, telefono_whatsapp, estado_registro, created_at,
+      descuento_hermanos_activo, beca_activa, beca_porcentaje,
       persona_grupo (
         estado,
         grupo ( id, nombre, color, emoji, es_temporal )
@@ -149,6 +154,9 @@ export default async function AlumnosPage() {
       esHuerfano: sinPlan || (sinGrupo && tieneRecurrente),
       estadoFinanciero,
       saldoTotal,
+      descuentoHermanosActivo: !!p.descuento_hermanos_activo,
+      becaActiva: !!p.beca_activa,
+      becaPorcentaje: p.beca_porcentaje ?? 0,
     }
   })
 

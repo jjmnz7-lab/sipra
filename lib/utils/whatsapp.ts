@@ -157,7 +157,7 @@ export function buildRecordatorioConTono(
   let base = ''
   switch (tono) {
     case 'amigable':
-      base = `Hola 😊, te escribimos de ${academia} para recordarte que tenemos un saldo pendiente de ${montoStr} de *${params.nombre}*. ¡Cualquier duda quedamos a tus órdenes, gracias! 🙌`
+      base = `Hola, te escribimos de ${academia} para recordarte que tenemos un saldo pendiente de ${montoStr} de *${params.nombre}*. ¡Cualquier duda quedamos a tus órdenes, gracias!`
       break
     case 'formal':
       base = `Buen día. Por medio del presente le informamos de parte de ${academia} que se registra un saldo pendiente de ${montoStr} para el alumno *${params.nombre}*. Le invitamos a regularizar su situación a la brevedad posible. Quedamos a su disposición para cualquier aclaración.`

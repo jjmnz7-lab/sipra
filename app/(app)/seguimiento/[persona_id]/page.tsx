@@ -87,15 +87,6 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
     .map((g: any) => ({ id: g.id, nombre: g.nombre, color: g.color ?? null, emoji: g.emoji ?? null })) as { id: string; nombre: string; color: string | null; emoji: string | null }[]
   const currentGrupoId: string | null = gruposAlumno[0]?.id ?? null
 
-  // 1c. Planes por visita (catálogo de "clases" para el modal de Visita Express)
-  const { data: planesPorVisita } = await supabase
-    .from('planes_cobro')
-    .select('id, nombre, monto')
-    .eq('academia_id', persona.academia_id)
-    .eq('activo', true)
-    .eq('frecuencia', 'por_visita')
-    .order('nombre') as any
-
   // 1d. Catálogo completo de grupos regulares activos (sin actividades)
   const { data: grupos } = await supabase
     .from('grupo')
@@ -178,7 +169,6 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
       timeline={timeline || []}
       allowPartial={allowPartial}
       allowOverpayment={allowOverpayment}
-      planesPorVisita={planesPorVisita || []}
       grupos={grupos || []}
       planes={planes || []}
       cobrosFrecuentes={cobrosFrecuentes || []}

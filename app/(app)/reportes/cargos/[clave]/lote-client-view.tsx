@@ -38,54 +38,48 @@ export function LoteClientView({ lote }: { lote: LoteCargos }) {
   const [incluirLiquidados, setIncluirLiquidados] = useState(false)
   const [mensaje, setMensaje] = useState('')
   const [edited, setEdited] = useState(false)
-  // Filtro por grupo (solo lotes masivos multi-grupo). null = Todos.
+  // Filtro por esquema (solo lotes de mensualidad con >1 esquema). null = Todos.
+  const [esquemaSel, setEsquemaSel] = useState<string | null>(null)
+  // Filtro por grupo (lotes con >1 grupo). null = Todos.
   const [grupoSel, setGrupoSel] = useState<string | null>(null)
 
-  // Para scroll de filtros
-  const filtrosRef = useRef<HTMLDivElement>(null)
-  const [filtrosScrollLeft, setFiltrosScrollLeft] = useState(0)
-  const [filtrosScrollWidth, setFiltrosScrollWidth] = useState(0)
-  const [filtrosClientWidth, setFiltrosClientWidth] = useState(0)
-
   const esMultigrupo = lote.grupos.length > 1
-
-  const hasOverflow = filtrosScrollWidth > filtrosClientWidth
+  const esMultiEsquema = lote.esquemas.length > 1
 
   const handleBack = () => {
     setIsExiting(true)
     setTimeout(() => router.back(), 200)
   }
 
-  const updateFiltrosMetrics = () => {
-    if (!filtrosRef.current) return
-    setFiltrosScrollLeft(filtrosRef.current.scrollLeft)
-    setFiltrosScrollWidth(filtrosRef.current.scrollWidth)
-    setFiltrosClientWidth(filtrosRef.current.clientWidth)
-  }
-
-  useEffect(() => {
-    updateFiltrosMetrics()
-    const ref = filtrosRef.current
-    if (!ref) return
-    ref.addEventListener('scroll', updateFiltrosMetrics)
-    window.addEventListener('resize', updateFiltrosMetrics)
-    return () => {
-      ref.removeEventListener('scroll', updateFiltrosMetrics)
-      window.removeEventListener('resize', updateFiltrosMetrics)
-    }
-  }, [esMultigrupo])
-
-  // Alumnos según el filtro de grupo. Con un grupo seleccionado se usa su
-  // desglose (monto/saldo de ese grupo); con "Todos", el total del lote.
+  // Alumnos según los filtros de esquema y/o grupo (combinables).
+  // - Esquema: split real (cada esquema es un cargo distinto) → remapea monto/saldo.
+  // - Grupo: en lotes de mensualidad NO es un split (el cargo no se reparte por
+  //   grupo, solo se etiqueta), así que si ya se filtró por esquema no se vuelve
+  //   a remapear el monto por grupo — solo se acota la lista.
   const alumnosEfectivos = useMemo(() => {
-    if (!grupoSel) return lote.alumnos
-    return lote.alumnos
-      .filter((a) => a.grupos.some((g) => g.grupoId === grupoSel))
-      .map((a) => {
-        const gb = a.grupos.find((g) => g.grupoId === grupoSel)!
-        return { ...a, montoOriginal: gb.montoOriginal, saldoPendiente: gb.saldoPendiente }
-      })
-  }, [lote.alumnos, grupoSel])
+    let base = lote.alumnos
+
+    if (esquemaSel) {
+      base = base
+        .filter((a) => a.esquemas.some((e) => e.esquemaId === esquemaSel))
+        .map((a) => {
+          const eb = a.esquemas.find((e) => e.esquemaId === esquemaSel)!
+          return { ...a, montoOriginal: eb.montoOriginal, saldoPendiente: eb.saldoPendiente }
+        })
+    }
+
+    if (grupoSel) {
+      base = base.filter((a) => a.grupos.some((g) => g.grupoId === grupoSel))
+      if (!esquemaSel) {
+        base = base.map((a) => {
+          const gb = a.grupos.find((g) => g.grupoId === grupoSel)!
+          return { ...a, montoOriginal: gb.montoOriginal, saldoPendiente: gb.saldoPendiente }
+        })
+      }
+    }
+
+    return base
+  }, [lote.alumnos, esquemaSel, grupoSel])
 
   const { pendientes, liquidados } = useMemo(() => {
     const p: AlumnoEnLote[] = []
@@ -111,9 +105,10 @@ export function LoteClientView({ lote }: { lote: LoteCargos }) {
   ]
 
   const mensajeResumen = useMemo(() => {
-    // Si hay un grupo seleccionado, el resumen es solo de ese grupo.
-    const meta = grupoSel ? lote.grupos.find((g) => g.id === grupoSel) : null
-    const ctx = meta ? meta.nombre : lote.contexto
+    // Si hay esquema y/o grupo seleccionados, el contexto del resumen los refleja.
+    const esquemaMeta = esquemaSel ? lote.esquemas.find((e) => e.id === esquemaSel) : null
+    const grupoMeta = grupoSel ? lote.grupos.find((g) => g.id === grupoSel) : null
+    const ctx = [esquemaMeta?.nombre, grupoMeta?.nombre].filter(Boolean).join(' • ') || lote.contexto
     let msg = `*${lote.titulo}${ctx ? ` • ${ctx}` : ''}*`
 
     msg += `\n\n*Pendientes de pago (${pendientes.length}):*`
@@ -137,7 +132,7 @@ export function LoteClientView({ lote }: { lote: LoteCargos }) {
     }
 
     return msg
-  }, [lote.titulo, lote.contexto, lote.grupos, grupoSel, pendientes, liquidados, incluirLiquidados])
+  }, [lote.titulo, lote.contexto, lote.grupos, lote.esquemas, esquemaSel, grupoSel, pendientes, liquidados, incluirLiquidados])
 
   useEffect(() => {
     if (!edited) {
@@ -223,67 +218,22 @@ export function LoteClientView({ lote }: { lote: LoteCargos }) {
           })}
         </div>
 
-        {/* Filtros por grupo (solo lotes masivos multi-grupo). Desplazable en horizontal. */}
+        {/* Filtros por esquema (solo lotes de mensualidad con >1 esquema). */}
+        {esMultiEsquema && (
+          <FiltroBadgesRow
+            items={lote.esquemas.map((e) => ({ id: e.id, nombre: e.nombre }))}
+            selectedId={esquemaSel}
+            onSelect={setEsquemaSel}
+          />
+        )}
+
+        {/* Filtros por grupo (lotes con >1 grupo). */}
         {esMultigrupo && (
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-1">
-              {/* Botón izquierda — solo desktop, solo con overflow */}
-              {hasOverflow && (
-                <button
-                  onClick={() => filtrosRef.current?.scrollBy({ left: -200, behavior: 'smooth' })}
-                  className="hidden md:flex flex-shrink-0 items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label="Desplazar filtros a la izquierda"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-              )}
-
-              {/* Fila de badges: centrada cuando no hay overflow, scrollable cuando sí */}
-              <div
-                ref={filtrosRef}
-                className={cn(
-                  'flex flex-1 items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden',
-                  hasOverflow ? 'justify-start' : 'justify-center',
-                )}
-              >
-                <GrupoFiltroBadge todos label="Todos" selected={grupoSel === null} onClick={() => setGrupoSel(null)} />
-                {lote.grupos.map((g) => (
-                  <GrupoFiltroBadge
-                    key={g.id}
-                    label={g.nombre}
-                    emoji={g.emoji}
-                    colorSlug={g.color}
-                    selected={grupoSel === g.id}
-                    onClick={() => setGrupoSel(g.id)}
-                  />
-                ))}
-              </div>
-
-              {/* Botón derecha — solo desktop, solo con overflow */}
-              {hasOverflow && (
-                <button
-                  onClick={() => filtrosRef.current?.scrollBy({ left: 200, behavior: 'smooth' })}
-                  className="hidden md:flex flex-shrink-0 items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label="Desplazar filtros a la derecha"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-
-            {/* Scrollbar indicator — solo visible cuando hay overflow */}
-            {hasOverflow && (
-              <div className="relative h-0.5 rounded-full bg-border/50 mx-1">
-                <div
-                  className="absolute top-0 h-full rounded-full bg-primary/40 transition-all duration-75"
-                  style={{
-                    width: `${(filtrosClientWidth / filtrosScrollWidth) * 100}%`,
-                    left: `${(filtrosScrollLeft / filtrosScrollWidth) * 100}%`,
-                  }}
-                />
-              </div>
-            )}
-          </div>
+          <FiltroBadgesRow
+            items={lote.grupos.map((g) => ({ id: g.id, nombre: g.nombre, emoji: g.emoji, color: g.color }))}
+            selectedId={grupoSel}
+            onSelect={setGrupoSel}
+          />
         )}
 
         {/* Lista de alumnos del tab activo */}
@@ -379,6 +329,108 @@ export function LoteClientView({ lote }: { lote: LoteCargos }) {
             </div>
           </DrawerContent>
         </Drawer>
+    </div>
+  )
+}
+
+/**
+ * Fila de badges de filtro (esquema o grupo): "Todos" + un badge por item,
+ * desplazable en horizontal con flechas e indicador de scroll cuando desborda.
+ * Cada instancia lleva su propio tracking de scroll (no se comparte entre filas).
+ */
+function FiltroBadgesRow({
+  items,
+  selectedId,
+  onSelect,
+}: {
+  items: { id: string; nombre: string; emoji?: string | null; color?: string | null }[]
+  selectedId: string | null
+  onSelect: (id: string | null) => void
+}) {
+  const filtrosRef = useRef<HTMLDivElement>(null)
+  const [scrollLeft, setScrollLeft] = useState(0)
+  const [scrollWidth, setScrollWidth] = useState(0)
+  const [clientWidth, setClientWidth] = useState(0)
+  const hasOverflow = scrollWidth > clientWidth
+
+  const updateMetrics = () => {
+    if (!filtrosRef.current) return
+    setScrollLeft(filtrosRef.current.scrollLeft)
+    setScrollWidth(filtrosRef.current.scrollWidth)
+    setClientWidth(filtrosRef.current.clientWidth)
+  }
+
+  useEffect(() => {
+    updateMetrics()
+    const ref = filtrosRef.current
+    if (!ref) return
+    ref.addEventListener('scroll', updateMetrics)
+    window.addEventListener('resize', updateMetrics)
+    return () => {
+      ref.removeEventListener('scroll', updateMetrics)
+      window.removeEventListener('resize', updateMetrics)
+    }
+  }, [items.length])
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-1">
+        {/* Botón izquierda — solo desktop, solo con overflow */}
+        {hasOverflow && (
+          <button
+            onClick={() => filtrosRef.current?.scrollBy({ left: -200, behavior: 'smooth' })}
+            className="hidden md:flex flex-shrink-0 items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Desplazar filtros a la izquierda"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+        )}
+
+        {/* Fila de badges: centrada cuando no hay overflow, scrollable cuando sí */}
+        <div
+          ref={filtrosRef}
+          className={cn(
+            'flex flex-1 items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden',
+            hasOverflow ? 'justify-start' : 'justify-center',
+          )}
+        >
+          <GrupoFiltroBadge todos label="Todos" selected={selectedId === null} onClick={() => onSelect(null)} />
+          {items.map((it) => (
+            <GrupoFiltroBadge
+              key={it.id}
+              label={it.nombre}
+              emoji={it.emoji}
+              colorSlug={it.color}
+              selected={selectedId === it.id}
+              onClick={() => onSelect(it.id)}
+            />
+          ))}
+        </div>
+
+        {/* Botón derecha — solo desktop, solo con overflow */}
+        {hasOverflow && (
+          <button
+            onClick={() => filtrosRef.current?.scrollBy({ left: 200, behavior: 'smooth' })}
+            className="hidden md:flex flex-shrink-0 items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Desplazar filtros a la derecha"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
+      {/* Scrollbar indicator — solo visible cuando hay overflow */}
+      {hasOverflow && (
+        <div className="relative h-0.5 rounded-full bg-border/50 mx-1">
+          <div
+            className="absolute top-0 h-full rounded-full bg-primary/40 transition-all duration-75"
+            style={{
+              width: `${(clientWidth / scrollWidth) * 100}%`,
+              left: `${(scrollLeft / scrollWidth) * 100}%`,
+            }}
+          />
+        </div>
+      )}
     </div>
   )
 }
