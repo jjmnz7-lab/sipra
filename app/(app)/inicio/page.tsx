@@ -117,6 +117,7 @@ export default async function InicioPage() {
         nombre,
         apellido,
         telefono_whatsapp,
+        codigo_pais,
         email,
         estado_registro,
         persona_grupo (
@@ -159,6 +160,7 @@ export default async function InicioPage() {
             nombre: cargo.persona?.nombre ?? '—',
             apellido: cargo.persona?.apellido ?? '',
             telefono_whatsapp: cargo.persona?.telefono_whatsapp ?? null,
+            codigo_pais: cargo.persona?.codigo_pais ?? null,
             estado_registro: cargo.persona?.estado_registro ?? 'activo',
             grupo_nombre: grupoNombre,
             grupo: grupo

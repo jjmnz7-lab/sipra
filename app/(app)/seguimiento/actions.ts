@@ -510,9 +510,29 @@ export async function editarAlumnoAction(prevState: FormState, formData: FormDat
     }
   }
 
+  // 4. Mensualidad del mes en curso para esquemas recién asignados: el cron solo
+  //    materializa mensualidades el día 1, así que quien recibe su esquema después
+  //    quedaría sin cargo hasta el próximo mes. La RPC decide monto según las
+  //    reglas de la academia y deduplica por persona+periodo (no genera nada si
+  //    el mes ya está cubierto, es mes sin cobro, el plan no es mensual, etc.).
+  const avisosCargo: string[] = []
+  for (const pId of plsToAdd) {
+    const { data: gen } = await (supabase as any).rpc('generar_mensualidad_esquema_v1', {
+      p_academia_id: academiaId,
+      p_persona_id: validated.data.persona_id,
+      p_plan_cobro_id: pId,
+    })
+    if (gen?.generado) {
+      avisosCargo.push(`Se generó ${gen.concepto} por $${Math.round(Number(gen.monto))}.`)
+    } else if (gen?.motivo === 'exento') {
+      avisosCargo.push(`${gen.concepto}: alumno exento por beca.`)
+    }
+  }
+
   revalidatePath('/seguimiento/[persona_id]', 'page')
   revalidatePath('/inicio')
-  return { success: true, message: 'Alumno actualizado.' }
+  const message = ['Alumno actualizado.', ...avisosCargo].join(' ')
+  return { success: true, message }
 }
 
 async function _cambiarEstadoRegistro(persona_id: string, nuevoEstado: 'activo' | 'inactivo' | 'archivado'): Promise<FormState> {

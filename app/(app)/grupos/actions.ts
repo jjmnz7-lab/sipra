@@ -305,13 +305,15 @@ export async function crearPersonaAction(prevState: FormState, formData: FormDat
   // 2. Montos por plan: en modo simple (1 plan) se respeta el monto editado;
   //    en avanzado (varios planes) se cobra el monto de cada plan.
   let montoPorPlan: Record<string, number> = {}
+  const nombrePorPlan: Record<string, string> = {}
   if (plan_ids.length > 0) {
     const { data: planesData } = await supabase
       .from('planes_cobro')
-      .select('id, monto')
+      .select('id, nombre, monto')
       .in('id', plan_ids)
       .eq('academia_id', academiaId) as any
     montoPorPlan = Object.fromEntries((planesData ?? []).map((p: any) => [p.id, Number(p.monto)]))
+    for (const p of (planesData ?? []) as any[]) nombrePorPlan[p.id] = p.nombre
     if (plan_ids.length === 1 && monto != null) {
       montoPorPlan[plan_ids[0]] = monto
     }
@@ -349,7 +351,14 @@ export async function crearPersonaAction(prevState: FormState, formData: FormDat
 
   revalidatePath('/grupos')
   revalidatePath('/alumnos')
-  return { success: true, message: 'Alumno inscrito con éxito.', personaId }
+
+  // Aviso de los cargos iniciales generados (uno por plan con monto > 0),
+  // para que el toast del drawer informe qué se cobró al guardar.
+  const avisosCargo = plan_ids
+    .filter((id) => (montoPorPlan[id] ?? 0) > 0)
+    .map((id) => `Se generó cargo ${nombrePorPlan[id] ?? 'del plan'} por $${Math.round(montoPorPlan[id])}.`)
+  const message = ['Alumno inscrito con éxito.', ...avisosCargo].join(' ')
+  return { success: true, message, personaId }
 }
 
 // Server action ligera: devuelve preview del primer cargo de un plan para el drawer

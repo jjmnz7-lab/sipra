@@ -312,6 +312,7 @@ export function SeguimientoClientView({
           personaId={persona.id}
           open={isRecordatorioOpen}
           onOpenChange={setIsRecordatorioOpen}
+          codigoPais={persona.codigo_pais}
         />
 
         <CrearPromesaDrawer personaId={persona.id} open={isPromesaOpen} onOpenChange={setIsPromesaOpen} />
@@ -366,6 +367,7 @@ export function SeguimientoClientView({
           alumnoNombre={nombreCompleto}
           telefono={persona.telefono_whatsapp}
           shareCode={persona.share_code}
+          codigoPais={persona.codigo_pais}
         />
 
         <EditarAlumnoDrawer

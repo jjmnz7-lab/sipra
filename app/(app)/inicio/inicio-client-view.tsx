@@ -20,6 +20,7 @@ export type AlumnoConDeuda = {
     nombre: string
     apellido: string
     telefono_whatsapp: string | null
+    codigo_pais?: string | null
     estado_registro: string
     grupo_nombre: string
     grupo: { id: string; nombre: string; color: string | null; emoji: string | null } | null

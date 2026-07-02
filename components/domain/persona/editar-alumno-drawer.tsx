@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/drawer'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import { useToast } from '@/components/ui/use-toast'
 import { cn } from '@/lib/utils'
 import { formatCurrencyCompact } from '@/lib/utils/currency'
 import { colorPorSlug } from '@/lib/constants/grupo-apariencia'
@@ -136,6 +137,7 @@ export function EditarAlumnoDrawer({
   initialFocus,
 }: Props) {
   const [state, formAction] = useActionState(editarAlumnoAction, initialState)
+  const { showToast, toast } = useToast()
 
   const telefonoRef = React.useRef<HTMLInputElement>(null)
 
@@ -227,8 +229,13 @@ export function EditarAlumnoDrawer({
   }, [open, persona, currentGrupoId, currentPlanIds, initialFocus])
 
   useEffect(() => {
-    if (state.success) onOpenChange(false)
-  }, [state.success, onOpenChange])
+    if (state.success) {
+      // El mensaje puede incluir el aviso de la mensualidad generada al
+      // asignar un esquema (ver generar_mensualidad_esquema_v1).
+      showToast(state.message ?? 'Alumno actualizado.', 4000)
+      onOpenChange(false)
+    }
+  }, [state, onOpenChange, showToast])
 
   const toggle = (set: Set<string>, setter: (s: Set<string>) => void, id: string) => {
     const next = new Set(set)
@@ -300,6 +307,7 @@ export function EditarAlumnoDrawer({
   }
 
   return (
+    <>
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent>
         <div className="mx-auto w-full max-w-sm max-h-[85vh] overflow-y-auto">
@@ -526,6 +534,9 @@ export function EditarAlumnoDrawer({
         </div>
       </DrawerContent>
     </Drawer>
+    {/* Fuera del Drawer: el toast sobrevive al cierre del sheet. */}
+    {toast}
+    </>
   )
 }
 

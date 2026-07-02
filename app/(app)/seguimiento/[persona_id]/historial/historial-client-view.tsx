@@ -56,7 +56,7 @@ export function HistorialClientView({
   hasMoreInicial,
   pageSize,
 }: {
-  persona: { id: string; nombre: string; apellido: string | null; estado_registro: string; share_code: string; telefono_whatsapp: string | null }
+  persona: { id: string; nombre: string; apellido: string | null; estado_registro: string; share_code: string; telefono_whatsapp: string | null; codigo_pais: string | null }
   eventosIniciales: EventoTimeline[]
   hasMoreInicial: boolean
   pageSize: number
@@ -261,6 +261,7 @@ export function HistorialClientView({
         alumnoNombre={nombreCompleto}
         telefono={persona.telefono_whatsapp}
         shareCode={persona.share_code}
+        codigoPais={persona.codigo_pais}
       />
     </div>
   )

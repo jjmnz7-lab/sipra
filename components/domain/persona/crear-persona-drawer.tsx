@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/drawer'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import { useToast } from '@/components/ui/use-toast'
 import { cn } from '@/lib/utils'
 import { formatCurrencyCompact } from '@/lib/utils/currency'
 import { colorPorSlug } from '@/lib/constants/grupo-apariencia'
@@ -134,6 +135,7 @@ export function CrearPersonaDrawer({
   const open = isControlled ? controlledOpen : uncontrolledOpen
   const setOpen = isControlled && onOpenChange ? onOpenChange : setUncontrolledOpen
   const [state, formAction, isPending] = useActionState(crearPersonaAction, initialState)
+  const { showToast, toast } = useToast()
 
   // Datos personales
   const [nombre, setNombre] = useState('')
@@ -279,6 +281,12 @@ export function CrearPersonaDrawer({
           // registrar manualmente. No bloqueamos el cierre.
         }
       }
+      // Toast al guardar: alta + cargos iniciales generados (planes desde el
+      // server action; la inscripción se acaba de cobrar aquí).
+      const avisos = [state.message ?? 'Alumno inscrito con éxito.']
+      if (insc) avisos.push(`Se generó cargo Inscripción por $${Math.round(insc.monto)}.`)
+      showToast(avisos.join(' '), 4500)
+
       pendingInscripcionRef.current = null
 
       setOpen(false)
@@ -299,7 +307,6 @@ export function CrearPersonaDrawer({
       setGrupoId(defaultGrupoId)
       setGrupoIds((prev) => new Set(prev).add(defaultGrupoId))
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultGrupoId])
 
   const toggle = (set: Set<string>, setter: (s: Set<string>) => void, id: string) => {
@@ -375,6 +382,7 @@ export function CrearPersonaDrawer({
   }
 
   return (
+    <>
     <Drawer open={open} onOpenChange={setOpen}>
       {!isControlled && !hideTrigger && (
         <DrawerTrigger asChild>
@@ -672,6 +680,9 @@ export function CrearPersonaDrawer({
         </div>
       </DrawerContent>
     </Drawer>
+    {/* Fuera del Drawer: el toast sobrevive al cierre del sheet. */}
+    {toast}
+    </>
   )
 }
 

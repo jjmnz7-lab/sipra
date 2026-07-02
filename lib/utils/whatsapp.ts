@@ -71,9 +71,17 @@ export function formatDesgloseCargos(cargos: CargoRecordatorio[]): string {
   return text
 }
 
-export function buildWhatsAppUrl(telefono: string | null | undefined, mensaje: string): string {
+export function buildWhatsAppUrl(
+  telefono: string | null | undefined,
+  mensaje: string,
+  codigoPais?: string | null,
+): string {
   if (!telefono) return '#'
-  const clean = telefono.replace(/\D/g, '')
+  const cleanTel = telefono.replace(/\D/g, '')
+  const prefix = (codigoPais ?? '52').replace(/\D/g, '')
+  const clean = (cleanTel.length === (10 + prefix.length) && cleanTel.startsWith(prefix))
+    ? cleanTel
+    : `${prefix}${cleanTel}`
   return `https://wa.me/${clean}?text=${encodeURIComponent(mensaje)}`
 }
 
@@ -81,10 +89,18 @@ export function buildWhatsAppUrl(telefono: string | null | undefined, mensaje: s
  * Variante para compartir: si no hay teléfono, abre WhatsApp con el mensaje
  * precargado y deja que el remitente elija el contacto (wa.me sin número).
  */
-export function buildWhatsAppShareUrl(telefono: string | null | undefined, mensaje: string): string {
-  const clean = (telefono ?? '').replace(/\D/g, '')
-  const base = clean ? `https://wa.me/${clean}` : 'https://wa.me/'
-  return `${base}?text=${encodeURIComponent(mensaje)}`
+export function buildWhatsAppShareUrl(
+  telefono: string | null | undefined,
+  mensaje: string,
+  codigoPais?: string | null,
+): string {
+  const cleanTel = (telefono ?? '').replace(/\D/g, '')
+  if (!cleanTel) return `https://wa.me/?text=${encodeURIComponent(mensaje)}`
+  const prefix = (codigoPais ?? '52').replace(/\D/g, '')
+  const clean = (cleanTel.length === (10 + prefix.length) && cleanTel.startsWith(prefix))
+    ? cleanTel
+    : `${prefix}${cleanTel}`
+  return `https://wa.me/${clean}?text=${encodeURIComponent(mensaje)}`
 }
 
 /** URL absoluta del historial público por token: {origin}/historial/{token}. */

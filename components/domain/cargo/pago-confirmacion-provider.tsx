@@ -72,7 +72,7 @@ export function PagoConfirmacionProvider({ children }: { children: React.ReactNo
       fecha: info.fecha,
       link,
     })
-    window.open(buildWhatsAppShareUrl(datos.telefono, msg), '_blank', 'noopener,noreferrer')
+    window.open(buildWhatsAppShareUrl(datos.telefono, msg, datos.codigo_pais), '_blank', 'noopener,noreferrer')
     setOpen(false)
   }
 

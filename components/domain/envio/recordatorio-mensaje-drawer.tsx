@@ -35,6 +35,7 @@ interface RecordatorioMensajeDrawerProps {
   children?: React.ReactNode
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  codigoPais?: string | null
 }
 
 type CargoRecordatorioConEstado = CargoRecordatorio & {
@@ -89,6 +90,7 @@ export function RecordatorioMensajeDrawer({
   children,
   open: controlledOpen,
   onOpenChange,
+  codigoPais,
 }: RecordatorioMensajeDrawerProps) {
   const { academiaNombre } = useAcademia()
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
@@ -158,7 +160,7 @@ export function RecordatorioMensajeDrawer({
   }
 
   const handleSend = () => {
-    const url = buildWhatsAppUrl(telefono, mensaje)
+    const url = buildWhatsAppUrl(telefono, mensaje, codigoPais)
     if (url !== '#') {
       window.open(url, '_blank', 'noopener,noreferrer')
     }

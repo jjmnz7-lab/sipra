@@ -251,6 +251,7 @@ export function SwipeableCargoCard({
           concepto={concepto}
           cargosActivos={alumno.cargos}
           personaId={alumno.persona_id}
+          codigoPais={alumno.persona.codigo_pais}
         />
       )}
 
