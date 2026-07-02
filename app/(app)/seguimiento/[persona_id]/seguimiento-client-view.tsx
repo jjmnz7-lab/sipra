@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { PageSubheader } from '@/components/layout/page-subheader'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils/currency'
 import Link from 'next/link'
@@ -18,7 +17,6 @@ import {
   Phone,
   Plus,
   Copy,
-  X,
   ChevronDown,
   ChevronRight,
   GraduationCap,
@@ -45,12 +43,6 @@ import { EventoRow } from '@/components/domain/timeline/evento-row'
 
 const TIMELINE_PREVIEW = 4
 
-function getIniciales(nombre: string, apellido: string | null) {
-  const a = (nombre?.[0] ?? '').toUpperCase()
-  const b = (apellido?.[0] ?? '').toUpperCase()
-  return (a + b) || '?'
-}
-
 export function SeguimientoClientView({
   persona,
   gruposAlumno = [],
@@ -59,7 +51,6 @@ export function SeguimientoClientView({
   estadoFinanciero,
   deudaTotal,
   saldoAFavor = 0,
-  primerCargo,
   timeline,
   allowPartial = true,
   allowOverpayment = true,
@@ -77,7 +68,6 @@ export function SeguimientoClientView({
   estadoFinanciero: EstadoFinancieroAlumno
   deudaTotal: number
   saldoAFavor?: number
-  primerCargo: any
   timeline: any[]
   allowPartial?: boolean
   allowOverpayment?: boolean
@@ -125,7 +115,6 @@ export function SeguimientoClientView({
   const suspendido = persona.estado_registro !== 'activo'
   const tieneHistorial = (timeline?.length ?? 0) > 0
   const descuento = descuentoEspecialBadge(persona.descuento_hermanos_activo, persona.beca_activa, persona.beca_porcentaje)
-  const iniciales = getIniciales(persona.nombre, persona.apellido)
   const eventosPreview = timeline.slice(0, TIMELINE_PREVIEW)
   const nombreCompleto = `${persona.nombre} ${persona.apellido ?? ''}`.trim()
 

@@ -96,14 +96,31 @@ export function RecordatorioMensajeDrawer({
   const open = isControlled ? controlledOpen : uncontrolledOpen
   const setOpen = isControlled && onOpenChange ? onOpenChange : setUncontrolledOpen
 
-  const defaultTono = getTonoPredeterminado(cargosActivos)
-  const [tono, setTono] = useState<TonoRecordatorio>(defaultTono)
-  const [mensaje, setMensaje] = useState('')
-  const [editado, setEditado] = useState(false)
+  // Estado derivado con override manual: el tono y el mensaje se CALCULAN en
+  // cada render a partir de props/toggles; el usuario puede sobreescribirlos y
+  // su override vive en *Manual (null = usar el valor autogenerado). Así no
+  // hay efectos sincronizando estado (patrón "you might not need an effect").
+  const [tonoManual, setTonoManual] = useState<TonoRecordatorio | null>(null)
+  const [mensajeManual, setMensajeManual] = useState<string | null>(null)
   const [incluirDesglose, setIncluirDesglose] = useState(true)
   const [incluirEnlace, setIncluirEnlace] = useState(false)
   const [shareCode, setShareCode] = useState<string | null>(null)
   const tonoSugerido = getEtiquetaTonoSugerido(cargosActivos)
+
+  const tono = tonoManual ?? getTonoPredeterminado(cargosActivos)
+  const editado = mensajeManual !== null
+
+  const desgloseText = incluirDesglose && cargosActivos ? formatDesgloseCargos(cargosActivos) : undefined
+  let mensajeAuto = buildRecordatorioConTono(
+    { nombre, academia: academiaNombre, monto, concepto, desglose: desgloseText },
+    tono
+  )
+  // incluirEnlace solo puede activarse con interacción del usuario (cliente),
+  // así que window nunca se toca durante el prerender.
+  if (incluirEnlace && shareCode) {
+    mensajeAuto = appendEnlaceHistorial(mensajeAuto, buildShareLink(shareCode, window.location.origin))
+  }
+  const mensaje = mensajeManual ?? mensajeAuto
 
   // Carga perezosa del código al abrir (sólo si hay alumno asociado).
   useEffect(() => {
@@ -114,46 +131,30 @@ export function RecordatorioMensajeDrawer({
     }
   }, [open, personaId, shareCode])
 
-  useEffect(() => {
-    if (open) {
-      setTono(getTonoPredeterminado(cargosActivos))
-      setEditado(false)
-    }
-  }, [open, cargosActivos])
-
-  // Generar mensaje cuando cambia el tono, desglose, enlace o al abrir (salvo si fue editado manualmente)
-  useEffect(() => {
-    if (open && !editado) {
-      const desgloseText = incluirDesglose && cargosActivos ? formatDesgloseCargos(cargosActivos) : undefined
-      let msg = buildRecordatorioConTono(
-        { nombre, academia: academiaNombre, monto, concepto, desglose: desgloseText },
-        tono
-      )
-      if (incluirEnlace && shareCode) {
-        msg = appendEnlaceHistorial(msg, buildShareLink(shareCode, window.location.origin))
-      }
-      setMensaje(msg)
-    }
-  }, [open, tono, nombre, academiaNombre, monto, concepto, editado, incluirDesglose, cargosActivos, incluirEnlace, shareCode])
+  const resetEstado = () => {
+    setTonoManual(null)
+    setMensajeManual(null)
+    setIncluirDesglose(true)
+    setIncluirEnlace(false)
+  }
 
   const handleTonoChange = (nuevoTono: TonoRecordatorio) => {
-    setTono(nuevoTono)
-    setEditado(false) // Regenerar al cambiar tono
+    setTonoManual(nuevoTono)
+    setMensajeManual(null) // Regenerar al cambiar tono
   }
 
   const handleDesgloseToggle = (val: boolean) => {
     setIncluirDesglose(val)
-    setEditado(false) // Regenerar al cambiar desglose
+    setMensajeManual(null) // Regenerar al cambiar desglose
   }
 
   const handleEnlaceToggle = (val: boolean) => {
     setIncluirEnlace(val)
-    setEditado(false) // Regenerar al cambiar el enlace
+    setMensajeManual(null) // Regenerar al cambiar el enlace
   }
 
   const handleMensajeChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setMensaje(e.target.value)
-    setEditado(true)
+    setMensajeManual(e.target.value)
   }
 
   const handleSend = () => {
@@ -162,17 +163,12 @@ export function RecordatorioMensajeDrawer({
       window.open(url, '_blank', 'noopener,noreferrer')
     }
     setOpen(false)
+    resetEstado()
   }
 
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen)
-    if (!isOpen) {
-      // Reset al cerrar
-      setEditado(false)
-      setTono(getTonoPredeterminado(cargosActivos))
-      setIncluirDesglose(true)
-      setIncluirEnlace(false)
-    }
+    if (!isOpen) resetEstado()
   }
 
   return (
@@ -272,7 +268,7 @@ export function RecordatorioMensajeDrawer({
                 {editado && (
                   <button
                     type="button"
-                    onClick={() => setEditado(false)}
+                    onClick={() => setMensajeManual(null)}
                     className="text-[10px] text-primary hover:underline font-medium"
                   >
                     Restaurar original

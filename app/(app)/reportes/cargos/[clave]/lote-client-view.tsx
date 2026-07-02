@@ -36,8 +36,8 @@ export function LoteClientView({ lote }: { lote: LoteCargos }) {
   const [tab, setTab] = useState<TabKey>('pendientes')
   const [shareOpen, setShareOpen] = useState(false)
   const [incluirLiquidados, setIncluirLiquidados] = useState(false)
-  const [mensaje, setMensaje] = useState('')
-  const [edited, setEdited] = useState(false)
+  // Override manual del mensaje a compartir; null = usar el resumen autogenerado.
+  const [mensajeManual, setMensajeManual] = useState<string | null>(null)
   // Filtro por esquema (solo lotes de mensualidad con >1 esquema). null = Todos.
   const [esquemaSel, setEsquemaSel] = useState<string | null>(null)
   // Filtro por grupo (lotes con >1 grupo). null = Todos.
@@ -134,11 +134,7 @@ export function LoteClientView({ lote }: { lote: LoteCargos }) {
     return msg
   }, [lote.titulo, lote.contexto, lote.grupos, lote.esquemas, esquemaSel, grupoSel, pendientes, liquidados, incluirLiquidados])
 
-  useEffect(() => {
-    if (!edited) {
-      setMensaje(mensajeResumen)
-    }
-  }, [mensajeResumen, edited])
+  const mensaje = mensajeManual ?? mensajeResumen
 
   const esCargoMensualOManual = lote.familia === 'mensualidad' || lote.familia === 'grupal'
   const subtituloText = esCargoMensualOManual
@@ -258,7 +254,7 @@ export function LoteClientView({ lote }: { lote: LoteCargos }) {
       {/* Drawer para enviar resumen */}
       <Drawer open={shareOpen} onOpenChange={(open) => {
           setShareOpen(open)
-          if (!open) setEdited(false)
+          if (!open) setMensajeManual(null)
         }}>
           <DrawerContent>
             <div className="mx-auto w-full max-w-sm">
@@ -299,10 +295,7 @@ export function LoteClientView({ lote }: { lote: LoteCargos }) {
                   <Textarea
                     id="mensaje-resumen"
                     value={mensaje}
-                    onChange={(e) => {
-                      setMensaje(e.target.value)
-                      setEdited(true)
-                    }}
+                    onChange={(e) => setMensajeManual(e.target.value)}
                     className="min-h-[160px] text-xs font-sans resize-none"
                   />
                 </div>

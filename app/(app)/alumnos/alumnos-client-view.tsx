@@ -3,14 +3,12 @@
 import { useMemo, useRef, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Search, X, Filter, ArrowUpDown, Tag, AlertTriangle, ChevronRight, RefreshCw, Users, GraduationCap } from 'lucide-react'
-import { formatCurrency } from '@/lib/utils/currency'
+import { Search, X, Filter, ArrowUpDown, Tag, AlertTriangle, RefreshCw, Users, GraduationCap } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   ESTADOS_FINANCIEROS,
   colorEstado,
   descuentoEspecialBadge,
-  type EstadoFinancieroAlumno,
   type EstadoFinancieroDef,
 } from '@/lib/constants/alumno-finanzas'
 import { colorPorSlug } from '@/lib/constants/grupo-apariencia'
@@ -28,19 +26,12 @@ type Props = {
   cobrarInscripcionDefault?: boolean
 }
 
-const COLOR_AL_DIA = ESTADOS_FINANCIEROS[0].hex // #5C8F78
 const SORT_DEFAULT = 'nombre'
 
 const ORDEN_LABEL: Record<string, string> = {
   nombre: 'Nombre A-Z',
   fecha: 'Fecha de registro',
   grupo: 'Grupo',
-}
-
-function getIniciales(nombre: string, apellido: string | null) {
-  const a = (nombre?.[0] ?? '').toUpperCase()
-  const b = (apellido?.[0] ?? '').toUpperCase()
-  return (a + b) || '?'
 }
 
 function normalizar(s: string | null | undefined) {
@@ -60,25 +51,26 @@ export function AlumnosClientView({ alumnos, grupos, planes, modoProrrateo, mult
     if (searchOpen) inputRef.current?.focus()
   }, [searchOpen])
 
+  // Deep-links que precargan filtros al montar: ?filtro=huerfanos (desde
+  // Pendientes) y ?estado=al_dia|pendiente|atrasado|urgente (desde las KPI
+  // cards de Reportes). Se leen en el inicializador — la página se monta de
+  // cero en cada navegación, así que no hace falta sincronizarlos después.
+  const searchParams = useSearchParams()
+
   // Filtros — defaults
-  const [filtroEstado, setFiltroEstado] = useState<Set<string>>(new Set())          // vacío = sin filtro (todos)
+  const [filtroEstado, setFiltroEstado] = useState<Set<string>>(() => {           // vacío = sin filtro (todos)
+    const estado = searchParams.get('estado')
+    return estado && ESTADOS_FINANCIEROS.some((e) => e.slug === estado)
+      ? new Set([estado])
+      : new Set<string>()
+  })
   const [filtroGrupos, setFiltroGrupos] = useState<Set<string>>(new Set())          // vacío = todos
   const [filtroPlanes, setFiltroPlanes] = useState<Set<string>>(new Set())          // vacío = todos (solo multi-plan)
   const [filtroSituacion, setFiltroSituacion] = useState<string>('activos')         // default: activos (siempre aplica como filtro)
   const [orden, setOrden] = useState<string>(SORT_DEFAULT)
-  const [soloHuerfanos, setSoloHuerfanos] = useState(false)                          // control de huérfanos
-
-  // Activa el filtro de huérfanos si se llega con ?filtro=huerfanos (desde Pendientes).
-  // Precarga el filtro de estado si se llega con ?estado=al_dia|pendiente|atrasado|urgente
-  // (desde las KPI cards de Reportes).
-  const searchParams = useSearchParams()
-  useEffect(() => {
-    if (searchParams.get('filtro') === 'huerfanos') setSoloHuerfanos(true)
-    const estado = searchParams.get('estado')
-    if (estado && ESTADOS_FINANCIEROS.some((e) => e.slug === estado)) {
-      setFiltroEstado(new Set([estado]))
-    }
-  }, [searchParams])
+  const [soloHuerfanos, setSoloHuerfanos] = useState(                               // control de huérfanos
+    () => searchParams.get('filtro') === 'huerfanos',
+  )
 
   // Bottom sheet de filtros
   const [filtrosOpen, setFiltrosOpen] = useState(false)
@@ -430,7 +422,6 @@ export function AlumnosClientView({ alumnos, grupos, planes, modoProrrateo, mult
 
 function AlumnoCard({ a, multiPlanEnabled }: { a: AlumnoListItem; multiPlanEnabled: boolean }) {
   const estado = colorEstado(a.estadoFinanciero)
-  const iniciales = getIniciales(a.nombre, a.apellido)
   const grupoColor = a.grupo ? colorPorSlug(a.grupo.color) : null
   const suspendido = a.estado_registro !== 'activo'
   const planPrincipal = a.planes[0]

@@ -133,13 +133,6 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
   const deudaTotal = cargosActivos.reduce((acc: number, c: any) => acc + Number(c.saldo_pendiente), 0)
   const estadoFinanciero = clasificarAlumno(cargosActivos, ahoraAcademia(timezone))
 
-  // Preparar el primer cargo para el RegistrarPagoDrawer (inyectando la persona y el ID)
-  const primerCargo = cargosActivos[0] ? {
-    ...cargosActivos[0],
-    persona_id: persona.id,
-    persona: { nombre: persona.nombre, apellido: persona.apellido }
-  } : null as any
-
   // Saldo a favor: crédito disponible de pagos/anticipos no aplicados (monto_disponible).
   const { data: movsCredito } = await supabase
     .from('movimiento')
@@ -165,7 +158,6 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
       estadoFinanciero={estadoFinanciero}
       deudaTotal={deudaTotal}
       saldoAFavor={saldoAFavor}
-      primerCargo={primerCargo}
       timeline={timeline || []}
       allowPartial={allowPartial}
       allowOverpayment={allowOverpayment}
