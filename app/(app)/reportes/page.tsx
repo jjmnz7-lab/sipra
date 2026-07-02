@@ -29,6 +29,14 @@ async function computarCobrado(
   const inicioMes = new Date(Date.UTC(y, m, 1))
   const inicioSerie = new Date(Date.UTC(y, m - 11, 1)) // últimos 12 meses, incluido el actual
 
+  // Monday of this week:
+  const dayOfWeek = now.getUTCDay()
+  const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+  const inicioSemana = new Date(Date.UTC(y, m, now.getUTCDate() - daysToSubtract, 0, 0, 0, 0))
+
+  // Today (00:00:00)
+  const inicioHoy = new Date(Date.UTC(y, m, now.getUTCDate(), 0, 0, 0, 0))
+
   const { data: eventosRes } = await supabase
     .from('evento_timeline')
     .select('tipo, monto, fecha_evento, metadata')
@@ -45,8 +53,15 @@ async function computarCobrado(
 
   let totalMes = 0
   const metodosMes = new Map<string, number>()
-  // Anulaciones del mes: el método se resuelve por el movimiento anulado.
   const anulacionesMes: { movimientoId: string | null; monto: number }[] = []
+
+  let totalSemana = 0
+  const metodosSemana = new Map<string, number>()
+  const anulacionesSemana: { movimientoId: string | null; monto: number }[] = []
+
+  let totalHoy = 0
+  const metodosHoy = new Map<string, number>()
+  const anulacionesHoy: { movimientoId: string | null; monto: number }[] = []
 
   for (const e of eventos) {
     const monto = Number(e.monto ?? 0)
@@ -60,11 +75,12 @@ async function computarCobrado(
     const fecha = zonedAcademia(new Date(e.fecha_evento), timezone)
     const k = claveMes(fecha)
     const signo = e.tipo === 'PAGO_ABONO' ? 1 : -1
-    porMes.set(k, (porMes.get(k) ?? 0) + signo * monto)
+    const amount = signo * monto
+    porMes.set(k, (porMes.get(k) ?? 0) + amount)
     mesesConHistorial.add(k)
 
     if (fecha >= inicioMes) {
-      totalMes += signo * monto
+      totalMes += amount
       if (e.tipo === 'PAGO_ABONO') {
         const metodo = capitalizar(String(meta.metodo ?? 'otro').toLowerCase())
         metodosMes.set(metodo, (metodosMes.get(metodo) ?? 0) + monto)
@@ -72,27 +88,60 @@ async function computarCobrado(
         anulacionesMes.push({ movimientoId: meta.movimiento_id ?? null, monto })
       }
     }
+
+    if (fecha >= inicioSemana) {
+      totalSemana += amount
+      if (e.tipo === 'PAGO_ABONO') {
+        const metodo = capitalizar(String(meta.metodo ?? 'otro').toLowerCase())
+        metodosSemana.set(metodo, (metodosSemana.get(metodo) ?? 0) + monto)
+      } else {
+        anulacionesSemana.push({ movimientoId: meta.movimiento_id ?? null, monto })
+      }
+    }
+
+    if (fecha >= inicioHoy) {
+      totalHoy += amount
+      if (e.tipo === 'PAGO_ABONO') {
+        const metodo = capitalizar(String(meta.metodo ?? 'otro').toLowerCase())
+        metodosHoy.set(metodo, (metodosHoy.get(metodo) ?? 0) + monto)
+      } else {
+        anulacionesHoy.push({ movimientoId: meta.movimiento_id ?? null, monto })
+      }
+    }
   }
 
   // Resta cada anulación del método con el que se registró el pago original.
-  if (anulacionesMes.length > 0) {
-    const ids = anulacionesMes.map((a) => a.movimientoId).filter(Boolean) as string[]
-    const metodoPorMov = new Map<string, string>()
-    if (ids.length > 0) {
-      const { data: movs } = await supabase
-        .from('movimiento')
-        .select('id, metodo_pago')
-        .in('id', ids)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      for (const mov of (movs ?? []) as any[]) {
-        metodoPorMov.set(mov.id, capitalizar(String(mov.metodo_pago ?? 'otro').toLowerCase()))
-      }
-    }
-    for (const a of anulacionesMes) {
-      const metodo = (a.movimientoId && metodoPorMov.get(a.movimientoId)) || 'Otro'
-      metodosMes.set(metodo, (metodosMes.get(metodo) ?? 0) - a.monto)
+  const ids = Array.from(new Set([
+    ...anulacionesMes.map((a) => a.movimientoId),
+    ...anulacionesSemana.map((a) => a.movimientoId),
+    ...anulacionesHoy.map((a) => a.movimientoId)
+  ])).filter(Boolean) as string[]
+
+  const metodoPorMov = new Map<string, string>()
+  if (ids.length > 0) {
+    const { data: movs } = await supabase
+      .from('movimiento')
+      .select('id, metodo_pago')
+      .in('id', ids)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const mov of (movs ?? []) as any[]) {
+      metodoPorMov.set(mov.id, capitalizar(String(mov.metodo_pago ?? 'otro').toLowerCase()))
     }
   }
+
+  const restarAnulaciones = (
+    anulaciones: { movimientoId: string | null; monto: number }[],
+    metodosMap: Map<string, number>,
+  ) => {
+    for (const a of anulaciones) {
+      const metodo = (a.movimientoId && metodoPorMov.get(a.movimientoId)) || 'Otro'
+      metodosMap.set(metodo, (metodosMap.get(metodo) ?? 0) - a.monto)
+    }
+  }
+
+  restarAnulaciones(anulacionesMes, metodosMes)
+  restarAnulaciones(anulacionesSemana, metodosSemana)
+  restarAnulaciones(anulacionesHoy, metodosHoy)
 
   // Serie de los últimos 12 meses; se recortan los meses previos al primer
   // movimiento registrado (academias con menos historial).
@@ -113,18 +162,35 @@ async function computarCobrado(
   // Efectivo y Transferencia siempre se muestran (aunque queden en 0, son los
   // únicos métodos que ofrece la UI de cobro); los demás solo si tienen monto.
   const ORDEN_BASE = ['Efectivo', 'Transferencia']
-  const metodos: { label: string; monto: number }[] = ORDEN_BASE.map((label) => ({
-    label,
-    monto: metodosMes.get(label) ?? 0,
-  }))
-  for (const [label, monto] of Array.from(metodosMes.entries())) {
-    if (ORDEN_BASE.includes(label)) continue
-    if (Math.abs(monto) >= 0.01) metodos.push({ label, monto })
+  const formatearMetodos = (metodosMap: Map<string, number>) => {
+    const metodos: { label: string; monto: number }[] = ORDEN_BASE.map((label) => ({
+      label,
+      monto: metodosMap.get(label) ?? 0,
+    }))
+    for (const [label, monto] of Array.from(metodosMap.entries())) {
+      if (ORDEN_BASE.includes(label)) continue
+      if (Math.abs(monto) >= 0.01) metodos.push({ label, monto })
+    }
+    return metodos
   }
+
+  const metodosHoyList = formatearMetodos(metodosHoy)
+  const metodosSemanaList = formatearMetodos(metodosSemana)
+  const metodosMesList = formatearMetodos(metodosMes)
 
   // Más reciente primero (el mes en curso a la cabeza de la serie).
   const mesLabel = capitalizar(now.toLocaleDateString('es-MX', { month: 'long', timeZone: 'UTC' }))
-  return { mesLabel, total: totalMes, metodos, serie: meses.reverse() }
+
+  return {
+    mesLabel,
+    total: totalMes,
+    metodos: metodosMesList,
+    serie: meses.reverse(),
+    hoyTotal: totalHoy,
+    hoyMetodos: metodosHoyList,
+    semanaTotal: totalSemana,
+    semanaMetodos: metodosSemanaList,
+  }
 }
 
 export default async function ReportesPage() {
@@ -156,11 +222,22 @@ export default async function ReportesPage() {
     urgente: 0,
   }
 
-  const activeAlumnos = (alumnosRes.data ?? []) as any[]
+  type AlumnoConCargos = {
+    id: string
+    cargo: {
+      persona_id: string
+      saldo_pendiente: number
+      concepto: string
+      estado_financiero: string
+      fecha_vencimiento: string
+    }[]
+  }
+
+  const activeAlumnos = (alumnosRes.data ?? []) as unknown as AlumnoConCargos[]
   const totalAlumnosReporte = activeAlumnos.length
 
   for (const p of activeAlumnos) {
-    const cargosPendientes = (p.cargo ?? []).filter((c: any) =>
+    const cargosPendientes = (p.cargo ?? []).filter((c) =>
       ['pendiente', 'parcial', 'vencido'].includes(c.estado_financiero)
     )
     const estado = clasificarAlumno(cargosPendientes, now)

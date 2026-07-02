@@ -30,6 +30,14 @@ export type CobradoMes = {
   metodos: { label: string; monto: number }[]
   /** Cobranza neta mensual, más reciente primero (hasta 12 meses). */
   serie: { label: string; total: number }[]
+  /** Neto de hoy. */
+  hoyTotal: number
+  /** Desglose por método de pago registrado de hoy. */
+  hoyMetodos: { label: string; monto: number }[]
+  /** Neto de la semana. */
+  semanaTotal: number
+  /** Desglose por método de pago registrado de la semana. */
+  semanaMetodos: { label: string; monto: number }[]
 }
 
 const HEX = {
@@ -108,6 +116,8 @@ export function ReportesClientView({
   const [mostrarArchivados, setMostrarArchivados] = useState(false)
   const [sortLotes, setSortLotes] = useState<SortLoteKey>('reciente')
 
+
+
   // La gráfica ocupa exactamente la altura del bloque "cobrado este mes".
   const cobradoRef = useRef<HTMLDivElement>(null)
   const [chartHeight, setChartHeight] = useState(0)
@@ -171,20 +181,58 @@ export function ReportesClientView({
         <section className="space-y-3">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Cobrado en {cobradoMes.mesLabel}</CardTitle>
+              <CardTitle className="text-lg">Ingresos</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div ref={cobradoRef} className="space-y-1">
-                <p className="text-4xl font-bold tracking-tight text-foreground tabular-nums leading-none">
-                  {formatCurrency(cobradoMes.total)}
-                </p>
-                {cobradoMes.metodos.length > 0 && (
-                  <p className="text-[10px] text-muted-foreground tabular-nums pt-0.5">
-                    {cobradoMes.metodos
-                      .map((m) => `${m.label}: ${formatCurrencyCompact(m.monto)}`)
-                      .join(' • ')}
-                  </p>
-                )}
+              {/* Clickable summaries zone */}
+              <div 
+                ref={cobradoRef}
+                onClick={() => router.push('/reportes/ingresos')}
+                className="flex items-center justify-between gap-3 p-3 -mx-2 rounded-xl border border-transparent hover:bg-muted/40 hover:border-border/40 cursor-pointer transition-all duration-200 active:scale-[0.99]"
+              >
+                <div className="flex-1 grid grid-cols-3 gap-4 min-w-0">
+                  {/* Hoy */}
+                  <div className="space-y-1">
+                    <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Hoy</span>
+                    <span className="block text-lg font-extrabold text-foreground tabular-nums leading-none">
+                      {formatCurrency(cobradoMes.hoyTotal)}
+                    </span>
+                    {cobradoMes.hoyMetodos.map((m) => (
+                      <span key={m.label} className="block text-[10px] text-muted-foreground/80 tabular-nums leading-tight mt-1">
+                        {m.label}: {formatCurrency(m.monto)}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Esta semana */}
+                  <div className="space-y-1 border-l border-border/40 pl-4">
+                    <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Esta semana</span>
+                    <span className="block text-lg font-extrabold text-foreground tabular-nums leading-none">
+                      {formatCurrency(cobradoMes.semanaTotal)}
+                    </span>
+                    {cobradoMes.semanaMetodos.map((m) => (
+                      <span key={m.label} className="block text-[10px] text-muted-foreground/80 tabular-nums leading-tight mt-1">
+                        {m.label}: {formatCurrency(m.monto)}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Este mes */}
+                  <div className="space-y-1 border-l border-border/40 pl-4">
+                    <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Este mes ({cobradoMes.mesLabel.toLowerCase()})</span>
+                    <span className="block text-lg font-extrabold text-foreground tabular-nums leading-none">
+                      {formatCurrency(cobradoMes.total)}
+                    </span>
+                    {cobradoMes.metodos.map((m) => (
+                      <span key={m.label} className="block text-[10px] text-muted-foreground/80 tabular-nums leading-tight mt-1">
+                        {m.label}: {formatCurrency(m.monto)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Chevron */}
+                <ChevronRight className="h-5 w-5 text-muted-foreground/60 flex-shrink-0" />
               </div>
 
               {hayHistorial && (
@@ -345,6 +393,7 @@ export function ReportesClientView({
             </CardContent>
           </Card>
         </section>
+
 
       </div>
     </div>
