@@ -190,31 +190,20 @@ export function ReportesClientView({
                 onClick={() => router.push('/reportes/ingresos')}
                 className="flex items-center justify-between gap-3 p-3 -mx-2 rounded-xl border border-transparent hover:bg-muted/40 hover:border-border/40 cursor-pointer transition-all duration-200 active:scale-[0.99]"
               >
-                <div className="flex-1 grid grid-cols-3 gap-4 min-w-0">
+                <div className="flex-1 grid grid-cols-2 gap-4 min-w-0">
                   {/* Hoy */}
                   <div className="space-y-1">
                     <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Hoy</span>
                     <span className="block text-lg font-extrabold text-foreground tabular-nums leading-none">
                       {formatCurrency(cobradoMes.hoyTotal)}
                     </span>
-                    {cobradoMes.hoyMetodos.map((m) => (
-                      <span key={m.label} className="block text-[10px] text-muted-foreground/80 tabular-nums leading-tight mt-1">
-                        {m.label}: {formatCurrency(m.monto)}
+                    {cobradoMes.hoyMetodos.length > 0 && (
+                      <span className="block text-[9px] text-muted-foreground/80 tabular-nums leading-tight mt-1">
+                        {cobradoMes.hoyMetodos
+                          .map((m) => `${m.label}: ${formatCurrencyCompact(m.monto)}`)
+                          .join(' • ')}
                       </span>
-                    ))}
-                  </div>
-
-                  {/* Esta semana */}
-                  <div className="space-y-1 border-l border-border/40 pl-4">
-                    <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Esta semana</span>
-                    <span className="block text-lg font-extrabold text-foreground tabular-nums leading-none">
-                      {formatCurrency(cobradoMes.semanaTotal)}
-                    </span>
-                    {cobradoMes.semanaMetodos.map((m) => (
-                      <span key={m.label} className="block text-[10px] text-muted-foreground/80 tabular-nums leading-tight mt-1">
-                        {m.label}: {formatCurrency(m.monto)}
-                      </span>
-                    ))}
+                    )}
                   </div>
 
                   {/* Este mes */}
@@ -223,11 +212,13 @@ export function ReportesClientView({
                     <span className="block text-lg font-extrabold text-foreground tabular-nums leading-none">
                       {formatCurrency(cobradoMes.total)}
                     </span>
-                    {cobradoMes.metodos.map((m) => (
-                      <span key={m.label} className="block text-[10px] text-muted-foreground/80 tabular-nums leading-tight mt-1">
-                        {m.label}: {formatCurrency(m.monto)}
+                    {cobradoMes.metodos.length > 0 && (
+                      <span className="block text-[9px] text-muted-foreground/80 tabular-nums leading-tight mt-1">
+                        {cobradoMes.metodos
+                          .map((m) => `${m.label}: ${formatCurrencyCompact(m.monto)}`)
+                          .join(' • ')}
                       </span>
-                    ))}
+                    )}
                   </div>
                 </div>
 
