@@ -34,7 +34,13 @@ export type AlumnoConDeuda = {
   estadoFinanciero: 'al_dia' | 'pendiente' | 'atrasado' | 'urgente'
 }
 
-export type GrupoEditar = { id: string; nombre: string; plan_sugerido_id?: string | null }
+export type GrupoEditar = {
+  id: string
+  nombre: string
+  color?: string | null
+  emoji?: string | null
+  plan_sugerido_id?: string | null
+}
 export type PlanEditar = { id: string; nombre: string; monto: number; frecuencia: string }
 
 type Props = {

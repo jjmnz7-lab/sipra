@@ -8,8 +8,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Loader2, GraduationCap, FileText, CreditCard } from 'lucide-react'
+import { Loader2, GraduationCap, FileText, Banknote, Landmark } from 'lucide-react'
 import { normalizeWholeMoneyInput, preventMoneyWheel } from '@/lib/utils/money-input'
+import { cn } from '@/lib/utils'
 import { ConceptoCombobox, GuardarCatalogoToggle, useCobroConcepto, type CobroFrecuente } from '@/components/ui/concepto-combobox'
 import {
   Drawer,
@@ -79,6 +80,7 @@ export function CrearCargoIndividualDrawer({
   const [state, formAction, isPending] = useActionState(crearCargoYCobrarAction, initialState)
   const [localError, setLocalError] = useState<string | null>(null)
   const [cobroGuardadoConExito, setCobroGuardadoConExito] = useState(false)
+  const [metodoPago, setMetodoPago] = useState<'efectivo' | 'transferencia'>('efectivo')
 
   const [prevOpen, setPrevOpen] = useState(open)
   if (open !== prevOpen) {
@@ -87,6 +89,7 @@ export function CrearCargoIndividualDrawer({
       setAplicarBeca(false)
       setLocalError(null)
       setCobroGuardadoConExito(false)
+      setMetodoPago('efectivo')
       if (conceptoDefault || montoDefault != null) {
         prefill(conceptoDefault, montoDefault != null ? String(Math.round(montoDefault)) : '')
       } else {
@@ -133,8 +136,8 @@ export function CrearCargoIndividualDrawer({
     fd.set('aplicar_beca', tieneBeca && aplicarBeca ? 'true' : 'false')
     fd.set('cobrar', cobrar ? 'true' : 'false')
     if (cobrar) {
-      // Pago completo en efectivo, atómico con el cargo (misma lógica que Visita).
-      fd.set('metodo_pago', 'efectivo')
+      // Pago completo en el método de pago seleccionado, atómico con el cargo.
+      fd.set('metodo_pago', metodoPago)
       fd.set('idempotency_key', crypto.randomUUID())
     }
     startTransition(() => formAction(fd))
@@ -220,6 +223,8 @@ export function CrearCargoIndividualDrawer({
                 </div>
               )}
 
+
+
               {(localError || (state?.message && !state.success)) && (
                 <div className="p-3 bg-red-50 text-red-700 text-sm rounded-md border border-red-200">
                   {localError ?? state.message}
@@ -236,19 +241,67 @@ export function CrearCargoIndividualDrawer({
                 onClick={() => enviar(false)}
               >
                 {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
-                Solo cargar a cuenta
+                Generar cargo
               </Button>
-              <Button
-                type="button"
-                className="w-full h-11 font-bold bg-[#22887c] hover:bg-[#1a6b62]"
-                disabled={isPending}
-                onClick={() => enviar(true)}
-              >
-                {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CreditCard className="mr-2 h-4 w-4" />}
-                Cargar y cobrar ahora
-              </Button>
+
+              <div className="grid grid-cols-5 gap-2 w-full">
+                <Button
+                  type="button"
+                  className="col-span-4 h-11 font-bold bg-[#22887c] hover:bg-[#1a6b62] rounded-lg"
+                  disabled={isPending}
+                  onClick={() => enviar(true)}
+                >
+                  {isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : metodoPago === 'efectivo' ? (
+                    <Banknote className="mr-2 h-4 w-4" />
+                  ) : (
+                    <Landmark className="mr-2 h-4 w-4" />
+                  )}
+                  Registrar pago ({metodoPago === 'efectivo' ? 'Efectivo' : 'Transferencia'})
+                </Button>
+                <button
+                  type="button"
+                  className="col-span-1 h-11 px-1 flex items-center justify-center border border-border bg-white rounded-lg relative overflow-hidden transition-colors hover:bg-muted/40"
+                  title="Cambiar método de pago"
+                  disabled={isPending}
+                  onClick={() => setMetodoPago((p) => (p === 'efectivo' ? 'transferencia' : 'efectivo'))}
+                >
+                  {/* El control segmentado de iconos */}
+                  <div className="relative w-full h-8 rounded-md border border-border/20 flex items-center p-0.5 select-none">
+                    {/* Pastilla indicadora */}
+                    <div
+                      className={cn(
+                        "absolute w-[44%] h-[85%] bg-zinc-100 rounded-sm shadow-sm transition-all duration-300 ease-in-out border border-border/10",
+                        metodoPago === 'efectivo' ? "left-0.5" : "left-[52%]"
+                      )}
+                    />
+                    
+                    {/* Icono Efectivo */}
+                    <div className="flex-1 z-10 flex items-center justify-center">
+                      <Banknote
+                        className={cn(
+                          "h-3.5 w-3.5 transition-all duration-300",
+                          metodoPago === 'efectivo' ? "text-[#22887c] scale-110 font-bold" : "text-muted-foreground/60 scale-95"
+                        )}
+                      />
+                    </div>
+
+                    {/* Icono Transferencia */}
+                    <div className="flex-1 z-10 flex items-center justify-center">
+                      <Landmark
+                        className={cn(
+                          "h-3.5 w-3.5 transition-all duration-300",
+                          metodoPago === 'transferencia' ? "text-primary scale-110 font-bold" : "text-muted-foreground/60 scale-95"
+                        )}
+                      />
+                    </div>
+                  </div>
+                </button>
+              </div>
+
               <DrawerClose asChild>
-                <Button type="button" variant="ghost" className="h-11 text-muted-foreground">Cancelar</Button>
+                <Button type="button" variant="ghost" className="h-11 text-muted-foreground w-full">Cancelar</Button>
               </DrawerClose>
             </DrawerFooter>
           </div>

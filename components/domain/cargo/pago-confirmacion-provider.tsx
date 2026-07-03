@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { createContext, useCallback, useContext, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { CheckCircle2, Send, Loader2 } from 'lucide-react'
 import {
   Drawer,
@@ -21,6 +22,8 @@ import {
   buildWhatsAppShareUrl,
 } from '@/lib/utils/whatsapp'
 import { formatCurrency } from '@/lib/utils/currency'
+import { FaltaTelefonoAlert } from '@/components/domain/persona/falta-telefono-alert'
+import { cn } from '@/lib/utils'
 
 type ConfirmarPagoArgs = {
   personaId: string
@@ -43,10 +46,12 @@ export function useConfirmarPago() {
  */
 export function PagoConfirmacionProvider({ children }: { children: React.ReactNode }) {
   const { academiaNombre } = useAcademia()
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [info, setInfo] = useState<{ alumno: string; monto: number; fecha: string } | null>(null)
   const [datos, setDatos] = useState<DatosCompartir | null>(null)
   const [cargando, setCargando] = useState(false)
+  const [noTelefonoAlertOpen, setNoTelefonoAlertOpen] = useState(false)
 
   const confirmar = useCallback((args: ConfirmarPagoArgs) => {
     setInfo({
@@ -76,6 +81,17 @@ export function PagoConfirmacionProvider({ children }: { children: React.ReactNo
     setOpen(false)
   }
 
+  const hasPhone = !!datos?.telefono
+
+  const handleButtonClick = () => {
+    if (!datos) return
+    if (!hasPhone) {
+      setNoTelefonoAlertOpen(true)
+      return
+    }
+    notificar()
+  }
+
   return (
     <PagoConfirmacionContext.Provider value={confirmar}>
       {children}
@@ -102,9 +118,14 @@ export function PagoConfirmacionProvider({ children }: { children: React.ReactNo
 
             <DrawerFooter>
               <Button
-                onClick={notificar}
+                onClick={handleButtonClick}
                 disabled={cargando || !datos}
-                className="w-full h-12 text-base font-bold bg-[#22887c] hover:bg-[#1a6b62]"
+                className={cn(
+                  "w-full h-12 text-base font-bold transition-all",
+                  (!hasPhone && datos)
+                    ? "bg-slate-300 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-pointer opacity-70 hover:bg-slate-300"
+                    : "bg-[#22887c] hover:bg-[#1a6b62] text-white"
+                )}
               >
                 {cargando ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -120,6 +141,20 @@ export function PagoConfirmacionProvider({ children }: { children: React.ReactNo
           </div>
         </DrawerContent>
       </Drawer>
+
+      {datos && (
+        <FaltaTelefonoAlert
+          open={noTelefonoAlertOpen}
+          onOpenChange={setNoTelefonoAlertOpen}
+          nombreAlumno={info?.alumno ?? ''}
+          onRegistrarClick={() => {
+            setOpen(false)
+            if (datos?.id) {
+              router.push(`/seguimiento/${datos.id}`)
+            }
+          }}
+        />
+      )}
     </PagoConfirmacionContext.Provider>
   )
 }

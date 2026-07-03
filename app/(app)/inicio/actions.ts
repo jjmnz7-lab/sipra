@@ -60,14 +60,14 @@ export async function registrarPagoAction(prevState: FormState, formData: FormDa
 
   if (!academiaId) return { message: 'Academia no encontrada', success: false }
 
-  const { error, data } = await (supabase as any).rpc('registrar_pago_atomico_v1', {
+  const { error } = await supabase.rpc('registrar_pago_atomico_v1', {
     p_academia_id: academiaId,
     p_persona_id: validatedFields.data.persona_id,
     p_cargo_ids: validatedFields.data.cargo_ids,
     p_monto_total: validatedFields.data.monto_pago,
     p_metodo_pago: validatedFields.data.metodo_pago,
     p_idempotency_key: validatedFields.data.idempotency_key,
-    p_referencia: validatedFields.data.nota || null,
+    p_referencia: validatedFields.data.nota || undefined,
   })
 
   if (error) {
@@ -92,6 +92,7 @@ export async function registrarPagoAction(prevState: FormState, formData: FormDa
 }
 
 export type DatosCompartir = {
+  id: string
   telefono: string | null
   codigo_pais?: string | null
   share_code: string
@@ -107,39 +108,51 @@ export type DatosCompartir = {
  * teléfono/token por props en cada caller del RegistrarPagoDrawer.
  */
 export async function obtenerDatosCompartir(persona_id: string): Promise<DatosCompartir | null> {
-  if (!z.string().uuid().safeParse(persona_id).success) return null
+  try {
+    if (!z.string().uuid().safeParse(persona_id).success) return null
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  const academiaId = user?.app_metadata?.academia_id
-  if (!academiaId) return null
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const academiaId = user?.app_metadata?.academia_id
+    if (!academiaId) return null
 
-  const { data } = await supabase
-    .from('persona')
-    .select('nombre, apellido, telefono_whatsapp, codigo_pais, share_code, share_link_bloqueado, estado_registro')
-    .eq('id', persona_id)
-    .eq('academia_id', academiaId)
-    .single() as {
-      data: {
-        nombre: string
-        apellido: string | null
-        telefono_whatsapp: string | null
-        codigo_pais: string | null
-        share_code: string
-        share_link_bloqueado: boolean
-        estado_registro: string
-      } | null
+    const { data, error } = await supabase
+      .from('persona')
+      .select('nombre, apellido, telefono_whatsapp, codigo_pais, share_code, share_link_bloqueado, estado_registro')
+      .eq('id', persona_id)
+      .eq('academia_id', academiaId)
+      .single() as {
+        data: {
+          nombre: string
+          apellido: string | null
+          telefono_whatsapp: string | null
+          codigo_pais: string | null
+          share_code: string
+          share_link_bloqueado: boolean
+          estado_registro: string
+        } | null
+        error: unknown
+      }
+
+    if (error) {
+      console.error('Error in obtenerDatosCompartir query:', error)
+      return null
     }
 
-  if (!data) return null
+    if (!data) return null
 
-  return {
-    telefono: data.telefono_whatsapp,
-    codigo_pais: data.codigo_pais,
-    share_code: data.share_code,
-    nombre: data.nombre,
-    apellido: data.apellido,
-    bloqueado: data.share_link_bloqueado,
-    suspendido: data.estado_registro !== 'activo',
+    return {
+      id: persona_id,
+      telefono: data.telefono_whatsapp,
+      codigo_pais: data.codigo_pais,
+      share_code: data.share_code,
+      nombre: data.nombre,
+      apellido: data.apellido,
+      bloqueado: data.share_link_bloqueado,
+      suspendido: data.estado_registro !== 'activo',
+    }
+  } catch (err) {
+    console.error('Exception in obtenerDatosCompartir:', err)
+    return null
   }
 }

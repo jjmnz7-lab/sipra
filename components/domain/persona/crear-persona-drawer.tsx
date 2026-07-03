@@ -704,28 +704,18 @@ function CheckRow({
       type="button"
       onClick={onClick}
       className={cn(
-        'w-full flex items-center justify-between gap-3 px-2.5 py-2 rounded-md text-left transition-colors',
-        checked ? 'bg-primary/5' : 'hover:bg-accent',
+        "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors text-left",
+        checked
+          ? "bg-primary/10 font-semibold"
+          : "hover:bg-accent",
+        !labelStyle && (checked ? "text-primary" : "text-muted-foreground"),
       )}
     >
       <span className="flex items-center gap-2.5 min-w-0">
         {leftSlot}
-        <span
-          className={cn('text-sm truncate', !labelStyle && (checked ? 'text-foreground font-medium' : 'text-foreground/90'))}
-          style={labelStyle}
-        >
-          {label}
-        </span>
+        <span className="truncate" style={labelStyle}>{label}</span>
       </span>
-      <span
-        className={cn(
-          'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border',
-          checked ? 'bg-primary border-primary text-primary-foreground' : 'border-border',
-        )}
-        aria-hidden="true"
-      >
-        {checked && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
-      </span>
+      {checked && <Check className="h-4 w-4 text-primary flex-shrink-0 ml-2" />}
     </button>
   )
 }

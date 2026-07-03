@@ -61,6 +61,8 @@ export default async function InicioPage() {
   const gruposParaEditar = (gruposRaw ?? []).map((g: any) => ({
     id: g.id,
     nombre: g.nombre,
+    color: g.color ?? null,
+    emoji: g.emoji ?? null,
     plan_sugerido_id: g.plan_sugerido_id ?? null,
   }))
   const planesParaEditar = (planesCatalogo ?? []).map((p: any) => ({

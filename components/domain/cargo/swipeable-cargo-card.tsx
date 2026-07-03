@@ -13,7 +13,13 @@ import { formatCurrency } from '@/lib/utils/currency'
 import { colorEstado } from '@/lib/constants/alumno-finanzas'
 import { colorPorSlug } from '@/lib/constants/grupo-apariencia'
 
-type GrupoEditar = { id: string; nombre: string; plan_sugerido_id?: string | null }
+type GrupoEditar = {
+  id: string
+  nombre: string
+  color?: string | null
+  emoji?: string | null
+  plan_sugerido_id?: string | null
+}
 type PlanEditar = { id: string; nombre: string; monto: number; frecuencia: string }
 
 interface SwipeableCargoCardProps {
