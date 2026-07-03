@@ -11,7 +11,7 @@ import { Loader2, Pencil, CheckCircle2 } from 'lucide-react'
 import { EMOJI_ACTIVIDAD_DEFAULT } from '@/lib/constants/actividad-apariencia'
 import { AparienciaActividadFields } from './apariencia-actividad-fields'
 import { LogisticaGrupoFields } from '@/components/domain/grupo/logistica-grupo-fields'
-import { useToast } from '@/hooks/use-toast'
+import { useToast } from '@/components/ui/use-toast'
 import { normalizeWholeMoneyInput, preventMoneyWheel } from '@/lib/utils/money-input'
 import {
   Drawer,
