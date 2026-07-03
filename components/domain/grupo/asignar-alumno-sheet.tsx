@@ -105,7 +105,8 @@ export function AsignarAlumnoSheet({
         setMonto(String(montoSugerido))
       }, 0)
     }
-  }, [open, montoSugerido, state])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, montoSugerido])
 
   // Cerrar al éxito (mismo patrón que el resto de drawers con server actions del codebase).
   useEffect(() => {

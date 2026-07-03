@@ -265,7 +265,8 @@ export function CrearPersonaDrawer({
 
   useEffect(() => {
     if (open) prevState.current = state
-  }, [open, state])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   useEffect(() => {
     if (state !== prevState.current) {
