@@ -496,7 +496,7 @@ function AlumnoCard({ a, multiPlanEnabled }: { a: AlumnoListItem; multiPlanEnabl
                  <RefreshCw className="h-3 w-3 absolute" />
                  <span className="absolute text-[5px] font-black leading-none">$</span>
                </span>
-               Sin plan
+               Sin plan de pago
              </span>
           ) : multiPlanEnabled && planPrincipal ? (
              <span

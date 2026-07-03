@@ -241,7 +241,7 @@ export function SeguimientoClientView({
           {/* Badge de esquemas de cobro */}
           {planesAlumno.length === 0 ? (
             <ListonBadge className="bg-amber-500/10 text-amber-700 dark:text-amber-500 border-amber-500/30">
-              ⚠️ sin esquema de pago
+              ⚠️ Sin plan de pago
             </ListonBadge>
           ) : planesAlumno.length === 1 ? (
             <ListonBadge icon={<PlanIcon />}>

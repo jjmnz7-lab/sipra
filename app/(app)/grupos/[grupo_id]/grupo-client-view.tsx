@@ -217,7 +217,7 @@ export function GrupoClientView({
                     </span>
                   ) : (
                     <span className="inline-flex items-center text-[9px] font-semibold border border-amber-200 bg-amber-50 text-amber-600 rounded-full px-1.5 py-0.5 flex-shrink-0 whitespace-nowrap">
-                      Sin plan
+                      Sin plan de pago
                     </span>
                   )}
                 </div>
@@ -281,7 +281,7 @@ export function GrupoClientView({
                             </span>
                           ) : (
                             <span className="inline-flex items-center text-[9px] font-semibold border border-amber-200 bg-amber-50 text-amber-600 rounded-full px-1.5 py-0.5 flex-shrink-0 whitespace-nowrap">
-                              Sin plan
+                              Sin plan de pago
                             </span>
                           )}
                         </div>
