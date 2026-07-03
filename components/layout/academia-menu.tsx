@@ -61,7 +61,7 @@ export function AcademiaMenu() {
       icon: <BarChart3 className="h-5 w-5" />,
       color: '#15435a',
       titulo: 'Reportes',
-      desc: 'Estado financiero de alumnos y control de cargos grupales.',
+      desc: 'Ingresos y control de cargos grupales.',
       href: '/reportes',
     },
     {

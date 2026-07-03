@@ -7,7 +7,7 @@ export interface CargoRecordatorio {
   concepto: string
   monto_original: number | string
   saldo_pendiente: number | string
-  fecha_vencimiento: string
+  fecha_vencimiento: string | null | undefined
   aplicacion_movimiento?: {
     id: string
     monto_aplicado: number | string
@@ -20,7 +20,7 @@ export interface CargoRecordatorio {
   }[] | null
 }
 
-function parseLocalDate(dateStr: string): Date {
+function parseLocalDate(dateStr: string | null | undefined): Date {
   if (!dateStr) return new Date()
   if (dateStr.includes('T')) return new Date(dateStr)
   const parts = dateStr.split('-')
@@ -33,7 +33,7 @@ function parseLocalDate(dateStr: string): Date {
   return new Date(dateStr)
 }
 
-function formatCompactDate(dateStr: string): string {
+function formatCompactDate(dateStr: string | null | undefined): string {
   if (!dateStr) return ''
   try {
     const d = parseLocalDate(dateStr)
@@ -47,15 +47,30 @@ function formatCompactDate(dateStr: string): string {
   }
 }
 
+function compareDatesDesc(a: string | null | undefined, b: string | null | undefined): number {
+  const safeA = a?.trim() ?? ''
+  const safeB = b?.trim() ?? ''
+  const timeA = safeA.length > 0 ? parseLocalDate(safeA).getTime() : Number.NaN
+  const timeB = safeB.length > 0 ? parseLocalDate(safeB).getTime() : Number.NaN
+
+  const aValid = Number.isFinite(timeA)
+  const bValid = Number.isFinite(timeB)
+
+  if (aValid && bValid) return timeB - timeA
+  if (aValid) return -1
+  if (bValid) return 1
+  return 0
+}
+
 export function formatDesgloseCargos(cargos: CargoRecordatorio[]): string {
   if (!cargos || cargos.length === 0) return ''
 
   let text = '*Detalle del saldo:*\n'
-  cargos.forEach((c) => {
+  const cargosOrdenados = [...cargos].sort((a, b) => compareDatesDesc(a.fecha_vencimiento, b.fecha_vencimiento))
+
+  cargosOrdenados.forEach((c) => {
     const monto = formatCurrency(Number(c.monto_original))
-    const fecha = formatCompactDate(c.fecha_vencimiento)
-    const fechaPart = fecha ? ` (${fecha})` : ''
-    text += `• ${c.concepto}${fechaPart}: ${monto}\n`
+    text += `• ${c.concepto}: ${monto}\n`
 
     // Filtrar abonos activos
     const abonos = c.aplicacion_movimiento?.filter(am => am.estado === 'activa') || []

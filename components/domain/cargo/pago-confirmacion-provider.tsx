@@ -101,7 +101,7 @@ export function PagoConfirmacionProvider({ children }: { children: React.ReactNo
             </DrawerHeader>
 
             <div className="px-4 text-sm text-muted-foreground">
-              Comparte la confirmación y el enlace seguro del historial con el tutor.
+              Comparte la confirmación y el enlace del historial de pagos.
             </div>
 
             <DrawerFooter>
@@ -123,16 +123,18 @@ export function PagoConfirmacionProvider({ children }: { children: React.ReactNo
                   <p className="text-xs text-red-500 font-medium">
                     El alumno NO tiene registrado un número de teléfono/Whatsapp
                   </p>
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 w-full text-xs font-medium"
                     onClick={() => {
                       setOpen(false)
                       router.push(`/seguimiento/${datos.id}?edit=telefono`)
                     }}
-                    className="text-xs text-[#22887c] hover:text-[#1a6b62] underline font-semibold transition-colors cursor-pointer"
                   >
                     Registrar número ahora
-                  </button>
+                  </Button>
                 </div>
               )}
 
