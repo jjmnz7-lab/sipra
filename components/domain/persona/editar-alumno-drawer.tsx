@@ -180,7 +180,7 @@ export function EditarAlumnoDrawer({
 
   const selectedGrupoSimple = grupos.find((g) => g.id === grupoId)
   const activeAlumnosSimple = selectedGrupoSimple
-    ? (selectedGrupoSimple.persona_grupo || []).filter((pg: any) => pg.estado === 'activo').length
+    ? (selectedGrupoSimple.persona_grupo || []).filter((pg: { estado: string }) => pg.estado === 'activo').length
     : 0
   const cupoMaximoSimple = selectedGrupoSimple?.cupo_maximo
   const isSimpleFull = !!(cupoMaximoSimple && activeAlumnosSimple >= cupoMaximoSimple && grupoId !== currentGrupoId)
@@ -190,31 +190,33 @@ export function EditarAlumnoDrawer({
     return grupos
       .filter((g) => grupoIds.has(g.id) && g.id !== currentGrupoId)
       .filter((g) => {
-        const active = (g.persona_grupo || []).filter((pg: any) => pg.estado === 'activo').length
+        const active = (g.persona_grupo || []).filter((pg: { estado: string }) => pg.estado === 'activo').length
         const max = g.cupo_maximo
         return !!(max && active >= max)
       })
       .map((g) => ({
         nombre: g.nombre,
-        active: (g.persona_grupo || []).filter((pg: any) => pg.estado === 'activo').length,
+        active: (g.persona_grupo || []).filter((pg: { estado: string }) => pg.estado === 'activo').length,
         max: g.cupo_maximo
       }))
   }, [grupos, grupoIds, multiPlanEnabled, currentGrupoId])
 
   useEffect(() => {
     if (open) {
-      setNombre(persona.nombre)
-      setApellido(persona.apellido ?? '')
-      setTelefono(persona.telefono_whatsapp ?? '')
-      setGrupoId(currentGrupoId ?? '')
-      setPlanId(currentPlanIds[0] ?? '')
-      setGrupoIds(new Set(currentGrupoId ? [currentGrupoId] : []))
-      setPlanIds(new Set(currentPlanIds))
-      setHermanosActivo(!!persona.descuento_hermanos_activo)
-      setHermanosMonto(persona.descuento_hermanos_monto ? String(persona.descuento_hermanos_monto) : '')
-      setBecaActiva(!!persona.beca_activa)
-      setBecaPorcentaje(persona.beca_porcentaje && persona.beca_porcentaje > 0 ? persona.beca_porcentaje : 25)
-      setLocalError(null)
+      setTimeout(() => {
+        setNombre(persona.nombre)
+        setApellido(persona.apellido ?? '')
+        setTelefono(persona.telefono_whatsapp ?? '')
+        setGrupoId(currentGrupoId ?? '')
+        setPlanId(currentPlanIds[0] ?? '')
+        setGrupoIds(new Set(currentGrupoId ? [currentGrupoId] : []))
+        setPlanIds(new Set(currentPlanIds))
+        setHermanosActivo(!!persona.descuento_hermanos_activo)
+        setHermanosMonto(persona.descuento_hermanos_monto ? String(persona.descuento_hermanos_monto) : '')
+        setBecaActiva(!!persona.beca_activa)
+        setBecaPorcentaje(persona.beca_porcentaje && persona.beca_porcentaje > 0 ? persona.beca_porcentaje : 25)
+        setLocalError(null)
+      }, 0)
       
       if (initialFocus === 'telefono') {
         setTimeout(() => {
@@ -228,14 +230,23 @@ export function EditarAlumnoDrawer({
     }
   }, [open, persona, currentGrupoId, currentPlanIds, initialFocus])
 
+  const prevState = React.useRef(state)
+
   useEffect(() => {
-    if (state.success) {
-      // El mensaje puede incluir el aviso de la mensualidad generada al
-      // asignar un esquema (ver generar_mensualidad_esquema_v1).
-      showToast(state.message ?? 'Alumno actualizado.', 4000)
-      onOpenChange(false)
+    if (open) prevState.current = state
+  }, [open, state])
+
+  useEffect(() => {
+    if (state !== prevState.current) {
+      prevState.current = state
+      if (state.success && open) {
+        // El mensaje puede incluir el aviso de la mensualidad generada al
+        // asignar un esquema (ver generar_mensualidad_esquema_v1).
+        showToast(state.message ?? 'Alumno actualizado.', 4000)
+        onOpenChange(false)
+      }
     }
-  }, [state, onOpenChange, showToast])
+  }, [state, open, onOpenChange, showToast])
 
   const toggle = (set: Set<string>, setter: (s: Set<string>) => void, id: string) => {
     const next = new Set(set)

@@ -50,6 +50,12 @@ export function AccionesAlumnoSheet({ open, onOpenChange, persona, tieneHistoria
   const [confirmOpen, setConfirmOpen] = useState<null | 'suspender' | 'reactivar' | 'eliminar' | 'baja'>(null)
   const [step, setStep] = useState<'menu' | 'enlace'>('menu')
 
+  useEffect(() => {
+    if (!open) {
+      setTimeout(() => setStep('menu'), 0)
+    }
+  }, [open])
+
   const suspendido = persona.estado_registro !== 'activo'
   const nombreCompleto = `${persona.nombre} ${persona.apellido ?? ''}`.trim()
 

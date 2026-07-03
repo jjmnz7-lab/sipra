@@ -37,8 +37,11 @@ interface CrearActividadDrawerProps {
   timezone?: string
 }
 
+import { useToast } from '@/components/ui/use-toast'
+
 export function CrearActividadDrawer({ timezone = 'America/Mexico_City' }: CrearActividadDrawerProps) {
   const [open, setOpen] = useState(false)
+  const { showToast, toast } = useToast()
 
   const [state, formAction] = useActionState(crearActividadAction, initialState)
   const [nombre, setNombre] = useState<string>('')
@@ -59,25 +62,36 @@ export function CrearActividadDrawer({ timezone = 'America/Mexico_City' }: Crear
   // Reset al abrir
   useEffect(() => {
     if (open) {
-      setNombre('')
-      setEmoji(EMOJI_ACTIVIDAD_DEFAULT)
-      setDias([])
-      setHoraInicio('')
-      setHoraFin('')
-      setCupoIlimitado(true)
-      setCupoMaximo(10)
-      setUnSoloDia(false)
-      setFechaInicio('')
-      setFechaFin('')
+      setTimeout(() => {
+        setNombre('')
+        setEmoji(EMOJI_ACTIVIDAD_DEFAULT)
+        setDias([])
+        setHoraInicio('')
+        setHoraFin('')
+        setCupoIlimitado(true)
+        setCupoMaximo(10)
+        setUnSoloDia(false)
+        setFechaInicio('')
+        setFechaFin('')
+      }, 0)
     }
   }, [open])
 
+  const prevState = React.useRef(state)
+
   useEffect(() => {
-    if (state.success) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- cierre tras commit del server action
-      setOpen(false)
+    if (open) prevState.current = state
+  }, [open, state])
+
+  useEffect(() => {
+    if (state !== prevState.current) {
+      prevState.current = state
+      if (state.success && open) {
+        showToast(`Actividad ${nombre} creada.`)
+        setTimeout(() => setOpen(false), 0)
+      }
     }
-  }, [state.success])
+  }, [state, open, nombre, showToast])
 
   const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: timezone })
 
@@ -327,6 +341,7 @@ export function CrearActividadDrawer({ timezone = 'America/Mexico_City' }: Crear
             </form>
           </div>
         </DrawerContent>
+        {toast}
       </Drawer>
     </>
   )

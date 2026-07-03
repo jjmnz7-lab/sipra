@@ -21,6 +21,7 @@ import {
   DrawerTitle,
 } from '@/components/ui/drawer'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useToast } from '@/components/ui/use-toast'
 
 export type PlanLite = { id: string; nombre: string; monto: number; frecuencia: string }
 
@@ -48,6 +49,7 @@ interface CrearGrupoDrawerProps {
 
 export function CrearGrupoDrawer({ planes = [] }: CrearGrupoDrawerProps) {
   const [open, setOpen] = useState(false)
+  const { showToast, toast } = useToast()
 
   const [state, formAction] = useActionState(crearGrupoAction, initialState)
   const [planSugerido, setPlanSugerido] = useState<string>(NONE)
@@ -65,24 +67,35 @@ export function CrearGrupoDrawer({ planes = [] }: CrearGrupoDrawerProps) {
   // Reset al cerrar/abrir
   useEffect(() => {
     if (open) {
-      setNombre('')
-      setColorSlug(COLORES_GRUPO[0].slug)
-      setEmoji(EMOJIS_GRUPO[0])
-      setPlanSugerido(NONE)
-      setDias([])
-      setHoraInicio('')
-      setHoraFin('')
-      setCupoIlimitado(true)
-      setCupoMaximo(10)
+      setTimeout(() => {
+        setNombre('')
+        setColorSlug(COLORES_GRUPO[0].slug)
+        setEmoji(EMOJIS_GRUPO[0])
+        setPlanSugerido(NONE)
+        setDias([])
+        setHoraInicio('')
+        setHoraFin('')
+        setCupoIlimitado(true)
+        setCupoMaximo(10)
+      }, 0)
     }
   }, [open])
 
+  const prevState = React.useRef(state)
+
   useEffect(() => {
-    if (state.success) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- cierre tras commit del server action
-      setOpen(false)
+    if (open) prevState.current = state
+  }, [open, state])
+
+  useEffect(() => {
+    if (state !== prevState.current) {
+      prevState.current = state
+      if (state.success && open) {
+        showToast(`Grupo ${nombre} creado.`)
+        setTimeout(() => setOpen(false), 0)
+      }
     }
-  }, [state.success])
+  }, [state, open, nombre, showToast])
 
   return (
     <>
@@ -255,6 +268,7 @@ export function CrearGrupoDrawer({ planes = [] }: CrearGrupoDrawerProps) {
             </form>
           </div>
         </DrawerContent>
+        {toast}
       </Drawer>
     </>
   )

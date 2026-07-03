@@ -104,18 +104,27 @@ export function MassCargoDrawer({
     (i) => selectedIds.includes(i.persona.id) && i.persona?.beca_activa && (i.persona?.beca_porcentaje ?? 0) > 0,
   ).length
 
+  const prevState = React.useRef(state)
+
   useEffect(() => {
-    if (!state.success) return
-    const msg = state.message ?? 'Cargos generados con éxito.'
-    const finalMsg = cobroGuardadoConExito
-      ? `${msg} Y se guardó "${concepto.trim()}" en el catálogo.`
-      : msg
-    onSuccess?.(finalMsg)
-    setTimeout(() => {
-      setOpen(false)
-    }, 0)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.success, cobroGuardadoConExito])
+    if (open) prevState.current = state
+  }, [open, state])
+
+  useEffect(() => {
+    if (state !== prevState.current) {
+      prevState.current = state
+      if (state.success && open) {
+        const msg = state.message ?? 'Cargos generados con éxito.'
+        const finalMsg = cobroGuardadoConExito
+          ? `${msg} Y se guardó "${concepto.trim()}" en el catálogo.`
+          : msg
+        onSuccess?.(finalMsg)
+        setTimeout(() => {
+          setOpen(false)
+        }, 0)
+      }
+    }
+  }, [state, open, cobroGuardadoConExito, concepto, setOpen, onSuccess])
 
   const togglePersona = (id: string, isChecked: boolean) => {
     setSelectedIds((prev) => (isChecked ? [...prev, id] : prev.filter((x) => x !== id)))

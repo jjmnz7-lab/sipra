@@ -203,7 +203,7 @@ export function CrearPersonaDrawer({
 
   const selectedGrupoActiveAlumnos = useMemo(() => {
     if (!grupoSimpleSel) return 0
-    return (grupoSimpleSel.persona_grupo || []).filter((pg: any) => pg.estado === 'activo').length
+    return (grupoSimpleSel.persona_grupo || []).filter((pg: { estado: string }) => pg.estado === 'activo').length
   }, [grupoSimpleSel])
 
   const selectedGrupoCupoMaximo = grupoSimpleSel?.cupo_maximo
@@ -214,13 +214,13 @@ export function CrearPersonaDrawer({
     return grupos
       .filter((g) => grupoIds.has(g.id))
       .filter((g) => {
-        const active = (g.persona_grupo || []).filter((pg: any) => pg.estado === 'activo').length
+        const active = (g.persona_grupo || []).filter((pg: { estado: string }) => pg.estado === 'activo').length
         const max = g.cupo_maximo
         return !!(max && active >= max)
       })
       .map((g) => ({
         nombre: g.nombre,
-        active: (g.persona_grupo || []).filter((pg: any) => pg.estado === 'activo').length,
+        active: (g.persona_grupo || []).filter((pg: { estado: string }) => pg.estado === 'activo').length,
         max: g.cupo_maximo
       }))
   }, [grupos, grupoIds, multiPlanEnabled])
@@ -239,73 +239,87 @@ export function CrearPersonaDrawer({
 
   // Sincroniza el monto sugerido (modo simple) cuando cambia el plan efectivo.
   useEffect(() => {
-    setMonto(String(Math.round(preview.monto)))
-    setCondonar(false)
+    setTimeout(() => {
+      setMonto(String(Math.round(preview.monto)))
+      setCondonar(false)
+    }, 0)
   }, [preview.monto, open])
 
   // Reinicia los campos de inscripción y descuentos al abrir el drawer.
   useEffect(() => {
     if (open) {
-      setCobrarInscripcion(cobrarInscripcionDefault)
-      setMontoInscripcion(String(Math.round(montoInscripcionDefault)))
-      setMotivoInscripcion('')
-      setHermanosActivo(false)
-      setHermanosMonto('')
-      setBecaActiva(false)
-      setBecaPorcentaje(25)
+      setTimeout(() => {
+        setCobrarInscripcion(cobrarInscripcionDefault)
+        setMontoInscripcion(String(Math.round(montoInscripcionDefault)))
+        setMotivoInscripcion('')
+        setHermanosActivo(false)
+        setHermanosMonto('')
+        setBecaActiva(false)
+        setBecaPorcentaje(25)
+      }, 0)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
+  const prevState = React.useRef(state)
+
   useEffect(() => {
-    if (!state.success) return
+    if (open) prevState.current = state
+  }, [open, state])
 
-    const run = async () => {
-      // Cargo de inscripción (con rastro de auditoría) tras crear al alumno.
-      const insc = pendingInscripcionRef.current
-      if (insc && state.personaId) {
-        try {
-          await fetch('/api/cargos/manual', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              alumno_id: state.personaId,
-              monto: insc.monto,
-              concepto: 'Inscripción',
-              origen: 'inscripcion',
-              nota_modificacion: insc.motivo ?? undefined,
-            }),
-          })
-        } catch {
-          // El alumno ya se creó; si el cargo de inscripción falla, se podrá
-          // registrar manualmente. No bloqueamos el cierre.
+  useEffect(() => {
+    if (state !== prevState.current) {
+      prevState.current = state
+      if (state.success && open) {
+        const run = async () => {
+          // Cargo de inscripción (con rastro de auditoría) tras crear al alumno.
+          const insc = pendingInscripcionRef.current
+          if (insc && state.personaId) {
+            try {
+              await fetch('/api/cargos/manual', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  alumno_id: state.personaId,
+                  monto: insc.monto,
+                  concepto: 'Inscripción',
+                  origen: 'inscripcion',
+                  nota_modificacion: insc.motivo ?? undefined,
+                }),
+              })
+            } catch {
+              // El alumno ya se creó; si el cargo de inscripción falla, se podrá
+              // registrar manualmente. No bloqueamos el cierre.
+            }
+          }
+          // Toast al guardar: alta + cargos iniciales generados (planes desde el
+          // server action; la inscripción se acaba de cobrar aquí).
+          const avisos = [state.message ?? 'Alumno inscrito con éxito.']
+          if (insc) avisos.push(`Se generó cargo Inscripción por $${Math.round(insc.monto)}.`)
+          showToast(avisos.join(' '), 4500)
+
+          pendingInscripcionRef.current = null
+
+          setOpen(false)
+          // reset
+          setNombre(''); setApellido(''); setTelefono('')
+          setGrupoId(defaultGrupoId ?? '')
+          setGrupoIds(new Set(defaultGrupoId ? [defaultGrupoId] : []))
+          setPlanIds(new Set())
+          setLocalError(null)
+          router.refresh()
         }
+        void run()
       }
-      // Toast al guardar: alta + cargos iniciales generados (planes desde el
-      // server action; la inscripción se acaba de cobrar aquí).
-      const avisos = [state.message ?? 'Alumno inscrito con éxito.']
-      if (insc) avisos.push(`Se generó cargo Inscripción por $${Math.round(insc.monto)}.`)
-      showToast(avisos.join(' '), 4500)
-
-      pendingInscripcionRef.current = null
-
-      setOpen(false)
-      // reset
-      setNombre(''); setApellido(''); setTelefono('')
-      setGrupoId(defaultGrupoId ?? '')
-      setGrupoIds(new Set(defaultGrupoId ? [defaultGrupoId] : []))
-      setPlanIds(new Set())
-      setLocalError(null)
-      router.refresh()
     }
-    void run()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.success])
+  }, [state, open, router, showToast, defaultGrupoId, setOpen])
 
   useEffect(() => {
     if (open && defaultGrupoId) {
-      setGrupoId(defaultGrupoId)
-      setGrupoIds((prev) => new Set(prev).add(defaultGrupoId))
+      setTimeout(() => {
+        setGrupoId(defaultGrupoId)
+        setGrupoIds((prev) => new Set(prev).add(defaultGrupoId))
+      }, 0)
     }
   }, [open, defaultGrupoId])
 

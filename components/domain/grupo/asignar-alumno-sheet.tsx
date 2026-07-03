@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
 import { asignarAlumnoAGrupoAction, type FormState } from '@/app/(app)/grupos/actions'
@@ -93,21 +93,29 @@ export function AsignarAlumnoSheet({
       .slice(0, 12)
   }, [alumnos, cleanQuery])
 
+  const prevState = useRef(state)
+
   // Reset al abrir
   useEffect(() => {
     if (open) {
-      setQuery('')
-      setAlumnoSel(null)
-      setMonto(String(montoSugerido))
+      prevState.current = state
+      setTimeout(() => {
+        setQuery('')
+        setAlumnoSel(null)
+        setMonto(String(montoSugerido))
+      }, 0)
     }
-  }, [open, montoSugerido])
+  }, [open, montoSugerido, state])
 
   // Cerrar al éxito (mismo patrón que el resto de drawers con server actions del codebase).
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- cierre tras commit del server action
-    if (state.success) onOpenChange(false)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.success])
+    if (state !== prevState.current) {
+      prevState.current = state
+      if (state.success && open) {
+        setTimeout(() => onOpenChange(false), 0)
+      }
+    }
+  }, [state, open, onOpenChange])
 
   const montoNum = Number(monto) || 0
 

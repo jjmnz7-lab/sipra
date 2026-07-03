@@ -60,8 +60,11 @@ type Props = {
   onOpenChange: (open: boolean) => void
 }
 
+import { useToast } from '@/components/ui/use-toast'
+
 export function EditarGrupoDrawer({ grupo, planes = [], open, onOpenChange }: Props) {
   const [state, formAction] = useActionState(editarGrupoAction, initialState)
+  const { showToast, toast } = useToast()
   const [colorSlug, setColorSlug] = useState<string>(grupo.color ?? COLORES_GRUPO[0].slug)
   const [emoji, setEmoji] = useState<string>(grupo.emoji || EMOJIS_GRUPO[0])
   const [nombre, setNombre] = useState<string>(grupo.nombre)
@@ -77,24 +80,35 @@ export function EditarGrupoDrawer({ grupo, planes = [], open, onOpenChange }: Pr
   // Resync cuando se abre el drawer (por si cambió el grupo entre aperturas).
   useEffect(() => {
     if (open) {
-      setColorSlug(grupo.color ?? COLORES_GRUPO[0].slug)
-      setEmoji(grupo.emoji || EMOJIS_GRUPO[0])
-      setNombre(grupo.nombre)
-      setPlanSugerido(grupo.plan_sugerido_id ?? NONE)
-      setDias(grupo.dias_semana ?? [])
-      setHoraInicio((grupo.hora_inicio ?? '').slice(0, 5))
-      setHoraFin((grupo.hora_fin ?? '').slice(0, 5))
-      setCupoIlimitado(grupo.cupo_maximo === null || grupo.cupo_maximo === undefined)
-      setCupoMaximo(grupo.cupo_maximo ?? 10)
+      setTimeout(() => {
+        setColorSlug(grupo.color ?? COLORES_GRUPO[0].slug)
+        setEmoji(grupo.emoji || EMOJIS_GRUPO[0])
+        setNombre(grupo.nombre)
+        setPlanSugerido(grupo.plan_sugerido_id ?? NONE)
+        setDias(grupo.dias_semana ?? [])
+        setHoraInicio((grupo.hora_inicio ?? '').slice(0, 5))
+        setHoraFin((grupo.hora_fin ?? '').slice(0, 5))
+        setCupoIlimitado(grupo.cupo_maximo === null || grupo.cupo_maximo === undefined)
+        setCupoMaximo(grupo.cupo_maximo ?? 10)
+      }, 0)
     }
   }, [open, grupo])
 
+  const prevState = React.useRef(state)
+
   useEffect(() => {
-    if (state.success) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- cierre tras commit del server action
-      onOpenChange(false)
+    if (open) prevState.current = state
+  }, [open, state])
+
+  useEffect(() => {
+    if (state !== prevState.current) {
+      prevState.current = state
+      if (state.success && open) {
+        showToast('Cambios guardados en grupo.')
+        setTimeout(() => onOpenChange(false), 0)
+      }
     }
-  }, [state.success, onOpenChange])
+  }, [state, open, onOpenChange, showToast])
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
@@ -251,6 +265,7 @@ export function EditarGrupoDrawer({ grupo, planes = [], open, onOpenChange }: Pr
           </form>
         </div>
       </DrawerContent>
+      {toast}
     </Drawer>
   )
 }

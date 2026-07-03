@@ -92,18 +92,27 @@ export function CargoMasivoWizard({ grupos, open, onOpenChange, cobros = [], onS
     }
   }
 
+  const prevState = useRef(state)
+
   useEffect(() => {
-    if (!state.success) return
-    const msg = state.message ?? 'Cargos generados con éxito.'
-    const finalMsg = cobroGuardadoConExito
-      ? `${msg} Y se guardó "${concepto.trim()}" en el catálogo.`
-      : msg
-    onSuccess?.(finalMsg)
-    setTimeout(() => {
-      onOpenChange(false)
-    }, 0)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.success, cobroGuardadoConExito])
+    if (open) prevState.current = state
+  }, [open, state])
+
+  useEffect(() => {
+    if (state !== prevState.current) {
+      prevState.current = state
+      if (state.success && open) {
+        const msg = state.message ?? 'Cargos generados con éxito.'
+        const finalMsg = cobroGuardadoConExito
+          ? `${msg} Y se guardó "${concepto.trim()}" en el catálogo.`
+          : msg
+        onSuccess?.(finalMsg)
+        setTimeout(() => {
+          onOpenChange(false)
+        }, 0)
+      }
+    }
+  }, [state, open, cobroGuardadoConExito, concepto, onOpenChange, onSuccess])
 
   const selectedGrupos = useMemo(
     () => selectedIds.map((id) => grupos.find((g) => g.id === id)).filter(Boolean) as GrupoCargoMasivo[],
