@@ -56,7 +56,7 @@ type Props = {
 export function EditarActividadDrawer({ actividad, open, onOpenChange, timezone = 'America/Mexico_City' }: Props) {
   const [state, formAction] = useActionState(editarActividadAction, initialState)
   const [nombre, setNombre] = useState(actividad.nombre)
-  const { showToast } = useToast()
+  const { showToast, toast } = useToast()
   const [emoji, setEmoji] = useState<string>(actividad.emoji ?? EMOJI_ACTIVIDAD_DEFAULT)
   const [dias, setDias] = useState<number[]>(actividad.dias_semana ?? [])
   const [horaInicio, setHoraInicio] = useState<string>((actividad.hora_inicio ?? '').slice(0, 5))
@@ -349,6 +349,7 @@ export function EditarActividadDrawer({ actividad, open, onOpenChange, timezone 
           </form>
         </div>
       </DrawerContent>
+      {toast}
     </Drawer>
   )
 }
