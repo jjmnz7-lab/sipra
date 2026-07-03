@@ -202,7 +202,7 @@ export function RegistrarPagoDrawer({
                   {/* Pastilla indicadora animada */}
                   <div
                     className={cn(
-                      "absolute w-[47%] h-[80%] bg-white dark:bg-zinc-900 rounded-lg shadow-sm transition-all duration-300 ease-in-out border",
+                      "absolute w-[47%] h-[80%] bg-white rounded-lg shadow-sm transition-all duration-300 ease-in-out border",
                       metodoPago === 'efectivo'
                         ? "left-1 border-[#22887c]"
                         : "left-[51.5%] border-primary"

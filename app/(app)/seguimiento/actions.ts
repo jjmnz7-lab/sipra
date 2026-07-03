@@ -276,8 +276,8 @@ export async function crearCargoYCobrarAction(prevState: FormState, formData: Fo
   const message = exento
     ? 'Alumno exento por beca: no se generó cargo.'
     : validated.data.cobrar
-      ? 'Cargo generado y cobrado.'
-      : 'Cargo generado con éxito.'
+      ? `Cargo generado y cobrado ${validated.data.metodo_pago === 'transferencia' ? 'por transferencia.' : 'en efectivo.'}`
+      : 'Cargo generado.'
   return { success: true, message }
 }
 

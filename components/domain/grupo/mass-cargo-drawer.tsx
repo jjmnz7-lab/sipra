@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { ArrowLeft, ArrowRight, Loader2, Banknote, GraduationCap } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Loader2, Banknote, GraduationCap, Users, Receipt } from 'lucide-react'
+import { formatCurrency } from '@/lib/utils/currency'
 import { normalizeWholeMoneyInput, preventMoneyWheel } from '@/lib/utils/money-input'
 import { ConceptoCombobox, GuardarCatalogoToggle, useCobroConcepto, type CobroFrecuente } from '@/components/ui/concepto-combobox'
 import { cn } from '@/lib/utils'
@@ -65,7 +66,7 @@ export function MassCargoDrawer({
   const setOpen = isControlled && onOpenChange ? onOpenChange : setUncontrolledOpen
   const [state, formAction, isPending] = useActionState(crearCargoGrupalAction, initialState)
 
-  // Flujo de 2 pasos: 0 = concepto + monto, 1 = selección de alumnos.
+  // Flujo de 3 pasos: 0 = concepto + monto, 1 = selección de alumnos, 2 = resumen.
   const [step, setStep] = useState(0)
   const [direction, setDirection] = useState<'forward' | 'back'>('forward')
 
@@ -126,8 +127,9 @@ export function MassCargoDrawer({
   const montoValido = Number(monto) > 0
   const puedeAvanzar = conceptoValido && montoValido
 
-  const goNext = () => { if (!puedeAvanzar) return; setDirection('forward'); setStep(1) }
-  const goBack = () => { setDirection('back'); setStep(0) }
+  const resumenStep = 2
+  const goNext = () => { if (!puedeAvanzar) return; setDirection('forward'); setStep((s) => Math.min(s + 1, resumenStep)) }
+  const goBack = () => { setDirection('back'); setStep((s) => Math.max(s - 1, 0)) }
 
   const handleGenerar = async () => {
     setCobroGuardadoConExito(false)
@@ -162,9 +164,13 @@ export function MassCargoDrawer({
       <DrawerContent>
         <div className="mx-auto w-full max-w-sm">
           <DrawerHeader className="text-left">
-            <DrawerTitle>{titulo}</DrawerTitle>
+            <DrawerTitle>{step === 0 ? titulo : step === 1 ? 'Selecciona alumnos' : 'Resumen'}</DrawerTitle>
             <DrawerDescription>
-              {step === 0 ? 'Define el concepto y el monto del cargo.' : 'Desmarca a quien no deba recibir el cargo.'}
+              {step === 0
+                ? 'Define el concepto y el monto del cargo.'
+                : step === 1
+                  ? 'Desmarca a quien no deba recibir el cargo.'
+                  : 'Revisa antes de generar los cargos.'}
             </DrawerDescription>
           </DrawerHeader>
 
@@ -208,7 +214,7 @@ export function MassCargoDrawer({
                         onWheel={preventMoneyWheel}
                         onChange={(e) => setMonto(normalizeWholeMoneyInput(e.target.value))}
                         placeholder="0"
-                        className="h-11"
+                        className="h-11 bg-white text-zinc-900 border-zinc-200 placeholder:text-zinc-400 focus-visible:ring-ring"
                       />
                     </div>
                   )}
@@ -220,9 +226,9 @@ export function MassCargoDrawer({
                 </div>
               )}
 
-              {/* Paso 1: selección de alumnos + opt-in de becas */}
+              {/* Paso 1: selección de alumnos */}
               {step === 1 && (
-                <div className="space-y-4 pb-2">
+                <div className="space-y-4 pb-2 animate-in fade-in duration-200">
                   <div>
                     <Label className="mb-2 block">Aplicar a ({selectedIds.length}/{allIds.length})</Label>
                     <div className="space-y-2">
@@ -244,6 +250,29 @@ export function MassCargoDrawer({
                       {inscripciones.length === 0 && (
                         <p className="text-sm text-muted-foreground py-6 text-center">Este grupo no tiene alumnos activos.</p>
                       )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Paso 2: Resumen */}
+              {step === 2 && (
+                <div className="space-y-4 pb-2 animate-in fade-in duration-200">
+                  <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-1">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-sm font-semibold text-foreground truncate">{concepto || '—'}</span>
+                      <span className="text-sm font-bold text-foreground tabular-nums flex-shrink-0">
+                        {formatCurrency(Number(monto || '0'))}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium text-foreground">Total a aplicar</span>
+                      <span className="text-base font-bold text-primary tabular-nums">
+                        {selectedIds.length} {selectedIds.length === 1 ? 'cargo' : 'cargos'}
+                      </span>
                     </div>
                   </div>
 
@@ -282,13 +311,28 @@ export function MassCargoDrawer({
           </div>
 
           <DrawerFooter className="mt-2">
-            {step === 0 ? (
-              <Button type="button" className="w-full h-11" onClick={goNext} disabled={!puedeAvanzar}>
-                Siguiente
-                <ArrowRight className="ml-1 h-4 w-4" />
-              </Button>
+            {step < resumenStep ? (
+              <div className="flex gap-2 w-full">
+                {step > 0 ? (
+                  <>
+                    <Button type="button" variant="outline" className="h-11" style={{ flex: '0 0 30%' }} onClick={goBack}>
+                      <ArrowLeft className="mr-1 h-4 w-4" />
+                      Atrás
+                    </Button>
+                    <Button type="button" className="h-11" style={{ flex: '0 0 70%' }} onClick={goNext} disabled={!puedeAvanzar}>
+                      Siguiente
+                      <ArrowRight className="ml-1 h-4 w-4" />
+                    </Button>
+                  </>
+                ) : (
+                  <Button type="button" className="w-full h-11" onClick={goNext} disabled={!puedeAvanzar}>
+                    Siguiente
+                    <ArrowRight className="ml-1 h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             ) : (
-              <div className="flex gap-2">
+              <div className="flex gap-2 w-full">
                 <Button type="button" variant="outline" className="h-11" style={{ flex: '0 0 30%' }} onClick={goBack}>
                   <ArrowLeft className="mr-1 h-4 w-4" />
                   Atrás
@@ -303,10 +347,13 @@ export function MassCargoDrawer({
                   {isPending ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Procesando cargos…
+                      Generando cargos…
                     </>
                   ) : (
-                    'Generar cargos'
+                    <>
+                      <IconoCargoGrupal className="mr-2" />
+                      Generar cargos
+                    </>
                   )}
                 </Button>
               </div>
@@ -315,5 +362,14 @@ export function MassCargoDrawer({
         </div>
       </DrawerContent>
     </Drawer>
+  )
+}
+
+function IconoCargoGrupal({ className }: { className?: string }) {
+  return (
+    <span className={cn('relative inline-flex items-center justify-center', className)}>
+      <Users className="h-4 w-4" />
+      <Receipt className="absolute -bottom-1 -right-1.5 h-2.5 w-2.5 bg-primary text-primary-foreground rounded-sm p-[1px]" />
+    </span>
   )
 }

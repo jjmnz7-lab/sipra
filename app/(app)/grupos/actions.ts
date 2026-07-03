@@ -481,7 +481,7 @@ export async function crearCargoGrupalAction(prevState: FormState, formData: For
      return { success: true, message: 'El cargo ya había sido procesado (Idempotencia).' }
   }
 
-  return { success: true, message: `Se generaron ${data?.cargos_creados || 0} cargos masivos con éxito.` }
+  return { success: true, message: `Se generaron ${data?.cargos_creados || 0} cargos.` }
 }
 
 // ── Cargo masivo multi-grupo ─────────────────────────────────────────────────

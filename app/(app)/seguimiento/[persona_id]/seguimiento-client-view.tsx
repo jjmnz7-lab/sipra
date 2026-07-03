@@ -334,6 +334,7 @@ export function SeguimientoClientView({
 
         <CrearCargoIndividualDrawer
           personaId={persona.id}
+          personaNombre={`${persona.nombre} ${persona.apellido ?? ''}`.trim()}
           open={isCargoOpen}
           onOpenChange={setIsCargoOpen}
           origen="manual"

@@ -83,7 +83,10 @@ export function FabOperativo({
       color: '#15435a',
       titulo: 'Cargo individual',
       desc: 'Asigna un cargo adicional a un alumno.',
-      onClick: () => setStep('cargo'),
+      onClick: () => {
+        setSheetOpen(false)
+        setCargoOpen(true)
+      },
     },
     {
       key: 'masivo' as const,
@@ -201,16 +204,21 @@ export function FabOperativo({
         />
       )}
 
-      {cargoSel && (
-        <CrearCargoIndividualDrawer
-          open={cargoOpen}
-          onOpenChange={setCargoOpen}
-          personaId={cargoSel.id}
-          tituloDrawer={`Nuevo cargo • ${cargoSel.nombre} ${cargoSel.apellido ?? ''}`.trim()}
-          cobros={cobros}
-          onSuccess={showToast}
-        />
-      )}
+      <CrearCargoIndividualDrawer
+        open={cargoOpen}
+        onOpenChange={(open) => {
+          setCargoOpen(open)
+          if (!open) {
+            setCargoSel(null)
+          }
+        }}
+        personaId={cargoSel?.id}
+        personaNombre={cargoSel ? `${cargoSel.nombre} ${cargoSel.apellido ?? ''}`.trim() : undefined}
+        tituloDrawer={cargoSel ? `Nuevo cargo • ${cargoSel.nombre} ${cargoSel.apellido ?? ''}`.trim() : 'Nuevo cargo'}
+        alumnos={alumnos}
+        cobros={cobros}
+        onSuccess={showToast}
+      />
 
       <CargoMasivoWizard
         open={masivoOpen}

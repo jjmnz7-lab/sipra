@@ -73,7 +73,6 @@ export function CargoMasivoWizard({ grupos, open, onOpenChange, cobros = [], onS
   const [duplicar, setDuplicar] = useState(false)
   const [aplicarBecas, setAplicarBecas] = useState(false)
   const [loteId, setLoteId] = useState('')
-  const [showConfirmation, setShowConfirmation] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
 
   // Reset completo en cada apertura.
@@ -560,43 +559,34 @@ export function CargoMasivoWizard({ grupos, open, onOpenChange, cobros = [], onS
               </div>
             ) : (
               <div className="space-y-3">
-                {/* Nota de confirmación inline */}
-                {showConfirmation && (
-                  <div className="rounded-lg border border-primary bg-white dark:bg-background px-3 py-2.5 text-xs text-primary text-center animate-in fade-in slide-in-from-bottom-2 duration-150">
-                    <p className="font-semibold">¿Confirmar generación de cargos?</p>
-                  </div>
-                )}
                 <div className="flex gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     className="h-11"
                     style={{ flex: '0 0 30%' }}
-                    onClick={showConfirmation ? () => setShowConfirmation(false) : goBack}
+                    onClick={goBack}
                   >
                     <ArrowLeft className="mr-1 h-4 w-4" />
-                    {showConfirmation ? 'Cancelar' : 'Atrás'}
+                    Atrás
                   </Button>
                   <Button
                     type="button"
                     className="h-11"
                     style={{ flex: '0 0 70%' }}
                     disabled={isPending || totalCargos === 0}
-                    onClick={showConfirmation
-                      ? async () => {
-                          setCobroGuardadoConExito(false)
-                          if (debeGuardarEnCatalogo) {
-                            try {
-                              const res = await guardarCobroFrecuenteAction({ id: null, concepto: concepto.trim(), monto: Number(monto || '0') })
-                              if (res.success) {
-                                setCobroGuardadoConExito(true)
-                              }
-                            } catch { /* el cargo no se bloquea si falla guardar en catálogo */ }
+                    onClick={async () => {
+                      setCobroGuardadoConExito(false)
+                      if (debeGuardarEnCatalogo) {
+                        try {
+                          const res = await guardarCobroFrecuenteAction({ id: null, concepto: concepto.trim(), monto: Number(monto || '0') })
+                          if (res.success) {
+                            setCobroGuardadoConExito(true)
                           }
-                          formRef.current?.requestSubmit()
-                        }
-                      : () => setShowConfirmation(true)
-                    }
+                        } catch { /* el cargo no se bloquea si falla guardar en catálogo */ }
+                      }
+                      formRef.current?.requestSubmit()
+                    }}
                   >
                     {isPending ? (
                       <>
@@ -606,7 +596,7 @@ export function CargoMasivoWizard({ grupos, open, onOpenChange, cobros = [], onS
                     ) : (
                       <>
                         <IconoCargoMasivo className="mr-2" />
-                        {showConfirmation ? 'Confirmar' : 'Generar cargos'}
+                        Generar cargos
                       </>
                     )}
                   </Button>
