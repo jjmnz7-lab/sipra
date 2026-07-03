@@ -194,7 +194,7 @@ export function ReportesClientView({
                   {/* Hoy */}
                   <div className="space-y-1">
                     <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Hoy</span>
-                    <span className="block text-lg font-extrabold text-foreground tabular-nums leading-none">
+                    <span className="block text-2xl font-bold text-foreground tabular-nums leading-none">
                       {formatCurrency(cobradoMes.hoyTotal)}
                     </span>
                     {cobradoMes.hoyMetodos.length > 0 && (
@@ -209,7 +209,7 @@ export function ReportesClientView({
                   {/* Este mes */}
                   <div className="space-y-1 border-l border-border/40 pl-4">
                     <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Este mes ({cobradoMes.mesLabel.toLowerCase()})</span>
-                    <span className="block text-lg font-extrabold text-foreground tabular-nums leading-none">
+                    <span className="block text-2xl font-bold text-foreground tabular-nums leading-none">
                       {formatCurrency(cobradoMes.total)}
                     </span>
                     {cobradoMes.metodos.length > 0 && (
