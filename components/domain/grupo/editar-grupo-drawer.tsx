@@ -105,11 +105,11 @@ export function EditarGrupoDrawer({ grupo, planes = [], open, onOpenChange }: Pr
     if (state !== prevState.current) {
       prevState.current = state
       if (state.success && open) {
-        showToast('Cambios guardados en grupo.')
+        showToast(`Cambios guardados en ${nombre}.`)
         setTimeout(() => onOpenChange(false), 0)
       }
     }
-  }, [state, open, onOpenChange, showToast])
+  }, [state, open, nombre, onOpenChange, showToast])
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>

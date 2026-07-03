@@ -88,7 +88,7 @@ export function CrearActividadDrawer({ timezone = 'America/Mexico_City' }: Crear
     if (state !== prevState.current) {
       prevState.current = state
       if (state.success && open) {
-        showToast(`Actividad ${nombre} creada.`)
+        showToast(`${nombre} creada.`)
         setTimeout(() => setOpen(false), 0)
       }
     }

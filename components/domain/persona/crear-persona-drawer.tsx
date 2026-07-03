@@ -295,7 +295,8 @@ export function CrearPersonaDrawer({
           }
           // Toast al guardar: alta + cargos iniciales generados (planes desde el
           // server action; la inscripción se acaba de cobrar aquí).
-          const avisos = [state.message ?? 'Alumno inscrito con éxito.']
+          const nombreCompleto = `${nombre} ${apellido}`.trim()
+          const avisos = [`${nombreCompleto} agregado correctamente.`]
           if (insc) avisos.push(`Se generó cargo Inscripción por $${Math.round(insc.monto)}.`)
           showToast(avisos.join(' '), 4500)
 
@@ -313,7 +314,7 @@ export function CrearPersonaDrawer({
         void run()
       }
     }
-  }, [state, open, router, showToast, defaultGrupoId, setOpen])
+  }, [state, open, router, showToast, defaultGrupoId, setOpen, nombre, apellido])
 
   useEffect(() => {
     if (open && defaultGrupoId) {

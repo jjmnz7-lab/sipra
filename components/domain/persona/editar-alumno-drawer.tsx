@@ -243,11 +243,12 @@ export function EditarAlumnoDrawer({
       if (state.success && open) {
         // El mensaje puede incluir el aviso de la mensualidad generada al
         // asignar un esquema (ver generar_mensualidad_esquema_v1).
-        showToast(state.message ?? 'Alumno actualizado.', 4000)
+        const nombreCompleto = `${nombre} ${apellido}`.trim()
+        showToast(`Cambios guardados en ${nombreCompleto}.`, 4000)
         onOpenChange(false)
       }
     }
-  }, [state, open, onOpenChange, showToast])
+  }, [state, open, onOpenChange, showToast, nombre, apellido])
 
   const toggle = (set: Set<string>, setter: (s: Set<string>) => void, id: string) => {
     const next = new Set(set)

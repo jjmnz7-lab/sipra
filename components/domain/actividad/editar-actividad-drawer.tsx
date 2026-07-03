@@ -11,6 +11,7 @@ import { Loader2, Pencil, CheckCircle2 } from 'lucide-react'
 import { EMOJI_ACTIVIDAD_DEFAULT } from '@/lib/constants/actividad-apariencia'
 import { AparienciaActividadFields } from './apariencia-actividad-fields'
 import { LogisticaGrupoFields } from '@/components/domain/grupo/logistica-grupo-fields'
+import { useToast } from '@/hooks/use-toast'
 import { normalizeWholeMoneyInput, preventMoneyWheel } from '@/lib/utils/money-input'
 import {
   Drawer,
@@ -54,7 +55,8 @@ type Props = {
 
 export function EditarActividadDrawer({ actividad, open, onOpenChange, timezone = 'America/Mexico_City' }: Props) {
   const [state, formAction] = useActionState(editarActividadAction, initialState)
-  const [nombre, setNombre] = useState<string>(actividad.nombre)
+  const [nombre, setNombre] = useState(actividad.nombre)
+  const { toast: showToast } = useToast()
   const [emoji, setEmoji] = useState<string>(actividad.emoji ?? EMOJI_ACTIVIDAD_DEFAULT)
   const [dias, setDias] = useState<number[]>(actividad.dias_semana ?? [])
   const [horaInicio, setHoraInicio] = useState<string>((actividad.hora_inicio ?? '').slice(0, 5))
@@ -77,26 +79,38 @@ export function EditarActividadDrawer({ actividad, open, onOpenChange, timezone 
   // Resync cuando se abre el drawer (por si cambió la actividad entre aperturas).
   useEffect(() => {
     if (open) {
-      setNombre(actividad.nombre)
-      setEmoji(actividad.emoji ?? EMOJI_ACTIVIDAD_DEFAULT)
-      setDias(actividad.dias_semana ?? [])
-      setHoraInicio((actividad.hora_inicio ?? '').slice(0, 5))
-      setHoraFin((actividad.hora_fin ?? '').slice(0, 5))
-      setCupoIlimitado(actividad.cupo_maximo === null || actividad.cupo_maximo === undefined)
-      setCupoMaximo(actividad.cupo_maximo ?? 10)
-      setUnSoloDia(!!actividad.fecha_inicio && actividad.fecha_inicio === actividad.fecha_fin)
-      setFechaInicio(actividad.fecha_inicio ?? '')
-      setFechaFin(actividad.fecha_fin ?? '')
-      setCosto(actividad.costo_actividad != null ? String(actividad.costo_actividad) : '')
+      setTimeout(() => {
+        setNombre(actividad.nombre)
+        setEmoji(actividad.emoji ?? EMOJI_ACTIVIDAD_DEFAULT)
+        setDias(actividad.dias_semana ?? [])
+        setHoraInicio((actividad.hora_inicio ?? '').slice(0, 5))
+        setHoraFin((actividad.hora_fin ?? '').slice(0, 5))
+        setCupoIlimitado(actividad.cupo_maximo === null || actividad.cupo_maximo === undefined)
+        setCupoMaximo(actividad.cupo_maximo ?? 10)
+        setUnSoloDia(!!actividad.fecha_inicio && actividad.fecha_inicio === actividad.fecha_fin)
+        setFechaInicio(actividad.fecha_inicio ?? '')
+        setFechaFin(actividad.fecha_fin ?? '')
+        setCosto(actividad.costo_actividad != null ? String(actividad.costo_actividad) : '')
+      }, 0)
     }
   }, [open, actividad])
 
+  const prevState = React.useRef(state)
+
   useEffect(() => {
-    if (state.success) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- cierre tras commit del server action
-      onOpenChange(false)
+    if (open) prevState.current = state
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  useEffect(() => {
+    if (state !== prevState.current) {
+      prevState.current = state
+      if (state.success && open) {
+        showToast(`Cambios guardados en ${nombre}.`)
+        setTimeout(() => onOpenChange(false), 0)
+      }
     }
-  }, [state.success, onOpenChange])
+  }, [state, open, nombre, showToast, onOpenChange])
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>

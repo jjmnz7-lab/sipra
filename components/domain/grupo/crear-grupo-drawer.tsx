@@ -92,7 +92,7 @@ export function CrearGrupoDrawer({ planes = [] }: CrearGrupoDrawerProps) {
     if (state !== prevState.current) {
       prevState.current = state
       if (state.success && open) {
-        showToast(`Grupo ${nombre} creado.`)
+        showToast(`${nombre} creado.`)
         setTimeout(() => setOpen(false), 0)
       }
     }
