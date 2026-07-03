@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2, Banknote, Landmark, CheckCircle2 } from 'lucide-react'
 import { parseWholeMoneyInput, preventMoneyWheel } from '@/lib/utils/money-input'
+import { cn } from '@/lib/utils'
 import {
   Drawer,
   DrawerClose,
@@ -80,6 +81,7 @@ export function RegistrarPagoDrawer({
   const [state, formAction] = useActionState(registrarPagoAction, initialState)
   const [idempotencyKey, setIdempotencyKey] = useState('')
   const [monto, setMonto] = useState<number | ''>(adeudo > 0 ? Math.round(adeudo) : '')
+  const [metodoPago, setMetodoPago] = useState<'efectivo' | 'transferencia'>('efectivo')
 
   const montoNumerico = typeof monto === 'number' ? monto : 0
   const esCobroLibre = adeudo <= 0                       // sin deuda → anticipo puro
@@ -97,8 +99,11 @@ export function RegistrarPagoDrawer({
   // Reset al abrir: nuevo idempotency key + monto = adeudo actual (vacío si no hay deuda)
   useEffect(() => {
     if (open) {
-      setIdempotencyKey(crypto.randomUUID())
-      setMonto(adeudo > 0 ? Math.round(adeudo) : '')
+      setTimeout(() => {
+        setIdempotencyKey(crypto.randomUUID())
+        setMonto(adeudo > 0 ? Math.round(adeudo) : '')
+        setMetodoPago('efectivo')
+      }, 0)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -192,23 +197,47 @@ export function RegistrarPagoDrawer({
 
               <div className="space-y-3">
                 <Label className="text-xs font-semibold text-muted-foreground tracking-wider">Método de pago</Label>
-                <div className="grid grid-cols-2 gap-3">
-                  <Label
-                    htmlFor="efectivo"
-                    className="flex flex-col items-center justify-center h-16 px-2 border border-border rounded-xl cursor-pointer hover:bg-accent transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5 has-[:checked]:text-primary text-muted-foreground"
+                <input type="hidden" name="metodo_pago" value={metodoPago} />
+                <div className="grid grid-cols-2 p-1 bg-muted/60 dark:bg-muted/30 rounded-xl border border-border/40 select-none relative w-full h-12 items-center">
+                  {/* Pastilla indicadora animada */}
+                  <div
+                    className={cn(
+                      "absolute w-[47%] h-[80%] bg-white dark:bg-zinc-900 rounded-lg shadow-sm transition-all duration-300 ease-in-out border",
+                      metodoPago === 'efectivo'
+                        ? "left-1 border-[#22887c]"
+                        : "left-[51.5%] border-primary"
+                    )}
+                  />
+
+                  {/* Opción Efectivo */}
+                  <button
+                    type="button"
+                    onClick={() => setMetodoPago('efectivo')}
+                    className={cn(
+                      "flex-1 h-9 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all z-10",
+                      metodoPago === 'efectivo'
+                        ? "text-[#22887c]"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
                   >
-                    <input type="radio" name="metodo_pago" value="efectivo" id="efectivo" className="sr-only" defaultChecked />
-                    <Banknote className="h-6 w-6 mb-1" />
-                    <span className="text-sm font-medium">Efectivo</span>
-                  </Label>
-                  <Label
-                    htmlFor="transferencia"
-                    className="flex flex-col items-center justify-center h-16 px-2 border border-border rounded-xl cursor-pointer hover:bg-accent transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5 has-[:checked]:text-primary text-muted-foreground"
+                    <Banknote className="h-4.5 w-4.5" />
+                    <span>Efectivo</span>
+                  </button>
+
+                  {/* Opción Transferencia */}
+                  <button
+                    type="button"
+                    onClick={() => setMetodoPago('transferencia')}
+                    className={cn(
+                      "flex-1 h-9 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all z-10",
+                      metodoPago === 'transferencia'
+                        ? "text-primary"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
                   >
-                    <input type="radio" name="metodo_pago" value="transferencia" id="transferencia" className="sr-only" />
-                    <Landmark className="h-6 w-6 mb-1" />
-                    <span className="text-sm font-medium">Transferencia</span>
-                  </Label>
+                    <Landmark className="h-4.5 w-4.5" />
+                    <span>Transferencia</span>
+                  </button>
                 </div>
                 {state?.errors?.metodo_pago && <p className="text-sm text-destructive">{state.errors.metodo_pago[0]}</p>}
               </div>
