@@ -251,6 +251,54 @@ export function ReportesClientView({
           </Card>
         </section>
 
+        {/* Control de cargos grupales */}
+        <section className="space-y-3">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Control de cargos grupales/masivos</CardTitle>
+              <CardAction>
+                <button
+                  type="button"
+                  onClick={cycleSortLotes}
+                  title={`Orden: ${sortLotesMeta.full} (toca para cambiar)`}
+                  aria-label={`Ordenar lotes. Actual: ${sortLotesMeta.full}`}
+                  className="flex items-center justify-center gap-1 rounded-lg h-8 w-11 sm:w-auto sm:px-2 border border-border bg-card shadow-sm hover:bg-accent active:scale-95 transition-all"
+                >
+                  <SortLotesIcon className="h-4 w-4 text-[#15435a]" />
+                  <span className="hidden sm:inline text-[10px] font-bold text-foreground">{sortLotesMeta.label}</span>
+                </button>
+              </CardAction>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {lotesVisibles.length > 0 ? (
+                lotesVisibles.map((lote) => <LoteRow key={lote.clave} lote={lote} />)
+              ) : (
+                <div className="text-center py-8 px-4">
+                  <p className="text-sm text-muted-foreground">
+                    {lotes.length === 0
+                      ? 'Aún no hay cargos grupales generados. Aquí verás el avance de cobranza de mensualidades, cargos a grupos e inscripciones a actividades.'
+                      : 'No hay cargos activos en este momento. Activa "Mostrar archivados" para ver los anteriores.'}
+                  </p>
+                </div>
+              )}
+
+              {/* Toggle de archivados */}
+              <div className="pt-2 border-t border-border flex items-center justify-between">
+                <label className="flex items-center gap-2 py-1 cursor-pointer select-none">
+                  <Checkbox
+                    checked={mostrarArchivados}
+                    onCheckedChange={(checked) => setMostrarArchivados(checked === true)}
+                  />
+                  <span className="text-xs font-medium text-muted-foreground">Mostrar archivados</span>
+                </label>
+                <span className="text-[10px] text-muted-foreground/70 tabular-nums">
+                  {archivadosCount} {archivadosCount === 1 ? 'archivado' : 'archivados'}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
         {/* Estado financiero de alumnos */}
         <section className="space-y-3">
           <Card>
@@ -332,54 +380,6 @@ export function ReportesClientView({
                     ))}
                   </ul>
                 )}
-              </div>
-            </CardContent>
-          </Card>
-        </section>
-
-        {/* Control de cargos grupales */}
-        <section className="space-y-3">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Control de cargos grupales/masivos</CardTitle>
-              <CardAction>
-                <button
-                  type="button"
-                  onClick={cycleSortLotes}
-                  title={`Orden: ${sortLotesMeta.full} (toca para cambiar)`}
-                  aria-label={`Ordenar lotes. Actual: ${sortLotesMeta.full}`}
-                  className="flex items-center justify-center gap-1 rounded-lg h-8 w-11 sm:w-auto sm:px-2 border border-border bg-card shadow-sm hover:bg-accent active:scale-95 transition-all"
-                >
-                  <SortLotesIcon className="h-4 w-4 text-[#15435a]" />
-                  <span className="hidden sm:inline text-[10px] font-bold text-foreground">{sortLotesMeta.label}</span>
-                </button>
-              </CardAction>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {lotesVisibles.length > 0 ? (
-                lotesVisibles.map((lote) => <LoteRow key={lote.clave} lote={lote} />)
-              ) : (
-                <div className="text-center py-8 px-4">
-                  <p className="text-sm text-muted-foreground">
-                    {lotes.length === 0
-                      ? 'Aún no hay cargos grupales generados. Aquí verás el avance de cobranza de mensualidades, cargos a grupos e inscripciones a actividades.'
-                      : 'No hay cargos activos en este momento. Activa "Mostrar archivados" para ver los anteriores.'}
-                  </p>
-                </div>
-              )}
-
-              {/* Toggle de archivados */}
-              <div className="pt-2 border-t border-border flex items-center justify-between">
-                <label className="flex items-center gap-2 py-1 cursor-pointer select-none">
-                  <Checkbox
-                    checked={mostrarArchivados}
-                    onCheckedChange={(checked) => setMostrarArchivados(checked === true)}
-                  />
-                  <span className="text-xs font-medium text-muted-foreground">Mostrar archivados</span>
-                </label>
-                <span className="text-[10px] text-muted-foreground/70 tabular-nums">
-                  {archivadosCount} {archivadosCount === 1 ? 'archivado' : 'archivados'}
-                </span>
               </div>
             </CardContent>
           </Card>
