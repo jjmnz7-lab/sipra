@@ -22,8 +22,6 @@ import {
   buildWhatsAppShareUrl,
 } from '@/lib/utils/whatsapp'
 import { formatCurrency } from '@/lib/utils/currency'
-import { FaltaTelefonoAlert } from '@/components/domain/persona/falta-telefono-alert'
-import { cn } from '@/lib/utils'
 
 type ConfirmarPagoArgs = {
   personaId: string
@@ -51,7 +49,6 @@ export function PagoConfirmacionProvider({ children }: { children: React.ReactNo
   const [info, setInfo] = useState<{ alumno: string; monto: number; fecha: string } | null>(null)
   const [datos, setDatos] = useState<DatosCompartir | null>(null)
   const [cargando, setCargando] = useState(false)
-  const [noTelefonoAlertOpen, setNoTelefonoAlertOpen] = useState(false)
 
   const confirmar = useCallback((args: ConfirmarPagoArgs) => {
     setInfo({
@@ -83,15 +80,6 @@ export function PagoConfirmacionProvider({ children }: { children: React.ReactNo
 
   const hasPhone = !!datos?.telefono
 
-  const handleButtonClick = () => {
-    if (!datos) return
-    if (!hasPhone) {
-      setNoTelefonoAlertOpen(true)
-      return
-    }
-    notificar()
-  }
-
   return (
     <PagoConfirmacionContext.Provider value={confirmar}>
       {children}
@@ -118,14 +106,9 @@ export function PagoConfirmacionProvider({ children }: { children: React.ReactNo
 
             <DrawerFooter>
               <Button
-                onClick={handleButtonClick}
-                disabled={cargando || !datos}
-                className={cn(
-                  "w-full h-12 text-base font-bold transition-all",
-                  (!hasPhone && datos)
-                    ? "bg-slate-300 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-pointer opacity-70 hover:bg-slate-300"
-                    : "bg-[#22887c] hover:bg-[#1a6b62] text-white"
-                )}
+                onClick={notificar}
+                disabled={cargando || !datos || !hasPhone}
+                className="w-full h-12 text-base font-bold bg-[#22887c] hover:bg-[#1a6b62]"
               >
                 {cargando ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -134,27 +117,32 @@ export function PagoConfirmacionProvider({ children }: { children: React.ReactNo
                 )}
                 Notificar por WhatsApp
               </Button>
+
+              {!hasPhone && datos && (
+                <div className="text-center mt-2 space-y-1">
+                  <p className="text-xs text-red-500 font-medium">
+                    El alumno NO tiene registrado un número de teléfono/Whatsapp
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpen(false)
+                      router.push(`/seguimiento/${datos.id}?edit=telefono`)
+                    }}
+                    className="text-xs text-[#22887c] hover:text-[#1a6b62] underline font-semibold transition-colors cursor-pointer"
+                  >
+                    Registrar número ahora
+                  </button>
+                </div>
+              )}
+
               <DrawerClose asChild>
-                <Button variant="ghost" className="h-11 text-muted-foreground">Cerrar</Button>
+                <Button variant="ghost" className="h-11 text-muted-foreground w-full">Cerrar</Button>
               </DrawerClose>
             </DrawerFooter>
           </div>
         </DrawerContent>
       </Drawer>
-
-      {datos && (
-        <FaltaTelefonoAlert
-          open={noTelefonoAlertOpen}
-          onOpenChange={setNoTelefonoAlertOpen}
-          nombreAlumno={info?.alumno ?? ''}
-          onRegistrarClick={() => {
-            setOpen(false)
-            if (datos?.id) {
-              router.push(`/seguimiento/${datos.id}`)
-            }
-          }}
-        />
-      )}
     </PagoConfirmacionContext.Provider>
   )
 }

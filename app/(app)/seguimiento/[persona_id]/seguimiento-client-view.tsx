@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { PageSubheader } from '@/components/layout/page-subheader'
 import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils/currency'
@@ -79,7 +79,9 @@ export function SeguimientoClientView({
   currentPlanIds?: string[]
 }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [isExiting, setIsExiting] = useState(false)
+
 
   const [isPagoOpen, setIsPagoOpen] = useState(false)
   const [isRecordatorioOpen, setIsRecordatorioOpen] = useState(false)
@@ -92,6 +94,19 @@ export function SeguimientoClientView({
   const [isEditarOpen, setIsEditarOpen] = useState(false)
   const [isAlertOpen, setIsAlertOpen] = useState(false)
   const [editFocus, setEditFocus] = useState<'telefono' | null>(null)
+
+  useEffect(() => {
+    const edit = searchParams.get('edit')
+    if (edit === 'telefono') {
+      setTimeout(() => {
+        setEditFocus('telefono')
+        setIsEditarOpen(true)
+      }, 0)
+      const url = new URL(window.location.href)
+      url.searchParams.delete('edit')
+      window.history.replaceState({}, '', url.pathname + url.search)
+    }
+  }, [searchParams])
 
   const [groupsExpanded, setGroupsExpanded] = useState(false)
   const [plansExpanded, setPlansExpanded] = useState(false)
