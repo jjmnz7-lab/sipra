@@ -49,7 +49,7 @@ export function descuentoEspecialBadge(
 type CargoLite = {
   concepto: string | null
   estado_financiero?: string | null
-  fecha_vencimiento: string | null
+  fecha_vencimiento: string | null | undefined
 }
 
 /**
