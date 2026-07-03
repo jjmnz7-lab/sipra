@@ -59,15 +59,26 @@ export function AnularCargoDrawer({ open, onOpenChange, cargos }: Props) {
   const cargosAnulables = cargos.filter(c => c.estado_financiero !== 'liquidado' && c.estado_financiero !== 'anulado')
   const cargoSeleccionado = cargosAnulables.find(c => c.id === selectedId)
 
-  useEffect(() => {
-    if (state.success) {
-      onOpenChange(false)
-      setSelectedId('')
-    }
-  }, [state.success, onOpenChange])
+  const prevState = React.useRef(state)
 
   useEffect(() => {
-    if (!open) setSelectedId('')
+    if (open) prevState.current = state
+  }, [open, state])
+
+  useEffect(() => {
+    if (state !== prevState.current) {
+      prevState.current = state
+      if (state.success && open) {
+        onOpenChange(false)
+        setTimeout(() => setSelectedId(''), 0)
+      }
+    }
+  }, [state, open, onOpenChange])
+
+  useEffect(() => {
+    if (!open) {
+      setTimeout(() => setSelectedId(''), 0)
+    }
   }, [open])
 
   return (

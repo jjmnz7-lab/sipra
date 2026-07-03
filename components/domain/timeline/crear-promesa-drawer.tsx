@@ -50,11 +50,20 @@ export function CrearPromesaDrawer({
 
   const [state, formAction] = useActionState(crearPromesaAction, initialState)
 
+  const prevState = React.useRef(state)
+
   useEffect(() => {
-    if (state.success) {
-      setOpen(false)
+    if (open) prevState.current = state
+  }, [open, state])
+
+  useEffect(() => {
+    if (state !== prevState.current) {
+      prevState.current = state
+      if (state.success && open) {
+        setOpen(false)
+      }
     }
-  }, [state.success])
+  }, [state, open, setOpen])
 
   // Obtener fecha de hoy en formato YYYY-MM-DD para el min del input date
   const hoy = new Date().toISOString().split('T')[0]

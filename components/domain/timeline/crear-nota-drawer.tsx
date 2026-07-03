@@ -49,11 +49,20 @@ export function CrearNotaDrawer({
 
   const [state, formAction] = useActionState(crearNotaAction, initialState)
 
+  const prevState = React.useRef(state)
+
   useEffect(() => {
-    if (state.success) {
-      setOpen(false)
+    if (open) prevState.current = state
+  }, [open, state])
+
+  useEffect(() => {
+    if (state !== prevState.current) {
+      prevState.current = state
+      if (state.success && open) {
+        setOpen(false)
+      }
     }
-  }, [state.success])
+  }, [state, open, setOpen])
 
   return (
     <Drawer open={open} onOpenChange={setOpen}>

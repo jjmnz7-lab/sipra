@@ -68,10 +68,10 @@ export function CrearCargoIndividualDrawer({
   const [internalOpen, setInternalOpen] = useState(false)
   const isControlled = openProp !== undefined
   const open = isControlled ? openProp : internalOpen
-  const setOpen = (v: boolean) => {
+  const setOpen = React.useCallback((v: boolean) => {
     if (isControlled) onOpenChange?.(v)
     else setInternalOpen(v)
-  }
+  }, [isControlled, onOpenChange])
 
   const tieneBeca = !!becaActiva && (becaPorcentaje ?? 0) > 0
   const [aplicarBeca, setAplicarBeca] = useState(false)
@@ -124,19 +124,27 @@ export function CrearCargoIndividualDrawer({
     return base.slice(0, 40)
   }, [alumnos, searchQuery])
 
+  const prevState = React.useRef(state)
+
   useEffect(() => {
-    if (state.success) {
-      const msg = state.message ?? 'Cargo generado.'
-      const finalMsg = cobroGuardadoConExito 
-        ? `${msg} Y se guardó "${concepto.trim()}" en el catálogo.` 
-        : msg
-      onSuccess?.(finalMsg)
-      setTimeout(() => {
-        setOpen(false)
-      }, 0)
+    if (open) prevState.current = state
+  }, [open, state])
+
+  useEffect(() => {
+    if (state !== prevState.current) {
+      prevState.current = state
+      if (state.success && open) {
+        const msg = state.message ?? 'Cargo generado.'
+        const finalMsg = cobroGuardadoConExito 
+          ? `${msg} Y se guardó "${concepto.trim()}" en el catálogo.` 
+          : msg
+        onSuccess?.(finalMsg)
+        setTimeout(() => {
+          setOpen(false)
+        }, 0)
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.success, cobroGuardadoConExito])
+  }, [state, open, onSuccess, cobroGuardadoConExito, concepto, setOpen])
 
   // cobrar=false → "Solo cargar a cuenta"; cobrar=true → "Cargar y cobrar ahora".
   const enviar = async (cobrar: boolean, metodoOverride?: 'efectivo' | 'transferencia') => {

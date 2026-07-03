@@ -96,9 +96,12 @@ export function RegistrarPagoDrawer({
   const esAbono = allowPartial && adeudo > 0 && montoNumerico > 0 && montoNumerico < adeudo
   const botonLabel = esCobroLibre ? 'Registrar cobro' : esAbono ? 'Registrar Abono' : 'Registrar Pago'
 
+  const prevState = React.useRef(state)
+
   // Reset al abrir: nuevo idempotency key + monto = adeudo actual (vacío si no hay deuda)
   useEffect(() => {
     if (open) {
+      prevState.current = state
       setTimeout(() => {
         setIdempotencyKey(crypto.randomUUID())
         setMonto(adeudo > 0 ? Math.round(adeudo) : '')
@@ -109,14 +112,17 @@ export function RegistrarPagoDrawer({
   }, [open])
 
   useEffect(() => {
-    if (state.success) {
-      // Dispara la confirmación en el provider (estable, sobrevive el desmontaje
-      // de esta tarjeta/drawer al revalidar) y cierra el drawer de cobro.
-      if (pid) confirmarPago({ personaId: pid, monto: montoNumerico, alumnoNombre: nombre })
-      setOpen(false)
+    if (state !== prevState.current) {
+      prevState.current = state
+      if (state.success && open) {
+        // Dispara la confirmación en el provider (estable, sobrevive el desmontaje
+        // de esta tarjeta/drawer al revalidar) y cierra el drawer de cobro.
+        if (pid) confirmarPago({ personaId: pid, monto: montoNumerico, alumnoNombre: nombre })
+        setOpen(false)
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.success])
+  }, [state, open, pid, confirmarPago, montoNumerico, nombre])
 
   return (
     <Drawer open={open} onOpenChange={setOpen}>
