@@ -59,7 +59,6 @@ export type PlanCobro = {
   nombre: string
   monto: number
   frecuencia: 'mensual' | 'semanal' | 'por_visita' | 'pago_unico'
-  /** Si true, al inscribir con este plan se ofrece el cargo de inscripción. */
   requiere_inscripcion?: boolean
 }
 
@@ -76,10 +75,6 @@ type Props = {
   /** Regla de complejidad bajo demanda: true = multi grupos/planes; false = simple. */
   multiPlanEnabled?: boolean
   modoProrrateo?: 'proporcional' | 'completo'
-  /** Monto de inscripción estándar de la academia (pre-llena el input). */
-  montoInscripcionDefault?: number
-  /** Si la academia cobra inscripción por defecto. */
-  cobrarInscripcionDefault?: boolean
   defaultGrupoId?: string
   open?: boolean
   onOpenChange?: (open: boolean) => void
@@ -122,8 +117,6 @@ export function CrearPersonaDrawer({
   planes = [],
   multiPlanEnabled = false,
   modoProrrateo = 'proporcional',
-  montoInscripcionDefault = 0,
-  cobrarInscripcionDefault = false,
   defaultGrupoId,
   open: controlledOpen,
   onOpenChange,
@@ -174,12 +167,6 @@ export function CrearPersonaDrawer({
     }
   }
 
-  // Inscripción (rastro de auditoría)
-  const [cobrarInscripcion, setCobrarInscripcion] = useState(cobrarInscripcionDefault)
-  const [montoInscripcion, setMontoInscripcion] = useState(String(Math.round(montoInscripcionDefault)))
-  const [motivoInscripcion, setMotivoInscripcion] = useState('')
-  // Captura del cargo de inscripción a generar tras crear al alumno (evita closure stale).
-  const pendingInscripcionRef = React.useRef<{ monto: number; motivo: string | null } | null>(null)
 
   const [localError, setLocalError] = useState<string | null>(null)
 
@@ -225,17 +212,6 @@ export function CrearPersonaDrawer({
       }))
   }, [grupos, grupoIds, multiPlanEnabled])
 
-  // ¿Algún plan seleccionado exige inscripción? (simple: el plan efectivo; avanzado: los marcados)
-  const inscripcionAplica = useMemo(() => {
-    if (multiPlanEnabled) {
-      return planes.some((p) => planIds.has(p.id) && p.requiere_inscripcion)
-    }
-    return !!planEfectivo?.requiere_inscripcion
-  }, [multiPlanEnabled, planes, planIds, planEfectivo])
-
-  const montoInscNum = Number(montoInscripcion) || 0
-  // "Modificó el estándar" = borró o cambió el monto pre-llenado → motivo obligatorio.
-  const inscripcionModificada = cobrarInscripcion && montoInscNum !== montoInscripcionDefault
 
   // Sincroniza el monto sugerido (modo simple) cuando cambia el plan efectivo.
   useEffect(() => {
@@ -245,13 +221,10 @@ export function CrearPersonaDrawer({
     }, 0)
   }, [preview.monto, open])
 
-  // Reinicia los campos de inscripción y descuentos al abrir el drawer.
+  // Reinicia descuentos al abrir el drawer.
   useEffect(() => {
     if (open) {
       setTimeout(() => {
-        setCobrarInscripcion(cobrarInscripcionDefault)
-        setMontoInscripcion(String(Math.round(montoInscripcionDefault)))
-        setMotivoInscripcion('')
         setHermanosActivo(false)
         setHermanosMonto('')
         setBecaActiva(false)
@@ -272,46 +245,16 @@ export function CrearPersonaDrawer({
     if (state !== prevState.current) {
       prevState.current = state
       if (state.success && open) {
-        const run = async () => {
-          // Cargo de inscripción (con rastro de auditoría) tras crear al alumno.
-          const insc = pendingInscripcionRef.current
-          if (insc && state.personaId) {
-            try {
-              await fetch('/api/cargos/manual', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  alumno_id: state.personaId,
-                  monto: insc.monto,
-                  concepto: 'Inscripción',
-                  origen: 'inscripcion',
-                  nota_modificacion: insc.motivo ?? undefined,
-                }),
-              })
-            } catch {
-              // El alumno ya se creó; si el cargo de inscripción falla, se podrá
-              // registrar manualmente. No bloqueamos el cierre.
-            }
-          }
-          // Toast al guardar: alta + cargos iniciales generados (planes desde el
-          // server action; la inscripción se acaba de cobrar aquí).
-          const nombreCompleto = `${nombre} ${apellido}`.trim()
-          const avisos = [`${nombreCompleto} agregado correctamente.`]
-          if (insc) avisos.push(`Se generó cargo Inscripción por $${Math.round(insc.monto)}.`)
-          showToast(avisos.join(' '), 4500)
-
-          pendingInscripcionRef.current = null
-
-          setOpen(false)
-          // reset
-          setNombre(''); setApellido(''); setTelefono('')
-          setGrupoId(defaultGrupoId ?? '')
-          setGrupoIds(new Set(defaultGrupoId ? [defaultGrupoId] : []))
-          setPlanIds(new Set())
-          setLocalError(null)
-          router.refresh()
-        }
-        void run()
+        const nombreCompleto = `${nombre} ${apellido}`.trim()
+        showToast(`${nombreCompleto} agregado correctamente.`, 4500)
+        setOpen(false)
+        // reset
+        setNombre(''); setApellido(''); setTelefono('')
+        setGrupoId(defaultGrupoId ?? '')
+        setGrupoIds(new Set(defaultGrupoId ? [defaultGrupoId] : []))
+        setPlanIds(new Set())
+        setLocalError(null)
+        router.refresh()
       }
     }
   }, [state, open, router, showToast, defaultGrupoId, setOpen, nombre, apellido])
@@ -365,20 +308,6 @@ export function CrearPersonaDrawer({
       planesSel = planEfectivo ? [planEfectivo.id] : []
     }
 
-    // Inscripción: si aplica y se cobra, exige motivo cuando se modifica el estándar.
-    pendingInscripcionRef.current = null
-    if (inscripcionAplica && cobrarInscripcion) {
-      if (inscripcionModificada && motivoInscripcion.trim().length === 0) {
-        setLocalError('Indica el motivo del cambio de inscripción (obligatorio).')
-        return
-      }
-      if (montoInscNum > 0) {
-        pendingInscripcionRef.current = {
-          monto: montoInscNum,
-          motivo: inscripcionModificada ? motivoInscripcion.trim() : null,
-        }
-      }
-    }
 
     const fd = new FormData()
     fd.set('nombre', nombre)
@@ -620,64 +549,6 @@ export function CrearPersonaDrawer({
                   )}
                 </div>
               </div>
-
-              {/* ---------------- INSCRIPCIÓN (rastro de auditoría) ---------------- */}
-              {inscripcionAplica && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 space-y-3">
-                  <label className="flex items-center justify-between gap-2 cursor-pointer">
-                    <span className="text-sm font-semibold text-foreground">Cobrar inscripción</span>
-                    <input
-                      type="checkbox"
-                      checked={cobrarInscripcion}
-                      onChange={(e) => setCobrarInscripcion(e.target.checked)}
-                      className="h-4 w-4"
-                    />
-                  </label>
-
-                  {cobrarInscripcion && (
-                    <>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="monto_inscripcion" className="text-xs font-semibold text-muted-foreground tracking-wider">
-                          Costo de inscripción
-                        </Label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
-                          <Input
-                            id="monto_inscripcion"
-                            type="number"
-                            step="1"
-                            min="0"
-                            inputMode="numeric"
-                            value={montoInscripcion}
-                            onChange={(e) => setMontoInscripcion(e.target.value)}
-                            className="h-10 pl-7 bg-white"
-                          />
-                        </div>
-                        <p className="text-[11px] text-muted-foreground">
-                          Estándar de la academia: ${Math.round(montoInscripcionDefault)}.
-                        </p>
-                      </div>
-
-                      {/* Motivo obligatorio si se modifica el estándar (auditoría) */}
-                      {inscripcionModificada && (
-                        <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
-                          <Label htmlFor="motivo_inscripcion" className="text-xs font-semibold text-amber-700 tracking-wider">
-                            Motivo del cambio (obligatorio)
-                          </Label>
-                          <textarea
-                            id="motivo_inscripcion"
-                            value={motivoInscripcion}
-                            onChange={(e) => setMotivoInscripcion(e.target.value)}
-                            rows={2}
-                            placeholder="Ej. Promoción 2x1 de inscripción"
-                            className="w-full rounded-md border border-amber-300 bg-white px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-amber-400"
-                          />
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
 
               {(localError || (state?.message && !state.success)) && (
                 <div className="p-3 bg-red-50 text-red-700 text-sm rounded-md border border-red-200">

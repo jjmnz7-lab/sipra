@@ -33,7 +33,7 @@ import { RegistrarPagoDrawer } from '@/components/domain/cargo/registrar-pago-dr
 import { RecordatorioMensajeDrawer } from '@/components/domain/envio/recordatorio-mensaje-drawer'
 import { CrearPromesaDrawer } from '@/components/domain/timeline/crear-promesa-drawer'
 import { CrearCargoIndividualDrawer } from '@/components/domain/cargo/crear-cargo-individual-drawer'
-import { AnularCargoDrawer } from '@/components/domain/cargo/anular-cargo-drawer'
+import { AplicarDescuentoDrawer } from '@/components/domain/cargo/aplicar-descuento-drawer'
 import { AccionesAlumnoSheet } from '@/components/domain/persona/acciones-alumno-sheet'
 import { EnviarEnlaceHistorialSheet } from '@/components/domain/envio/enviar-enlace-historial-sheet'
 import { EditarAlumnoDrawer } from '@/components/domain/persona/editar-alumno-drawer'
@@ -87,7 +87,7 @@ export function SeguimientoClientView({
   const [isRecordatorioOpen, setIsRecordatorioOpen] = useState(false)
   const [isPromesaOpen, setIsPromesaOpen] = useState(false)
   const [isCargoOpen, setIsCargoOpen] = useState(false)
-  const [isAnularCargoOpen, setIsAnularCargoOpen] = useState(false)
+  const [isDescuentoOpen, setIsDescuentoOpen] = useState(false)
   const [isMasAccionesOpen, setIsMasAccionesOpen] = useState(false)
   const [isKebabOpen, setIsKebabOpen] = useState(false)
   const [isEnviarEnlaceOpen, setIsEnviarEnlaceOpen] = useState(false)
@@ -345,10 +345,14 @@ export function SeguimientoClientView({
           onSuccess={showToast}
         />
 
-        <AnularCargoDrawer
-          open={isAnularCargoOpen}
-          onOpenChange={setIsAnularCargoOpen}
+        <AplicarDescuentoDrawer
+          personaId={persona.id}
+          personaNombre={`${persona.nombre} ${persona.apellido ?? ''}`.trim()}
           cargos={cargosActivos}
+          saldoTotal={deudaTotal}
+          open={isDescuentoOpen}
+          onOpenChange={setIsDescuentoOpen}
+          onSuccess={showToast}
         />
 
         <MasAccionesSheet
@@ -356,9 +360,10 @@ export function SeguimientoClientView({
           onOpenChange={setIsMasAccionesOpen}
           onAgregarCargo={() => setIsCargoOpen(true)}
           onRegistrarPromesa={() => setIsPromesaOpen(true)}
-          onAnularCargo={() => setIsAnularCargoOpen(true)}
+          onAplicarDescuento={() => setIsDescuentoOpen(true)}
           onEnviarEnlace={() => setIsEnviarEnlaceOpen(true)}
           suspendido={suspendido}
+          showDescuento={deudaTotal > 0}
         />
 
         <AccionesAlumnoSheet

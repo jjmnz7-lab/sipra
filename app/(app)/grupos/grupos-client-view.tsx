@@ -213,8 +213,6 @@ export function GruposClientView({
         planes={planes as any}
         modoProrrateo={modoProrrateo}
         multiPlanEnabled={multiPlanEnabled}
-        montoInscripcionDefault={montoInscripcionDefault}
-        cobrarInscripcionDefault={cobrarInscripcionDefault}
         hideTrigger={true}
       />
 

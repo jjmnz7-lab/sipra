@@ -63,6 +63,22 @@ const anularCargoSchema = z.object({
   motivo: z.string().min(5, { message: 'El motivo debe tener al menos 5 caracteres' }),
 })
 
+const aplicarDescuentoSchema = z.object({
+  persona_id: z.string().uuid({ message: 'Persona inválida' }),
+  monto: z.coerce.number().positive({ message: 'El monto debe ser mayor a 0' }),
+  concepto: z.string().min(3, { message: 'El concepto o motivo debe tener al menos 3 caracteres' }),
+  cargo_ids: z.string().transform((val) => {
+    try {
+      const parsed = JSON.parse(val);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }),
+  idempotency_key: z.string().uuid({ message: 'Clave de idempotencia inválida' }),
+})
+
+
 const timelinePageSchema = z.object({
   persona_id: z.string().uuid(),
   offset: z.coerce.number().int().nonnegative().default(0),
@@ -726,6 +742,60 @@ export async function anularCargoAction(prevState: FormState, formData: FormData
   revalidatePath('/inicio')
   return { success: true, message: 'Cargo anulado exitosamente.' }
 }
+
+export async function aplicarDescuentoAction(prevState: FormState, formData: FormData): Promise<FormState> {
+  const payload = {
+    persona_id: formData.get('persona_id') as string,
+    monto: formData.get('monto'),
+    concepto: formData.get('concepto') as string,
+    cargo_ids: formData.get('cargo_ids') as string,
+    idempotency_key: formData.get('idempotency_key') as string,
+  }
+
+  const validated = aplicarDescuentoSchema.safeParse(payload)
+  if (!validated.success) {
+    return {
+      errors: validated.error.flatten().fieldErrors,
+      message: 'Revisa los campos requeridos.',
+      success: false,
+    }
+  }
+
+  if (validated.data.cargo_ids.length === 0) {
+    return {
+      message: 'Debes seleccionar al menos un cargo para aplicar el descuento.',
+      success: false,
+    }
+  }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const academiaId = user?.app_metadata?.academia_id
+  if (!academiaId) return { message: 'Academia no encontrada', success: false }
+
+  if (await alumnoSuspendido(supabase, academiaId, validated.data.persona_id)) {
+    return { message: MSG_ALUMNO_SUSPENDIDO, success: false }
+  }
+
+  const { error } = await (supabase as any).rpc('aplicar_descuento_v1', {
+    p_academia_id: academiaId,
+    p_persona_id: validated.data.persona_id,
+    p_cargo_ids: validated.data.cargo_ids,
+    p_monto_total: validated.data.monto,
+    p_concepto: validated.data.concepto,
+    p_idempotency_key: validated.data.idempotency_key,
+  })
+
+  if (error) {
+    return { message: translateRpcError(error), success: false }
+  }
+
+  revalidatePath('/seguimiento/[persona_id]', 'page')
+  revalidatePath('/inicio')
+
+  return { success: true, message: 'Descuento aplicado con éxito.' }
+}
+
 
 // ============================================================================
 // Paginación del timeline (para el modal "Ver todo")

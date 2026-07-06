@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { Button } from '@/components/ui/button'
-import { CalendarClock, XCircle, Receipt } from 'lucide-react'
+import { CalendarClock, Receipt, Tag } from 'lucide-react'
 import { WhatsappLinkIcon } from '@/components/ui/whatsapp-link-icon'
 import {
   Drawer,
@@ -18,13 +18,23 @@ type Props = {
   onOpenChange: (open: boolean) => void
   onAgregarCargo: () => void
   onRegistrarPromesa: () => void
-  onAnularCargo: () => void
+  onAplicarDescuento: () => void
   onEnviarEnlace: () => void
   /** Si el alumno está suspendido, se deshabilitan las acciones que generan cargos $. */
   suspendido?: boolean
+  showDescuento?: boolean
 }
 
-export function MasAccionesSheet({ open, onOpenChange, onAgregarCargo, onRegistrarPromesa, onAnularCargo, onEnviarEnlace, suspendido = false }: Props) {
+export function MasAccionesSheet({
+  open,
+  onOpenChange,
+  onAgregarCargo,
+  onRegistrarPromesa,
+  onAplicarDescuento,
+  onEnviarEnlace,
+  suspendido = false,
+  showDescuento = false,
+}: Props) {
   const handle = (cb: () => void) => {
     onOpenChange(false)
     setTimeout(cb, 200)
@@ -57,6 +67,20 @@ export function MasAccionesSheet({ open, onOpenChange, onAgregarCargo, onRegistr
               <span className="text-sm font-medium text-foreground">Agregar Cargo</span>
             </button>
 
+            {showDescuento && (
+              <button
+                onClick={() => handle(onAplicarDescuento)}
+                disabled={suspendido}
+                className={cargoBtnClass}
+              >
+                <div className="h-5 w-5 flex items-center justify-center text-[#22887c] flex-shrink-0 font-extrabold text-sm select-none">
+                  <span>$</span>
+                  <span className="text-xs mt-1 -ml-0.5">↓</span>
+                </div>
+                <span className="text-sm font-medium text-foreground">Aplicar descuento</span>
+              </button>
+            )}
+
             <button
               onClick={() => handle(onEnviarEnlace)}
               disabled={suspendido}
@@ -73,14 +97,6 @@ export function MasAccionesSheet({ open, onOpenChange, onAgregarCargo, onRegistr
               <CalendarClock className="h-5 w-5 text-amber-600 flex-shrink-0" />
               <span className="text-sm font-medium text-foreground">Registrar promesa de pago</span>
             </button>
-
-            <button
-              onClick={() => handle(onAnularCargo)}
-              className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-destructive/10 transition-colors text-left"
-            >
-              <XCircle className="h-5 w-5 text-destructive flex-shrink-0" />
-              <span className="text-sm font-medium text-destructive">Cancelar / Anular un cargo</span>
-            </button>
           </div>
 
           <DrawerFooter className="pt-2">
@@ -93,3 +109,4 @@ export function MasAccionesSheet({ open, onOpenChange, onAgregarCargo, onRegistr
     </Drawer>
   )
 }
+

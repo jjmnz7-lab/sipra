@@ -413,8 +413,6 @@ export function AlumnosClientView({ alumnos, grupos, planes, modoProrrateo, mult
         planes={planes as any}
         modoProrrateo={modoProrrateo}
         multiPlanEnabled={multiPlanEnabled}
-        montoInscripcionDefault={montoInscripcionDefault}
-        cobrarInscripcionDefault={cobrarInscripcionDefault}
       />
     </div>
   )
