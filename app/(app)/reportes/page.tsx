@@ -67,6 +67,15 @@ async function computarCobrado(
     const monto = Number(e.monto ?? 0)
     if (!monto) continue
     const meta = e.metadata ?? {}
+
+    // Descuentos y anulaciones de descuentos: no son dinero nuevo/ingresos.
+    const isDescuento =
+      (e.tipo === 'PAGO_ABONO' && (meta.metodo === 'descuento' || meta.metodo_pago === 'descuento')) ||
+      (e.tipo === 'ANULACION_PAGO' && e.titulo === 'Descuento anulado') ||
+      (e.tipo === 'DESCUENTO')
+
+    if (isDescuento) continue
+
     // Consumo de saldo a favor: no es dinero nuevo.
     if (e.tipo === 'PAGO_ABONO' && meta.tipo === 'saldo_a_favor') continue
 

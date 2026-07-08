@@ -198,11 +198,13 @@ export function ReportesClientView({
                       {formatCurrency(cobradoMes.hoyTotal)}
                     </span>
                     {cobradoMes.hoyMetodos.length > 0 && (
-                      <span className="block text-[9px] text-muted-foreground/80 tabular-nums leading-tight mt-1">
-                        {cobradoMes.hoyMetodos
-                          .map((m) => `${m.label}: ${formatCurrencyCompact(m.monto)}`)
-                          .join(' • ')}
-                      </span>
+                      <div className="space-y-0.5 mt-1">
+                        {cobradoMes.hoyMetodos.map((m) => (
+                          <span key={m.label} className="block text-[10px] text-muted-foreground/80 tabular-nums leading-tight">
+                            {m.label}: {formatCurrencyCompact(m.monto)}
+                          </span>
+                        ))}
+                      </div>
                     )}
                   </div>
 
@@ -213,11 +215,13 @@ export function ReportesClientView({
                       {formatCurrency(cobradoMes.total)}
                     </span>
                     {cobradoMes.metodos.length > 0 && (
-                      <span className="block text-[9px] text-muted-foreground/80 tabular-nums leading-tight mt-1">
-                        {cobradoMes.metodos
-                          .map((m) => `${m.label}: ${formatCurrencyCompact(m.monto)}`)
-                          .join(' • ')}
-                      </span>
+                      <div className="space-y-0.5 mt-1">
+                        {cobradoMes.metodos.map((m) => (
+                          <span key={m.label} className="block text-[10px] text-muted-foreground/80 tabular-nums leading-tight">
+                            {m.label}: {formatCurrencyCompact(m.monto)}
+                          </span>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </div>

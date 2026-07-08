@@ -82,6 +82,14 @@ export function RegistrarPagoDrawer({
   const [idempotencyKey, setIdempotencyKey] = useState('')
   const [monto, setMonto] = useState<number | ''>(adeudo > 0 ? Math.round(adeudo) : '')
   const [metodoPago, setMetodoPago] = useState<'efectivo' | 'transferencia'>('efectivo')
+  const changeMetodoPago = (metodo: 'efectivo' | 'transferencia') => {
+    setMetodoPago(metodo)
+    try {
+      localStorage.setItem('sipra:ultimo_metodo_pago', metodo)
+    } catch {
+      // Ignore
+    }
+  }
 
   const montoNumerico = typeof monto === 'number' ? monto : 0
   const esCobroLibre = adeudo <= 0                       // sin deuda → anticipo puro
@@ -98,14 +106,23 @@ export function RegistrarPagoDrawer({
 
   const prevState = React.useRef(state)
 
-  // Reset al abrir: nuevo idempotency key + monto = adeudo actual (vacío si no hay deuda)
+  // Reset al abrir: nuevo idempotency key + monto = adeudo actual (vacío si no hay deuda) + cargar último método de pago
   useEffect(() => {
     if (open) {
       prevState.current = state
       setTimeout(() => {
         setIdempotencyKey(crypto.randomUUID())
         setMonto(adeudo > 0 ? Math.round(adeudo) : '')
-        setMetodoPago('efectivo')
+        let lastMetodo: 'efectivo' | 'transferencia' = 'efectivo'
+        try {
+          const stored = localStorage.getItem('sipra:ultimo_metodo_pago')
+          if (stored === 'efectivo' || stored === 'transferencia') {
+            lastMetodo = stored
+          }
+        } catch {
+          // Ignore
+        }
+        setMetodoPago(lastMetodo)
       }, 0)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -218,7 +235,7 @@ export function RegistrarPagoDrawer({
                   {/* Opción Efectivo */}
                   <button
                     type="button"
-                    onClick={() => setMetodoPago('efectivo')}
+                    onClick={() => changeMetodoPago('efectivo')}
                     className={cn(
                       "flex-1 h-9 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all z-10",
                       metodoPago === 'efectivo'
@@ -233,7 +250,7 @@ export function RegistrarPagoDrawer({
                   {/* Opción Transferencia */}
                   <button
                     type="button"
-                    onClick={() => setMetodoPago('transferencia')}
+                    onClick={() => changeMetodoPago('transferencia')}
                     className={cn(
                       "flex-1 h-9 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all z-10",
                       metodoPago === 'transferencia'
