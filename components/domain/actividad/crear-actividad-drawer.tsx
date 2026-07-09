@@ -33,6 +33,31 @@ function SubmitButton() {
   )
 }
 
+const obtenerSiguienteDia = (dateStr: string): string => {
+  if (!dateStr) return ''
+  const d = new Date(dateStr + 'T00:00:00')
+  d.setDate(d.getDate() + 1)
+  return d.toLocaleDateString('sv-SE')
+}
+
+const obtenerDiasEnRango = (startStr: string, endStr: string): number[] => {
+  if (!startStr || !endStr) return []
+  const start = new Date(startStr + 'T00:00:00')
+  const end = new Date(endStr + 'T00:00:00')
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) return []
+
+  const diffTime = Math.abs(end.getTime() - start.getTime())
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
+
+  const days = new Set<number>()
+  const current = new Date(start)
+  for (let i = 0; i < diffDays; i++) {
+    days.add(current.getDay())
+    current.setDate(current.getDate() + 1)
+  }
+  return Array.from(days)
+}
+
 interface CrearActividadDrawerProps {
   timezone?: string
 }
@@ -76,6 +101,58 @@ export function CrearActividadDrawer({ timezone = 'America/Mexico_City' }: Crear
       }, 0)
     }
   }, [open])
+
+  // Autoselección de días según el rango de fechas
+  useEffect(() => {
+    const computedFin = unSoloDia ? fechaInicio : fechaFin
+    if (!fechaInicio || !computedFin) return
+
+    const start = new Date(fechaInicio + 'T00:00:00')
+    const end = new Date(computedFin + 'T00:00:00')
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) return
+
+    const diffTime = Math.abs(end.getTime() - start.getTime())
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
+
+    if (unSoloDia || diffDays === 1) {
+      // Un solo día: seleccionar automáticamente el día y bloquear
+      setDias([start.getDay()])
+    } else if (diffDays < 7) {
+      // Menos de una semana: seleccionar automáticamente los días correspondientes
+      const inRange = obtenerDiasEnRango(fechaInicio, computedFin)
+      setDias(inRange.sort((a, b) => {
+        const orden = [1, 2, 3, 4, 5, 6, 0] // Lunes a Domingo
+        return orden.indexOf(a) - orden.indexOf(b)
+      }))
+    }
+    // Más de una semana (diffDays >= 7): no se autoselecciona nada y se deja abierto
+  }, [fechaInicio, fechaFin, unSoloDia])
+
+  const computedFin = unSoloDia ? fechaInicio : fechaFin
+  const isSingleDay = !!fechaInicio && (unSoloDia || (!!computedFin && fechaInicio === computedFin))
+
+  // Días permitidos (si el rango es < 7 días, limitamos a los días contenidos en el rango)
+  const diasPermitidos = React.useMemo(() => {
+    if (!fechaInicio || !computedFin) return undefined
+    const start = new Date(fechaInicio + 'T00:00:00')
+    const end = new Date(computedFin + 'T00:00:00')
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) return undefined
+
+    const diffTime = Math.abs(end.getTime() - start.getTime())
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
+
+    if (diffDays < 7) {
+      return obtenerDiasEnRango(fechaInicio, computedFin)
+    }
+    return undefined
+  }, [fechaInicio, computedFin])
+
+  // Deseleccionar automáticamente días que queden fuera del rango si este cambia
+  useEffect(() => {
+    if (diasPermitidos) {
+      setDias((prev) => prev.filter((d) => diasPermitidos.includes(d)))
+    }
+  }, [diasPermitidos])
 
   const prevState = React.useRef(state)
 
@@ -156,7 +233,14 @@ export function CrearActividadDrawer({ timezone = 'America/Mexico_City' }: Crear
                         type="button"
                         role="switch"
                         aria-checked={unSoloDia}
-                        onClick={() => setUnSoloDia(!unSoloDia)}
+                        onClick={() => {
+                          const nextVal = !unSoloDia
+                          setUnSoloDia(nextVal)
+                          if (!nextVal && fechaInicio) {
+                            const nextDay = obtenerSiguienteDia(fechaInicio)
+                            setFechaFin(nextDay)
+                          }
+                        }}
                         className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                           unSoloDia ? 'bg-[#22887c]' : 'bg-muted'
                         }`}
@@ -182,9 +266,17 @@ export function CrearActividadDrawer({ timezone = 'America/Mexico_City' }: Crear
                         required
                         value={fechaInicio}
                         onChange={(e) => {
-                          setFechaInicio(e.target.value)
-                          if (fechaFin && e.target.value && fechaFin < e.target.value) {
-                            setFechaFin(e.target.value)
+                          const newStart = e.target.value
+                          setFechaInicio(newStart)
+                          if (!unSoloDia && newStart) {
+                            const nextDay = obtenerSiguienteDia(newStart)
+                            if (!fechaFin || fechaFin <= newStart) {
+                              setFechaFin(nextDay)
+                            }
+                          } else {
+                            if (fechaFin && newStart && fechaFin < newStart) {
+                              setFechaFin(newStart)
+                            }
                           }
                         }}
                         min={todayStr}
@@ -201,7 +293,7 @@ export function CrearActividadDrawer({ timezone = 'America/Mexico_City' }: Crear
                           required
                           value={fechaFin}
                           onChange={(e) => setFechaFin(e.target.value)}
-                          min={fechaInicio || todayStr}
+                          min={fechaInicio ? obtenerSiguienteDia(fechaInicio) : todayStr}
                           className="h-11 text-sm"
                         />
                       </div>
@@ -317,6 +409,8 @@ export function CrearActividadDrawer({ timezone = 'America/Mexico_City' }: Crear
                   onDiasChange={setDias}
                   onHoraInicioChange={setHoraInicio}
                   onHoraFinChange={setHoraFin}
+                  disableDias={isSingleDay}
+                  diasPermitidos={diasPermitidos}
                 />
 
                 {/* 7-8. Emoji → Vista previa (sin color) */}

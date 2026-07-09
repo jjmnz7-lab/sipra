@@ -11,6 +11,8 @@ type Props = {
   onDiasChange: (dias: number[]) => void
   onHoraInicioChange: (v: string) => void
   onHoraFinChange: (v: string) => void
+  disableDias?: boolean
+  diasPermitidos?: number[]
 }
 
 /**
@@ -29,6 +31,8 @@ export function LogisticaGrupoFields({
   onDiasChange,
   onHoraInicioChange,
   onHoraFinChange,
+  disableDias = false,
+  diasPermitidos,
 }: Props) {
   const toggleDia = (valor: number) => {
     const next = diasSeleccionados.includes(valor)
@@ -54,19 +58,23 @@ export function LogisticaGrupoFields({
         <div className="grid grid-cols-7 gap-1.5">
           {DIAS_SEMANA.map((d) => {
             const selected = diasSeleccionados.includes(d.value)
+            const isPermitted = !diasPermitidos || diasPermitidos.includes(d.value)
+            const isDisabled = disableDias || !isPermitted
+
             return (
               <button
                 type="button"
                 key={d.value}
+                disabled={isDisabled}
                 onClick={() => toggleDia(d.value)}
                 title={d.fullLabel}
                 aria-label={d.fullLabel}
                 aria-pressed={selected}
-                className={`h-10 rounded-lg text-sm font-bold transition-colors active:scale-95 ${
+                className={`h-10 rounded-lg text-sm font-bold transition-colors disabled:pointer-events-none disabled:opacity-50 ${
                   selected
                     ? 'bg-primary text-primary-foreground border border-primary'
                     : 'bg-card text-muted-foreground border border-border hover:bg-accent'
-                }`}
+                } ${!isDisabled ? 'active:scale-95' : ''}`}
               >
                 {d.shortLabel}
               </button>
