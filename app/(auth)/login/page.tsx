@@ -81,12 +81,6 @@ export default function LoginPage() {
           </CardContent>
           <CardFooter className="flex flex-col gap-4 border-t-0 bg-transparent">
             <SubmitButton />
-            <div className="text-center text-sm text-slate-700">
-              ¿No tienes cuenta?{' '}
-              <Link href="/registro" className="font-semibold text-[#15435a] hover:text-[#15435a]/80">
-                Crea tu cuenta aquí
-              </Link>
-            </div>
           </CardFooter>
         </form>
       </Card>

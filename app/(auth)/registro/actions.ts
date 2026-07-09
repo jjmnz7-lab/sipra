@@ -4,25 +4,25 @@ import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 
 const onboardingSchema = z.object({
-  // Paso 1 — cuenta
+  // Cuenta
   nombreOwner: z.string().min(2, { message: 'El nombre debe tener al menos 2 caracteres' }),
   apellidoOwner: z.string().optional(),
   email: z.string().email({ message: 'Ingresa un email válido' }),
   password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres' }),
-  // Paso 2 — academia
+  // Paso 0 — academia
   nombreAcademia: z.string().min(3, { message: 'El nombre de la academia debe tener al menos 3 caracteres' }),
   telefono: z.string().optional(),
-  // Paso 3 — modelo de negocio
-  modelo: z.enum(['simple', 'avanzado', 'manual']),
-  montoMensualidad: z.coerce.number().nonnegative().optional(),
-}).superRefine((data, ctx) => {
-  if (data.modelo === 'simple' && (!data.montoMensualidad || data.montoMensualidad <= 0)) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['montoMensualidad'],
-      message: 'Define la mensualidad general (mayor a 0).',
-    })
-  }
+  // Paso 1 — plan
+  planNombre: z.string().default('Mensualidad Regular'),
+  planMonto: z.coerce.number().nonnegative({ message: 'El monto no puede ser negativo' }).default(300),
+  mesesSinCobro: z.string().default('[]'),
+  // Paso 2 — recargos y excepciones
+  criticoActivo: z.coerce.boolean().default(false),
+  criticoDia: z.coerce.number().int().min(6).max(25).default(10),
+  regimenAlta: z.enum(['completo', 'proporcional', 'no_cobrar']).default('completo'),
+  // Paso 3 — políticas
+  allowPartial: z.coerce.boolean().default(true),
+  allowOverpayment: z.coerce.boolean().default(true),
 })
 
 export type RegistroState = {
@@ -33,14 +33,19 @@ export type RegistroState = {
     email?: string[]
     password?: string[]
     telefono?: string[]
-    modelo?: string[]
-    montoMensualidad?: string[]
+    planNombre?: string[]
+    planMonto?: string[]
+    mesesSinCobro?: string[]
+    criticoActivo?: string[]
+    criticoDia?: string[]
+    regimenAlta?: string[]
+    allowPartial?: string[]
+    allowOverpayment?: string[]
     general?: string
   }
   message?: string | null
   success?: boolean
   academiaId?: string
-  modelo?: 'simple' | 'avanzado' | 'manual'
 }
 
 export async function registroAction(prevState: RegistroState, formData: FormData): Promise<RegistroState> {
@@ -51,8 +56,14 @@ export async function registroAction(prevState: RegistroState, formData: FormDat
     password: (formData.get('password') as string) || '',
     nombreAcademia: (formData.get('nombreAcademia') as string) || '',
     telefono: (formData.get('telefono') as string) || '',
-    modelo: (formData.get('modelo') as string) || '',
-    montoMensualidad: formData.get('montoMensualidad') ? Number(formData.get('montoMensualidad')) : undefined,
+    planNombre: (formData.get('planNombre') as string) || 'Mensualidad Regular',
+    planMonto: formData.get('planMonto') ? Number(formData.get('planMonto')) : 300,
+    mesesSinCobro: (formData.get('mesesSinCobro') as string) || '[]',
+    criticoActivo: formData.get('criticoActivo') === 'true',
+    criticoDia: formData.get('criticoDia') ? Number(formData.get('criticoDia')) : 10,
+    regimenAlta: (formData.get('regimenAlta') as string) || 'completo',
+    allowPartial: formData.get('allowPartial') === 'true',
+    allowOverpayment: formData.get('allowOverpayment') === 'true',
   }
 
   const validatedFields = onboardingSchema.safeParse(payload)
@@ -81,14 +92,20 @@ export async function registroAction(prevState: RegistroState, formData: FormDat
     return { errors: { general: 'No se pudo crear el usuario.' }, success: false }
   }
 
-  // 2. RPC transaccional: academia + suscripción + owner + flags del modelo + plan inicial
-  const { data: rpcData, error: rpcError } = await (supabase as any).rpc('registrar_owner_v2', {
+  // 2. RPC transaccional registrar_owner_v3
+  const { data: rpcData, error: rpcError } = await (supabase as any).rpc('registrar_owner_v3', {
     p_nombre_academia: data.nombreAcademia,
     p_nombre_owner: data.nombreOwner,
     p_apellido_owner: data.apellidoOwner || null,
     p_telefono: data.telefono || null,
-    p_modelo: data.modelo,
-    p_monto_mensualidad: data.modelo === 'simple' ? (data.montoMensualidad ?? null) : null,
+    p_plan_nombre: data.planNombre || 'Mensualidad Regular',
+    p_plan_monto: data.planMonto,
+    p_meses_sin_cobro: JSON.parse(data.mesesSinCobro),
+    p_critico_activo: data.criticoActivo,
+    p_critico_dia: data.criticoDia,
+    p_regimen_alta: data.regimenAlta,
+    p_allow_partial: data.allowPartial,
+    p_allow_overpayment: data.allowOverpayment,
   })
 
   if (rpcError) {
@@ -96,13 +113,11 @@ export async function registroAction(prevState: RegistroState, formData: FormDat
   }
 
   // 3. Refrescar sesión para que el JWT obtenga los claims (academia_id, rol).
-  //    Necesario para que la subida del logo (cliente) pase la RLS de storage.
   await supabase.auth.refreshSession()
 
-  // 4. Devolver éxito (sin redirect): el cliente sube el logo opcional y navega.
+  // 4. Devolver éxito
   return {
     success: true,
     academiaId: rpcData?.academia_id as string | undefined,
-    modelo: data.modelo,
   }
 }
