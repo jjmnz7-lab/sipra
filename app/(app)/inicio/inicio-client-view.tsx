@@ -49,7 +49,6 @@ type Props = {
   allowOverpayment: boolean
   gruposEditar: GrupoEditar[]
   planesEditar: PlanEditar[]
-  multiPlanEnabled: boolean
 }
 
 type ChipKey = 'todos' | 'urgente' | 'atrasado' | 'pendiente'
@@ -86,7 +85,6 @@ export function InicioClientView({
   allowOverpayment,
   gruposEditar,
   planesEditar,
-  multiPlanEnabled,
 }: Props) {
   // Búsqueda
   const [searchOpen, setSearchOpen] = useState(false)
@@ -288,7 +286,6 @@ export function InicioClientView({
             allowOverpayment={allowOverpayment}
             grupos={gruposEditar}
             planes={planesEditar}
-            multiPlanEnabled={multiPlanEnabled}
           />
         ))}
 

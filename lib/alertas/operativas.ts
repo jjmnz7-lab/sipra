@@ -61,8 +61,6 @@ export async function computeAlertasOperativas(supabase: any, academiaId?: strin
 
   const [
     personasRes,
-    pgRes,
-    apRes,
     planesRes,
     cargosRes,
     actividadesRes,
@@ -70,18 +68,9 @@ export async function computeAlertasOperativas(supabase: any, academiaId?: strin
   ] = await Promise.all([
     supabase
       .from('persona')
-      .select('id, estado_registro, telefono_whatsapp')
+      .select('id, estado_registro, telefono_whatsapp, grupo_id, plan_cobro_id, grupo:grupo_id (es_temporal)')
       .eq('academia_id', academiaId)
       .eq('etiqueta', 'alumno'),
-    supabase
-      .from('persona_grupo')
-      .select('persona_id, grupo:grupo_id (es_temporal)')
-      .eq('academia_id', academiaId)
-      .eq('estado', 'activo'),
-    supabase
-      .from('alumno_planes')
-      .select('alumno_id, plan_cobro_id')
-      .eq('academia_id', academiaId),
     supabase
       .from('planes_cobro')
       .select('id, activo, frecuencia')
@@ -116,24 +105,23 @@ export async function computeAlertasOperativas(supabase: any, academiaId?: strin
   // distingue quién tiene al menos un grupo REGULAR (no actividad).
   const conGrupo = new Set<string>()
   const conGrupoRegular = new Set<string>()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  for (const r of (pgRes.data ?? []) as any[]) {
-    if (!r.persona_id) continue
-    conGrupo.add(r.persona_id)
-    if (r.grupo && r.grupo.es_temporal === false) conGrupoRegular.add(r.persona_id)
+  const planesPorAlumno = new Map<string, string[]>()
+
+  for (const p of personas) {
+    if (p.grupo_id) {
+      conGrupo.add(p.id)
+      if (p.grupo && p.grupo.es_temporal === false) {
+        conGrupoRegular.add(p.id)
+      }
+    }
+    if (p.plan_cobro_id) {
+      planesPorAlumno.set(p.id, [p.plan_cobro_id])
+    }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const planes: any[] = planesRes.data ?? []
   const planActivo = new Map<string, boolean>(planes.map((p) => [p.id, !!p.activo]))
   const planFrec = new Map<string, string>(planes.map((p) => [p.id, p.frecuencia]))
-
-  const planesPorAlumno = new Map<string, string[]>()
-  for (const r of (apRes.data ?? []) as { alumno_id: string; plan_cobro_id: string }[]) {
-    const arr = planesPorAlumno.get(r.alumno_id) ?? []
-    arr.push(r.plan_cobro_id)
-    planesPorAlumno.set(r.alumno_id, arr)
-  }
 
   const conAdeudo = new Set<string>()
   for (const c of (cargosRes.data ?? []) as { persona_id: string; saldo_pendiente: number | string }[]) {

@@ -52,7 +52,6 @@ export function CrearGrupoDrawer({ planes = [] }: CrearGrupoDrawerProps) {
   const { showToast, toast } = useToast()
 
   const [state, formAction] = useActionState(crearGrupoAction, initialState)
-  const [planSugerido, setPlanSugerido] = useState<string>(NONE)
   const [nombre, setNombre] = useState<string>('')
   const [colorSlug, setColorSlug] = useState<string>(COLORES_GRUPO[0].slug)
   const [emoji, setEmoji] = useState<string>(EMOJIS_GRUPO[0])
@@ -71,7 +70,6 @@ export function CrearGrupoDrawer({ planes = [] }: CrearGrupoDrawerProps) {
         setNombre('')
         setColorSlug(COLORES_GRUPO[0].slug)
         setEmoji(EMOJIS_GRUPO[0])
-        setPlanSugerido(NONE)
         setDias([])
         setHoraInicio('')
         setHoraFin('')
@@ -123,7 +121,6 @@ export function CrearGrupoDrawer({ planes = [] }: CrearGrupoDrawerProps) {
             </DrawerHeader>
 
             <form action={formAction}>
-              <input type="hidden" name="plan_sugerido_id" value={planSugerido === NONE ? '' : planSugerido} />
               <input type="hidden" name="color" value={colorSlug} />
               <input type="hidden" name="emoji" value={emoji} />
 
@@ -147,25 +144,6 @@ export function CrearGrupoDrawer({ planes = [] }: CrearGrupoDrawerProps) {
                     <p className="text-sm text-red-600">{state.errors.nombre[0]}</p>
                   )}
                 </div>
-
-                {/* 2. Plan sugerido */}
-                {planes.length > 0 && (
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold text-muted-foreground tracking-wider">Plan sugerido (opcional)</Label>
-                    <Select value={planSugerido} onValueChange={setPlanSugerido}>
-                      <SelectTrigger className="h-11"><SelectValue placeholder="Sin plan sugerido" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={NONE}>Sin plan sugerido</SelectItem>
-                        {planes.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.nombre} — {formatCurrencyCompact(p.monto)} {FRECUENCIA_SUFIJO[p.frecuencia] ?? ''}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-[11px] text-muted-foreground">Se autoselecciona al inscribir alumnos a este grupo (editable).</p>
-                  </div>
-                )}
 
                 {/* 3. Cupo máximo */}
                 <div className="space-y-2">

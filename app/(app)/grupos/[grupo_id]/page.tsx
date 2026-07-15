@@ -35,11 +35,10 @@ export default async function GrupoDetallePage({ params, searchParams }: { param
 
   const { data: academia } = await supabase
     .from('academia')
-    .select('config_cobro, multi_plan_enabled, monto_inscripcion_default, cobrar_inscripcion_default, timezone')
+    .select('config_cobro, monto_inscripcion_default, cobrar_inscripcion_default, timezone')
     .eq('id', grupo.academia_id)
     .single() as any
   const modoProrrateo = (academia?.config_cobro?.modo_prorrateo as 'proporcional' | 'completo') || 'proporcional'
-  const multiPlanEnabled = !!academia?.multi_plan_enabled
   const montoInscripcionDefault = Number(academia?.monto_inscripcion_default ?? 0)
   const cobrarInscripcionDefault = !!academia?.cobrar_inscripcion_default
   const timezone = academia?.timezone || 'America/Mexico_City'
@@ -64,14 +63,18 @@ export default async function GrupoDetallePage({ params, searchParams }: { param
     .order('nombre', { ascending: true }) as any
 
   // Fetch alumnos inscritos
-  const { data: inscripciones } = await supabase
-    .from('persona_grupo')
-    .select(`
-      id, estado, fecha_inscripcion,
-      persona (id, nombre, apellido, telefono_whatsapp, estado_registro, beca_activa, beca_porcentaje)
-    `)
+  const { data: personas } = await supabase
+    .from('persona')
+    .select('id, created_at, nombre, apellido, telefono_whatsapp, estado_registro, beca_activa, beca_porcentaje, plan_cobro_id')
     .eq('grupo_id', grupo_id)
-    .eq('estado', 'activo') as any
+    .eq('estado_registro', 'activo') as any
+
+  const inscripciones = (personas ?? []).map((p: any) => ({
+    id: p.id,
+    estado: 'activo',
+    fecha_inscripcion: p.created_at,
+    persona: p,
+  }))
 
   // Orden A–Z por nombre completo (case-insensitive)
   const inscripcionesOrdenadas = [...(inscripciones ?? [])].sort((a: any, b: any) => {
@@ -128,16 +131,12 @@ export default async function GrupoDetallePage({ params, searchParams }: { param
   for (const p of (planes ?? []) as any[]) {
     planById.set(p.id, { id: p.id, nombre: p.nombre, monto: Number(p.monto ?? 0), frecuencia: p.frecuencia })
   }
-  const { data: alumnoPlanesRows } = await supabase
-    .from('alumno_planes')
-    .select('alumno_id, plan_cobro_id')
-    .eq('academia_id', grupo.academia_id)
-    .in('alumno_id', personaIds.length ? personaIds : ['00000000-0000-0000-0000-000000000000']) as any
   const planesPorAlumno: Record<string, { id: string; nombre: string; monto: number; frecuencia: string }[]> = {}
-  for (const r of (alumnoPlanesRows ?? []) as any[]) {
-    const plan = planById.get(r.plan_cobro_id)
+  for (const p of (personas ?? []) as any[]) {
+    if (!p.plan_cobro_id) continue
+    const plan = planById.get(p.plan_cobro_id)
     if (!plan) continue
-    ;(planesPorAlumno[r.alumno_id] ||= []).push(plan)
+    planesPorAlumno[p.id] = [plan]
   }
 
   // Alumnos disponibles para inscribir: activos, no inscritos a este grupo.
@@ -159,7 +158,6 @@ export default async function GrupoDetallePage({ params, searchParams }: { param
       inscripciones={inscripcionesOrdenadas}
       planes={planes || []}
       modoProrrateo={modoProrrateo}
-      multiPlanEnabled={multiPlanEnabled}
       montoInscripcionDefault={montoInscripcionDefault}
       cobrarInscripcionDefault={cobrarInscripcionDefault}
       gruposDestino={gruposDestino || []}

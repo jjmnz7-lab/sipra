@@ -13,7 +13,6 @@ const grupoSchema = z.object({
   nombre: z.string().min(2, { message: 'El nombre debe tener al menos 2 caracteres' }),
   color: z.string().optional(),
   emoji: z.string().optional(),
-  plan_sugerido_id: z.string().uuid().optional().or(z.literal('').transform(() => undefined)),
   /** Días de la semana 0..6 (0=Dom). Vacío permitido. */
   dias_semana: z.array(z.number().int().min(0).max(6)).default([]),
   /** HH:MM (opcional). */
@@ -30,7 +29,6 @@ const editarGrupoSchema = z.object({
   nombre: z.string().min(2, { message: 'El nombre debe tener al menos 2 caracteres' }),
   color: z.string().optional(),
   emoji: z.string().optional(),
-  plan_sugerido_id: z.string().uuid().optional().or(z.literal('').transform(() => undefined)),
   dias_semana: z.array(z.number().int().min(0).max(6)).default([]),
   hora_inicio: z.string().regex(HHMM_REGEX).optional().or(z.literal('').transform(() => undefined)),
   hora_fin: z.string().regex(HHMM_REGEX).optional().or(z.literal('').transform(() => undefined)),
@@ -45,10 +43,9 @@ const personaSchema = z.object({
   apellido: z.string().optional(),
   telefono_whatsapp: z.string().optional(),
   email: z.string().email({ message: 'Email inválido' }).optional().or(z.literal('')),
-  // Soporta 1..N grupos y 0..N planes (modo simple usa arrays de un elemento).
-  grupo_ids: z.array(z.string().uuid()).min(1, { message: 'Selecciona al menos un grupo' }),
-  plan_ids: z.array(z.string().uuid()).default([]),
-  // Monto inicial editable (solo modo simple, 1 plan). En avanzado se usa el monto del plan.
+  grupo_id: z.string().uuid({ message: 'Selecciona un grupo' }),
+  plan_id: z.string().uuid().optional().or(z.literal('').transform(() => undefined)),
+  // Monto inicial editable (solo 1 plan).
   monto: z.coerce.number().nonnegative().optional(),
   // Descuentos especiales (mutuamente excluyentes).
   descuento_hermanos_activo: z.boolean().default(false),
@@ -100,7 +97,6 @@ export async function crearGrupoAction(prevState: FormState, formData: FormData)
     nombre: formData.get('nombre') as string,
     color: (formData.get('color') as string) || undefined,
     emoji: (formData.get('emoji') as string) || undefined,
-    plan_sugerido_id: (formData.get('plan_sugerido_id') as string) || '',
     dias_semana: parseDiasSemana(formData.get('dias_semana')),
     hora_inicio: (formData.get('hora_inicio') as string) || '',
     hora_fin: (formData.get('hora_fin') as string) || '',
@@ -128,7 +124,6 @@ export async function crearGrupoAction(prevState: FormState, formData: FormData)
     nombre: validatedFields.data.nombre,
     color: validatedFields.data.color || null,
     emoji: validatedFields.data.emoji || null,
-    plan_sugerido_id: validatedFields.data.plan_sugerido_id ?? null,
     es_temporal: false,
     dias_semana: validatedFields.data.dias_semana.length > 0 ? validatedFields.data.dias_semana : null,
     hora_inicio: validatedFields.data.hora_inicio ?? null,
@@ -152,7 +147,6 @@ export async function editarGrupoAction(prevState: FormState, formData: FormData
     nombre: formData.get('nombre') as string,
     color: (formData.get('color') as string) || undefined,
     emoji: (formData.get('emoji') as string) || undefined,
-    plan_sugerido_id: (formData.get('plan_sugerido_id') as string) || '',
     dias_semana: parseDiasSemana(formData.get('dias_semana')),
     hora_inicio: (formData.get('hora_inicio') as string) || '',
     hora_fin: (formData.get('hora_fin') as string) || '',
@@ -188,7 +182,6 @@ export async function editarGrupoAction(prevState: FormState, formData: FormData
       nombre: validated.data.nombre,
       color: validated.data.color ?? null,
       emoji: validated.data.emoji ?? null,
-      plan_sugerido_id: validated.data.plan_sugerido_id ?? null,
       dias_semana: validated.data.dias_semana.length > 0 ? validated.data.dias_semana : null,
       hora_inicio: validated.data.hora_inicio ?? null,
       hora_fin: validated.data.hora_fin ?? null,
@@ -241,8 +234,8 @@ export async function crearPersonaAction(prevState: FormState, formData: FormDat
     apellido: (formData.get('apellido') as string) || '',
     telefono_whatsapp: (formData.get('telefono_whatsapp') as string) || '',
     email: (formData.get('email') as string) || '',
-    grupo_ids: parseIdArray(formData.get('grupo_ids')),
-    plan_ids: parseIdArray(formData.get('plan_ids')),
+    grupo_id: formData.get('grupo_id') as string,
+    plan_id: formData.get('plan_id') as string,
     monto: formData.get('monto') != null && formData.get('monto') !== '' ? Number(formData.get('monto')) : undefined,
     descuento_hermanos_activo: formData.get('descuento_hermanos_activo') === 'true',
     descuento_hermanos_monto: Number(formData.get('descuento_hermanos_monto') || '0'),
@@ -260,7 +253,7 @@ export async function crearPersonaAction(prevState: FormState, formData: FormDat
     }
   }
 
-  const { grupo_ids, plan_ids, monto } = validatedFields.data
+  const { grupo_id, plan_id, monto } = validatedFields.data
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -275,6 +268,8 @@ export async function crearPersonaAction(prevState: FormState, formData: FormDat
     apellido: validatedFields.data.apellido || null,
     telefono_whatsapp: validatedFields.data.telefono_whatsapp || null,
     email: validatedFields.data.email || null,
+    grupo_id: grupo_id,
+    plan_cobro_id: plan_id || null,
     // Descuentos especiales (mutuamente excluyentes; ya validado en el schema).
     descuento_hermanos_activo: validatedFields.data.descuento_hermanos_activo,
     descuento_hermanos_monto: validatedFields.data.descuento_hermanos_activo ? validatedFields.data.descuento_hermanos_monto : 0,
@@ -287,7 +282,6 @@ export async function crearPersonaAction(prevState: FormState, formData: FormDat
   }
 
   const personaId = personaData.id
-  const anchorGrupo = grupo_ids[0]
 
   // 1.b Evento OPERATIVO: alta inicial del alumno.
   await (supabase as any)
@@ -302,62 +296,33 @@ export async function crearPersonaAction(prevState: FormState, formData: FormDat
       actor_id: user.id,
     })
 
-  // 2. Montos por plan: en modo simple (1 plan) se respeta el monto editado;
-  //    en avanzado (varios planes) se cobra el monto de cada plan.
-  let montoPorPlan: Record<string, number> = {}
-  const nombrePorPlan: Record<string, string> = {}
-  if (plan_ids.length > 0) {
-    const { data: planesData } = await supabase
-      .from('planes_cobro')
-      .select('id, nombre, monto')
-      .in('id', plan_ids)
-      .eq('academia_id', academiaId) as any
-    montoPorPlan = Object.fromEntries((planesData ?? []).map((p: any) => [p.id, Number(p.monto)]))
-    for (const p of (planesData ?? []) as any[]) nombrePorPlan[p.id] = p.nombre
-    if (plan_ids.length === 1 && monto != null) {
-      montoPorPlan[plan_ids[0]] = monto
-    }
-  }
-
-  // 3. Inscribir a todos los grupos (solo logística, sin cargo).
-  for (const grupoId of grupo_ids) {
-    const { error } = await (supabase as any).rpc('inscribir_alumno_a_grupo_v1', {
-      p_academia_id: academiaId,
-      p_persona_id: personaId,
-      p_grupo_id: grupoId,
-      p_plan_cobro_id: null,
-      p_monto: 0,
-      p_concepto: null,
-    })
-    if (error) {
-      return { message: 'Alumno creado, pero falló la inscripción al grupo: ' + translateRpcError(error), success: false }
-    }
-  }
-
-  // 4. Vincular cada plan + cargo inicial (ancla en el primer grupo).
-  for (const planId of plan_ids) {
-    const { error } = await (supabase as any).rpc('inscribir_alumno_a_grupo_v1', {
-      p_academia_id: academiaId,
-      p_persona_id: personaId,
-      p_grupo_id: anchorGrupo,
-      p_plan_cobro_id: planId,
-      p_monto: montoPorPlan[planId] ?? 0,
-      p_concepto: null,
-    })
-    if (error) {
-      return { message: 'Alumno inscrito, pero falló la asignación de un plan: ' + translateRpcError(error), success: false }
-    }
+  // 2. Vincular grupo + plan + cargo inicial
+  const { error } = await (supabase as any).rpc('inscribir_alumno_a_grupo_v1', {
+    p_academia_id: academiaId,
+    p_persona_id: personaId,
+    p_grupo_id: grupo_id,
+    p_plan_cobro_id: plan_id || null,
+    p_monto: monto ?? 0,
+    p_concepto: null,
+  })
+  if (error) {
+    return { message: 'Alumno creado, pero falló la inscripción: ' + translateRpcError(error), success: false }
   }
 
   revalidatePath('/grupos')
   revalidatePath('/alumnos')
 
-  // Aviso de los cargos iniciales generados (uno por plan con monto > 0),
-  // para que el toast del drawer informe qué se cobró al guardar.
-  const avisosCargo = plan_ids
-    .filter((id) => (montoPorPlan[id] ?? 0) > 0)
-    .map((id) => `Se generó cargo ${nombrePorPlan[id] ?? 'del plan'} por $${Math.round(montoPorPlan[id])}.`)
-  const message = ['Alumno inscrito con éxito.', ...avisosCargo].join(' ')
+  // Aviso del cargo inicial generado, para que el toast del drawer informe qué se cobró al guardar.
+  let message = 'Alumno inscrito con éxito.'
+  if (plan_id && (monto ?? 0) > 0) {
+    const { data: planInfo } = await supabase
+      .from('planes_cobro')
+      .select('nombre')
+      .eq('id', plan_id)
+      .single() as any
+    const planNombre = planInfo?.nombre ?? 'del plan'
+    message += ` Se generó cargo ${planNombre} por $${Math.round(monto ?? 0)}.`
+  }
   return { success: true, message, personaId }
 }
 
@@ -420,16 +385,13 @@ export async function crearCargoGrupalAction(prevState: FormState, formData: For
 
   // Excluir del cargo masivo a los alumnos suspendidos del grupo: no se les generan cargos $.
   const { data: miembrosGrupo } = await (supabase as any)
-    .from('persona_grupo')
-    .select('persona_id, persona ( estado_registro )')
+    .from('persona')
+    .select('id, estado_registro')
     .eq('academia_id', academiaId)
     .eq('grupo_id', validatedFields.data.grupo_id)
-    .eq('estado', 'activo')
   const suspendidosIds: string[] = (miembrosGrupo ?? [])
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .filter((m: any) => m.persona && m.persona.estado_registro !== 'activo')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .map((m: any) => m.persona_id)
+    .filter((m: any) => m.estado_registro !== 'activo')
+    .map((m: any) => m.id)
   const excluidosFinal = Array.from(
     new Set<string>([...validatedFields.data.excluded_persona_ids, ...suspendidosIds]),
   )
@@ -700,59 +662,17 @@ export async function asignarAlumnoAGrupoAction(prevState: FormState, formData: 
     return { message: MSG_ALUMNO_SUSPENDIDO, success: false }
   }
 
-  // 1. Inscribir al grupo (logística, sin cargo).
+  // 1. Inscribir al grupo y asignar plan (atómico).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: errGrupo } = await (supabase as any).rpc('inscribir_alumno_a_grupo_v1', {
     p_academia_id: academiaId,
     p_persona_id: validated.data.persona_id,
     p_grupo_id: validated.data.grupo_id,
-    p_plan_cobro_id: null,
+    p_plan_cobro_id: validated.data.plan_id || null,
     p_monto: 0,
     p_concepto: null,
   })
   if (errGrupo) return { message: translateRpcError(errGrupo), success: false }
-
-  // 2. Si hay plan sugerido, agregarlo al alumno (sin duplicar si ya lo tiene).
-  if (validated.data.plan_id) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: yaAsignado } = await (supabase as any)
-      .from('alumno_planes')
-      .select('plan_cobro_id')
-      .eq('academia_id', academiaId)
-      .eq('alumno_id', validated.data.persona_id)
-      .eq('plan_cobro_id', validated.data.plan_id)
-      .maybeSingle()
-
-    if (!yaAsignado) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: errPlan } = await (supabase as any).from('alumno_planes').insert({
-        academia_id: academiaId,
-        alumno_id: validated.data.persona_id,
-        plan_cobro_id: validated.data.plan_id,
-      })
-      if (errPlan) {
-        return { message: 'Inscrito al grupo, pero falló al agregar el plan: ' + translateRpcError(errPlan), success: false }
-      }
-
-      // Evento OPERATIVO: esquema de cobro asignado.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: planInfo } = await (supabase as any)
-        .from('planes_cobro')
-        .select('nombre')
-        .eq('id', validated.data.plan_id)
-        .single()
-      await (supabase as any).from('evento_timeline').insert({
-        academia_id: academiaId,
-        persona_id: validated.data.persona_id,
-        categoria: 'OPERATIVO',
-        tipo: 'ESQUEMA_MUTACION',
-        titulo: 'Esquema asignado',
-        descripcion: planInfo?.nombre ?? null,
-        metadata: { plan_id: validated.data.plan_id },
-        actor_id: user.id,
-      })
-    }
-  }
 
   // 3. Si hay monto de inscripción > 0, inyectar cargo único.
   if (validated.data.inscripcion_monto > 0) {

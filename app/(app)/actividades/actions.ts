@@ -125,7 +125,6 @@ export async function crearActividadAction(prevState: FormState, formData: FormD
     nombre: validated.data.nombre,
     color: null,
     emoji: validated.data.emoji,
-    plan_sugerido_id: null,
     es_temporal: true,
     fecha_inicio: validated.data.fecha_inicio,
     fecha_fin: validated.data.fecha_fin,

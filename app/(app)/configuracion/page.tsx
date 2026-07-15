@@ -33,26 +33,24 @@ export default async function ConfiguracionPage({
     .order('nombre', { ascending: true }) as any
 
   // Conteo de alumnos por plan: activos (para archivado) y totales (para eliminar).
-  const { data: alumnosActivos } = await supabase
+  const { data: alumnosPlanes } = await supabase
     .from('persona')
-    .select('id')
+    .select('id, plan_cobro_id, estado_registro')
     .eq('academia_id', academiaId)
     .eq('etiqueta', 'alumno')
-    .eq('estado_registro', 'activo') as any
-  const activosSet = new Set<string>((alumnosActivos ?? []).map((p: any) => p.id))
+    .not('plan_cobro_id', 'is', null) as any
 
-  const { data: vinculos } = await supabase
-    .from('alumno_planes')
-    .select('plan_cobro_id, alumno_id')
-    .eq('academia_id', academiaId) as any
   const conteoActivo: Record<string, number> = {}
   const conteoTotal: Record<string, number> = {}
-  for (const v of (vinculos ?? [])) {
-    conteoTotal[v.plan_cobro_id] = (conteoTotal[v.plan_cobro_id] ?? 0) + 1
-    if (activosSet.has(v.alumno_id)) {
-      conteoActivo[v.plan_cobro_id] = (conteoActivo[v.plan_cobro_id] ?? 0) + 1
+  for (const p of (alumnosPlanes ?? [])) {
+    const planId = p.plan_cobro_id
+    if (!planId) continue
+    conteoTotal[planId] = (conteoTotal[planId] ?? 0) + 1
+    if (p.estado_registro === 'activo') {
+      conteoActivo[planId] = (conteoActivo[planId] ?? 0) + 1
     }
   }
+
   const planesConConteo = (planes ?? []).map((p: any) => ({
     ...p,
     alumnosCount: conteoActivo[p.id] ?? 0,

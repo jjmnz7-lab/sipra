@@ -32,11 +32,13 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
   const { persona_id } = await params
   const supabase = await createClient()
 
-  // 1. Fetch persona with detailed cargos and applied payments
+  // 1. Fetch persona with detailed cargos, group, and plan
   const { data: persona } = await supabase
     .from('persona')
     .select(`
       *,
+      grupo:grupo_id ( id, nombre, color, emoji, es_temporal ),
+      planes_cobro:plan_cobro_id ( id, nombre, activo ),
       cargo (
         id,
         concepto,
@@ -57,47 +59,48 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
       )
     `)
     .eq('id', persona_id)
-    .single() as { data: PersonaConCargo | null; error: unknown }
+    .single() as any
 
   if (!persona) notFound()
 
   // 1a. Bandera de abonos parciales de la academia y multi_plan
   const { data: academia } = await supabase
     .from('academia')
-    .select('allow_partial_payments, allow_overpayment, multi_plan_enabled, timezone')
+    .select('allow_partial_payments, allow_overpayment, timezone')
     .eq('id', persona.academia_id)
     .single() as any
   const allowPartial = academia?.allow_partial_payments ?? true
   const allowOverpayment = academia?.allow_overpayment ?? true
-  const multiPlanEnabled = !!academia?.multi_plan_enabled
   const timezone = academia?.timezone || 'America/Mexico_City'
 
-  // 1b. Fetch grupos a los que pertenece el alumno.
-  // El badge y el drawer de edición trabajan solo con grupos regulares; las
-  // actividades del alumno viven en su pantalla y en el historial.
-  const { data: personaGrupos } = await supabase
-    .from('persona_grupo')
-    .select('grupo_id, grupo (id, nombre, color, emoji, es_temporal)')
-    .eq('persona_id', persona_id)
-    .eq('estado', 'activo') as any
-
-  const gruposAlumno = (personaGrupos ?? [])
-    .map((pg: any) => pg.grupo)
-    .filter((g: any) => g && !g.es_temporal)
-    .map((g: any) => ({ id: g.id, nombre: g.nombre, color: g.color ?? null, emoji: g.emoji ?? null })) as { id: string; nombre: string; color: string | null; emoji: string | null }[]
-  const currentGrupoId: string | null = gruposAlumno[0]?.id ?? null
+  // 1b. Fetch grupo del alumno (relación directa 1:N).
+  const g = persona.grupo
+  const gruposAlumno = g && !g.es_temporal
+    ? [{ id: g.id, nombre: g.nombre, color: g.color ?? null, emoji: g.emoji ?? null }]
+    : []
+  const currentGrupoId: string | null = g?.id ?? null
 
   // 1d. Catálogo completo de grupos regulares activos (sin actividades)
   const { data: grupos } = await supabase
     .from('grupo')
     .select(`
-      id, nombre, plan_sugerido_id, cupo_maximo, color, emoji,
-      persona_grupo (estado)
+      id, nombre, cupo_maximo, color, emoji,
+      persona ( id, estado_registro )
     `)
     .eq('academia_id', persona.academia_id)
     .eq('estado', 'activo')
     .eq('es_temporal', false)
     .order('nombre') as any
+
+  const mappedGrupos = (grupos ?? []).map((g: any) => ({
+    id: g.id,
+    nombre: g.nombre,
+    plan_sugerido_id: null,
+    cupo_maximo: g.cupo_maximo,
+    color: g.color,
+    emoji: g.emoji,
+    persona_grupo: (g.persona ?? []).map((pe: any) => ({ estado: pe.estado_registro }))
+  }))
 
   // 1e. Catálogo completo de planes activos
   const { data: planes } = await supabase
@@ -107,7 +110,7 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
     .eq('activo', true)
     .order('nombre') as any
 
-  // 1e-bis. Catálogo de cobros frecuentes (para el combobox de concepto del cargo).
+  // 1e-bis. Catálogo de cobros frecuentes
   const { data: cobrosFrecuentes } = await supabase
     .from('cobros_frecuentes')
     .select('id, concepto, monto')
@@ -115,16 +118,10 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
     .eq('activo', true)
     .order('concepto', { ascending: true }) as any
 
-  // 1f. Planes actuales del alumno
-  const { data: currentPlanesRel } = await supabase
-    .from('alumno_planes')
-    .select('plan_cobro_id, planes_cobro (id, nombre)')
-    .eq('alumno_id', persona_id) as any
-
-  const planesAlumno = (currentPlanesRel ?? [])
-    .map((cp: any) => cp.planes_cobro)
-    .filter(Boolean) as { id: string; nombre: string }[]
-  const currentPlanIds = planesAlumno.map(p => p.id)
+  // 1f. Plan actual del alumno
+  const p = persona.planes_cobro
+  const planesAlumno = p && p.activo ? [{ id: p.id, nombre: p.nombre }] : []
+  const currentPlanIds = planesAlumno.map(x => x.id)
 
   // Cargos activos (para desglose en snapshot)
   const cargosActivos = persona.cargo?.filter((c: any) =>
@@ -133,15 +130,14 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
   const deudaTotal = cargosActivos.reduce((acc: number, c: any) => acc + Number(c.saldo_pendiente), 0)
   const estadoFinanciero = clasificarAlumno(cargosActivos, ahoraAcademia(timezone))
 
-  // Saldo a favor: crédito disponible de pagos/anticipos no aplicados (monto_disponible).
+  // Saldo a favor: crédito disponible
   const { data: movsCredito } = await supabase
     .from('movimiento')
     .select('monto_disponible')
     .eq('persona_id', persona_id) as { data: { monto_disponible: number | null }[] | null; error: unknown }
   const saldoAFavor = (movsCredito ?? []).reduce((acc, m) => acc + Number(m.monto_disponible ?? 0), 0)
 
-  // 2. Fetch timeline (sólo el preview de "Historial reciente"; el historial
-  //    completo vive en /seguimiento/[persona_id]/historial con paginación).
+  // 2. Fetch timeline
   const { data: timeline } = await supabase
     .from('evento_timeline')
     .select('*')
@@ -161,10 +157,9 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
       timeline={timeline || []}
       allowPartial={allowPartial}
       allowOverpayment={allowOverpayment}
-      grupos={grupos || []}
+      grupos={mappedGrupos}
       planes={planes || []}
       cobrosFrecuentes={cobrosFrecuentes || []}
-      multiPlanEnabled={multiPlanEnabled}
       currentGrupoId={currentGrupoId}
       currentPlanIds={currentPlanIds}
     />

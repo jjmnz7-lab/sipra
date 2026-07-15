@@ -12,18 +12,17 @@ export default async function InicioPage() {
   const academiaId = user?.app_metadata?.academia_id
   const { data: academia } = await supabase
     .from('academia')
-    .select('allow_partial_payments, allow_overpayment, multi_plan_enabled, timezone')
+    .select('allow_partial_payments, allow_overpayment, timezone')
     .eq('id', academiaId)
     .single() as any
   const allowPartial = academia?.allow_partial_payments ?? true
   const allowOverpayment = academia?.allow_overpayment ?? true
-  const multiPlanEnabled = !!academia?.multi_plan_enabled
   const timezone = academia?.timezone || 'America/Mexico_City'
 
   // 1. Alumnos activos (para el FAB: cargo individual y búsqueda de visita)
   const { data: alumnos } = await supabase
     .from('persona')
-    .select('id, nombre, apellido')
+    .select('id, nombre, apellido, plan_cobro_id')
     .eq('etiqueta', 'alumno')
     .eq('estado_registro', 'activo')
     .order('nombre') as any
@@ -32,7 +31,7 @@ export default async function InicioPage() {
   // Las actividades se gestionan desde su propia pantalla.
   const { data: gruposRaw } = await supabase
     .from('grupo')
-    .select('id, nombre, color, emoji, plan_sugerido_id')
+    .select('id, nombre, color, emoji')
     .eq('estado', 'activo')
     .eq('es_temporal', false)
     .order('nombre') as any
@@ -45,17 +44,12 @@ export default async function InicioPage() {
     .eq('activo', true)
     .order('nombre') as any
 
-  // 1e. Planes asignados por alumno (para precargar el drawer de edición sin perder datos)
-  const { data: alumnoPlanesRows } = await supabase
-    .from('alumno_planes')
-    .select('alumno_id, plan_cobro_id')
-    .eq('academia_id', academiaId) as any
+  // 1e. Planes asignados por alumno
   const planIdsPorAlumno = new Map<string, string[]>()
-  for (const r of (alumnoPlanesRows ?? [])) {
-    if (!r.alumno_id || !r.plan_cobro_id) continue
-    const arr = planIdsPorAlumno.get(r.alumno_id) ?? []
-    arr.push(r.plan_cobro_id)
-    planIdsPorAlumno.set(r.alumno_id, arr)
+  for (const a of (alumnos ?? [])) {
+    if (a.plan_cobro_id) {
+      planIdsPorAlumno.set(a.id, [a.plan_cobro_id])
+    }
   }
 
   const gruposParaEditar = (gruposRaw ?? []).map((g: any) => ({
@@ -63,7 +57,7 @@ export default async function InicioPage() {
     nombre: g.nombre,
     color: g.color ?? null,
     emoji: g.emoji ?? null,
-    plan_sugerido_id: g.plan_sugerido_id ?? null,
+    plan_sugerido_id: null,
   }))
   const planesParaEditar = (planesCatalogo ?? []).map((p: any) => ({
     id: p.id,
@@ -73,23 +67,24 @@ export default async function InicioPage() {
   }))
 
   const { data: pgMiembros } = await supabase
-    .from('persona_grupo')
-    .select('grupo_id, persona ( id, nombre, apellido, estado_registro, beca_activa, beca_porcentaje )')
+    .from('persona')
+    .select('grupo_id, id, nombre, apellido, estado_registro, beca_activa, beca_porcentaje')
     .eq('academia_id', academiaId)
-    .eq('estado', 'activo') as any
+    .eq('etiqueta', 'alumno')
+    .eq('estado_registro', 'activo')
+    .not('grupo_id', 'is', null) as any
 
   // Solo alumnos activos: a los suspendidos no se les pueden generar cargos.
   const miembrosPorGrupo = new Map<string, { persona: { id: string; nombre: string; apellido: string | null; beca_activa?: boolean; beca_porcentaje?: number } }[]>()
   for (const r of (pgMiembros ?? [])) {
-    if (!r.grupo_id || !r.persona) continue
-    if (r.persona.estado_registro !== 'activo') continue
+    if (!r.grupo_id) continue
     const arr = miembrosPorGrupo.get(r.grupo_id) ?? []
     arr.push({ persona: {
-      id: r.persona.id,
-      nombre: r.persona.nombre,
-      apellido: r.persona.apellido ?? '',
-      beca_activa: !!r.persona.beca_activa,
-      beca_porcentaje: r.persona.beca_porcentaje ?? 0,
+      id: r.id,
+      nombre: r.nombre,
+      apellido: r.apellido ?? '',
+      beca_activa: !!r.beca_activa,
+      beca_porcentaje: r.beca_porcentaje ?? 0,
     } })
     miembrosPorGrupo.set(r.grupo_id, arr)
   }
@@ -122,14 +117,11 @@ export default async function InicioPage() {
         codigo_pais,
         email,
         estado_registro,
-        persona_grupo (
-          estado,
-          grupo (
-            id,
-            nombre,
-            color,
-            emoji
-          )
+        grupo:grupo_id (
+          id,
+          nombre,
+          color,
+          emoji
         )
       ),
       aplicacion_movimiento (
@@ -152,8 +144,7 @@ export default async function InicioPage() {
     for (const cargo of cargos) {
       if (!cargo.persona_id) continue
       if (!alumnosConDeudaMap[cargo.persona_id]) {
-        const pgActivo = cargo.persona?.persona_grupo?.find((pg: any) => pg.estado === 'activo')
-        const grupo = pgActivo?.grupo ?? null
+        const grupo = cargo.persona?.grupo ?? null
         const grupoNombre = grupo?.nombre ?? 'Sin grupo'
 
         alumnosConDeudaMap[cargo.persona_id] = {
@@ -229,7 +220,6 @@ export default async function InicioPage() {
         allowOverpayment={allowOverpayment}
         gruposEditar={gruposParaEditar}
         planesEditar={planesParaEditar}
-        multiPlanEnabled={multiPlanEnabled}
       />
 
       <FabOperativo

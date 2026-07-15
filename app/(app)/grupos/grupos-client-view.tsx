@@ -20,7 +20,6 @@ type Props = {
   grupos: any[]
   planes: any[]
   modoProrrateo: 'proporcional' | 'completo'
-  multiPlanEnabled: boolean
   montoInscripcionDefault?: number
   cobrarInscripcionDefault?: boolean
   timezone?: string
@@ -37,7 +36,6 @@ export function GruposClientView({
   grupos,
   planes,
   modoProrrateo,
-  multiPlanEnabled,
   montoInscripcionDefault = 0,
   cobrarInscripcionDefault = false,
 }: Props) {
@@ -212,7 +210,6 @@ export function GruposClientView({
         grupos={grupos as any}
         planes={planes as any}
         modoProrrateo={modoProrrateo}
-        multiPlanEnabled={multiPlanEnabled}
         hideTrigger={true}
       />
 

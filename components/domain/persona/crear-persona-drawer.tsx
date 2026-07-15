@@ -47,7 +47,7 @@ type Grupo = {
   id: string
   nombre: string
   /** Plan que dicta el precio de este grupo (academias estilo fútbol). */
-  plan_sugerido_id?: string | null
+
   cupo_maximo?: number | null
   color?: string | null
   emoji?: string | null
@@ -115,7 +115,6 @@ function planPorDefecto(planes: PlanCobro[]): PlanCobro | undefined {
 export function CrearPersonaDrawer({
   grupos = [],
   planes = [],
-  multiPlanEnabled = false,
   modoProrrateo = 'proporcional',
   defaultGrupoId,
   open: controlledOpen,
@@ -140,14 +139,11 @@ export function CrearPersonaDrawer({
     setTelefono(value.slice(0, 10))
   }
 
-  // Modo SIMPLE
+  // Grupo y Plan Únicos
   const [grupoId, setGrupoId] = useState<string>(defaultGrupoId ?? '')
+  const [planId, setPlanId] = useState<string>('none')
   const [monto, setMonto] = useState<string>('0')
   const [condonar, setCondonar] = useState(false)
-
-  // Modo AVANZADO
-  const [grupoIds, setGrupoIds] = useState<Set<string>>(new Set(defaultGrupoId ? [defaultGrupoId] : []))
-  const [planIds, setPlanIds] = useState<Set<string>>(new Set())
 
   // Descuentos especiales (Hermanos y Beca son mutuamente excluyentes).
   const [hermanosActivo, setHermanosActivo] = useState(false)
@@ -167,24 +163,17 @@ export function CrearPersonaDrawer({
     }
   }
 
-
   const [localError, setLocalError] = useState<string | null>(null)
 
   const planDefault = useMemo(() => planPorDefecto(planes), [planes])
 
-  // Modo simple: el plan EFECTIVO es el plan sugerido del grupo elegido (si existe),
-  // si no, el plan por defecto. Auto-selección que ahorra clics ("la categoría dicta el precio").
   const grupoSimpleSel = useMemo(() => grupos.find((g) => g.id === grupoId), [grupos, grupoId])
   const planEfectivo = useMemo(() => {
-    const sugerido = grupoSimpleSel?.plan_sugerido_id
-      ? planes.find((p) => p.id === grupoSimpleSel.plan_sugerido_id)
-      : undefined
-    return sugerido ?? planDefault
-  }, [grupoSimpleSel, planes, planDefault])
-  const planVieneDeGrupo = !!(grupoSimpleSel?.plan_sugerido_id && planEfectivo?.id === grupoSimpleSel.plan_sugerido_id)
+    return planes.find((p) => p.id === planId) ?? null
+  }, [planes, planId])
 
   const preview = useMemo(
-    () => calcularPreviewPlan(planEfectivo, modoProrrateo, new Date()),
+    () => calcularPreviewPlan(planEfectivo ?? undefined, modoProrrateo, new Date()),
     [planEfectivo, modoProrrateo]
   )
 
@@ -196,24 +185,15 @@ export function CrearPersonaDrawer({
   const selectedGrupoCupoMaximo = grupoSimpleSel?.cupo_maximo
   const selectedGrupoFull = !!(selectedGrupoCupoMaximo && selectedGrupoActiveAlumnos >= selectedGrupoCupoMaximo)
 
-  const fullGroupsNames = useMemo(() => {
-    if (!multiPlanEnabled) return []
-    return grupos
-      .filter((g) => grupoIds.has(g.id))
-      .filter((g) => {
-        const active = (g.persona_grupo || []).filter((pg: { estado: string }) => pg.estado === 'activo').length
-        const max = g.cupo_maximo
-        return !!(max && active >= max)
-      })
-      .map((g) => ({
-        nombre: g.nombre,
-        active: (g.persona_grupo || []).filter((pg: { estado: string }) => pg.estado === 'activo').length,
-        max: g.cupo_maximo
-      }))
-  }, [grupos, grupoIds, multiPlanEnabled])
+  // Inicializar plan default al abrir
+  useEffect(() => {
+    if (open) {
+      const defaultPlan = planPorDefecto(planes)
+      setPlanId(defaultPlan?.id ?? 'none')
+    }
+  }, [open, planes])
 
-
-  // Sincroniza el monto sugerido (modo simple) cuando cambia el plan efectivo.
+  // Sincroniza el monto sugerido cuando cambia el plan efectivo.
   useEffect(() => {
     setTimeout(() => {
       setMonto(String(Math.round(preview.monto)))
@@ -231,14 +211,12 @@ export function CrearPersonaDrawer({
         setBecaPorcentaje(25)
       }, 0)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   const prevState = React.useRef(state)
 
   useEffect(() => {
     if (open) prevState.current = state
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   useEffect(() => {
@@ -251,41 +229,20 @@ export function CrearPersonaDrawer({
         // reset
         setNombre(''); setApellido(''); setTelefono('')
         setGrupoId(defaultGrupoId ?? '')
-        setGrupoIds(new Set(defaultGrupoId ? [defaultGrupoId] : []))
-        setPlanIds(new Set())
+        setPlanId(planPorDefecto(planes)?.id ?? 'none')
         setLocalError(null)
         router.refresh()
       }
     }
-  }, [state, open, router, showToast, defaultGrupoId, setOpen, nombre, apellido])
+  }, [state, open, router, showToast, defaultGrupoId, setOpen, nombre, apellido, planes])
 
   useEffect(() => {
     if (open && defaultGrupoId) {
       setTimeout(() => {
         setGrupoId(defaultGrupoId)
-        setGrupoIds((prev) => new Set(prev).add(defaultGrupoId))
       }, 0)
     }
   }, [open, defaultGrupoId])
-
-  const toggle = (set: Set<string>, setter: (s: Set<string>) => void, id: string) => {
-    const next = new Set(set)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-    setter(next)
-  }
-
-  // Avanzado: al marcar un grupo, auto-marca su plan sugerido (editable).
-  const toggleGrupoAvanzado = (grupo: Grupo) => {
-    const next = new Set(grupoIds)
-    const estabaMarcado = next.has(grupo.id)
-    if (estabaMarcado) next.delete(grupo.id)
-    else next.add(grupo.id)
-    setGrupoIds(next)
-    if (!estabaMarcado && grupo.plan_sugerido_id && planes.some((p) => p.id === grupo.plan_sugerido_id)) {
-      setPlanIds((prev) => new Set(prev).add(grupo.plan_sugerido_id!))
-    }
-  }
 
   const montoFinal = condonar ? 0 : Number(monto) || 0
 
@@ -294,35 +251,19 @@ export function CrearPersonaDrawer({
     setLocalError(null)
     if (nombre.trim().length < 2) { setLocalError('El nombre es requerido.'); return }
     if (telefono && telefono.length !== 10) { setLocalError('El teléfono debe tener exactamente 10 dígitos.'); return }
-
-    let gruposSel: string[]
-    let planesSel: string[]
-
-    if (multiPlanEnabled) {
-      gruposSel = Array.from(grupoIds)
-      planesSel = Array.from(planIds)
-      if (gruposSel.length === 0) { setLocalError('Selecciona al menos un grupo.'); return }
-    } else {
-      if (!grupoId) { setLocalError('Selecciona un grupo.'); return }
-      gruposSel = [grupoId]
-      planesSel = planEfectivo ? [planEfectivo.id] : []
-    }
-
+    if (!grupoId) { setLocalError('Selecciona un grupo.'); return }
 
     const fd = new FormData()
     fd.set('nombre', nombre)
     fd.set('apellido', apellido)
     fd.set('telefono_whatsapp', telefono)
-    fd.set('grupo_ids', JSON.stringify(gruposSel))
-    fd.set('plan_ids', JSON.stringify(planesSel))
-    // El monto editable solo aplica al modo simple (1 plan).
-    if (!multiPlanEnabled) fd.set('monto', String(montoFinal))
-    // Descuentos especiales (mutuamente excluyentes; la UI ya lo garantiza).
+    fd.set('grupo_id', grupoId)
+    fd.set('plan_id', planId === 'none' ? '' : planId)
+    fd.set('monto', String(montoFinal))
     fd.set('descuento_hermanos_activo', hermanosActivo ? 'true' : 'false')
     fd.set('descuento_hermanos_monto', hermanosActivo ? String(Number(hermanosMonto || '0')) : '0')
     fd.set('beca_activa', becaActiva ? 'true' : 'false')
     fd.set('beca_porcentaje', becaActiva ? String(becaPorcentaje) : '0')
-    // React 19: el action devuelto por useActionState debe invocarse dentro de una transición.
     startTransition(() => formAction(fd))
   }
 
@@ -363,9 +304,6 @@ export function CrearPersonaDrawer({
                 <Input id="telefono_whatsapp" value={telefono} onChange={handleTelefonoChange} type="tel" inputMode="numeric" maxLength={10} className="h-11" placeholder="10 dígitos" />
               </div>
 
-              {/* ---------------- MODO SIMPLE ---------------- */}
-              {!multiPlanEnabled && (
-                <>
                   <div className="space-y-2">
                     <Label htmlFor="grupo_id" className="text-xs font-semibold text-muted-foreground tracking-wider">Grupo *</Label>
                     <Select value={grupoId} onValueChange={setGrupoId}>
@@ -392,6 +330,23 @@ export function CrearPersonaDrawer({
                         </div>
                       </div>
                     )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="plan_id" className="text-xs font-semibold text-muted-foreground tracking-wider">Plan de cobro</Label>
+                    <Select value={planId} onValueChange={setPlanId}>
+                      <SelectTrigger id="plan_id" className="h-11">
+                        <SelectValue placeholder="Sin plan de cobro" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin plan de cobro</SelectItem>
+                        {planes.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.nombre} — {formatCurrencyCompact(p.monto)} {FRECUENCIA_LABEL[p.frecuencia] ?? ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
@@ -422,7 +377,7 @@ export function CrearPersonaDrawer({
                       </div>
                       <p className="text-[11px] text-muted-foreground">
                         {planEfectivo
-                          ? `Plan: ${planEfectivo.nombre}${planVieneDeGrupo ? ' (sugerido por el grupo)' : ''}. Puedes editar o condonar el primer cargo.`
+                          ? `Plan: ${planEfectivo.nombre}. Puedes editar o condonar el primer cargo.`
                           : 'No hay plan configurado; captura el cargo inicial o déjalo en 0.'}
                       </p>
                     </div>
@@ -431,55 +386,6 @@ export function CrearPersonaDrawer({
                       <span className={`text-lg font-bold ${montoFinal > 0 ? 'text-primary' : 'text-[#22887c]'}`}>${Math.round(montoFinal)}</span>
                     </div>
                   </div>
-                </>
-              )}
-
-              {/* ---------------- MODO AVANZADO ---------------- */}
-              {multiPlanEnabled && (
-                <>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold text-muted-foreground tracking-wider">Grupos *</Label>
-                    <div className="space-y-1.5 rounded-lg border border-border p-2">
-                      {grupos.map((g) => (
-                        <CheckRow
-                          key={g.id}
-                          label={g.nombre}
-                          checked={grupoIds.has(g.id)}
-                          onClick={() => toggleGrupoAvanzado(g)}
-                          leftSlot={<GrupoEmojiCircle slug={g.color} emoji={g.emoji} className="h-7 w-7 text-sm" />}
-                          labelStyle={{ color: colorPorSlug(g.color).textLight }}
-                        />
-                      ))}
-                      {grupos.length === 0 && <p className="text-xs text-muted-foreground px-2 py-1">No hay grupos.</p>}
-                    </div>
-                    {fullGroupsNames.length > 0 && (
-                      <div className="flex items-start gap-2.5 p-3 rounded-lg border border-amber-200 bg-amber-50/60 text-amber-800 text-xs">
-                        <Info className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <span className="font-bold">Capacidad máxima alcanzada: </span>
-                          Los siguientes grupos seleccionados están llenos: {fullGroupsNames.map((g) => `"${g.nombre}" (${g.active}/${g.max})`).join(', ')}.
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold text-muted-foreground tracking-wider">Planes de cobro</Label>
-                    <div className="space-y-1.5 rounded-lg border border-border p-2">
-                      {planes.map((p) => (
-                        <CheckRow
-                          key={p.id}
-                          label={`${p.nombre} — ${formatCurrencyCompact(p.monto)} ${FRECUENCIA_LABEL[p.frecuencia]}`}
-                          checked={planIds.has(p.id)}
-                          onClick={() => toggle(planIds, setPlanIds, p.id)}
-                        />
-                      ))}
-                      {planes.length === 0 && <p className="text-xs text-muted-foreground px-2 py-1">No hay planes. Créalos en Configuración.</p>}
-                    </div>
-                    <p className="text-[11px] text-muted-foreground">Se generará un cargo inicial por cada plan seleccionado.</p>
-                  </div>
-                </>
-              )}
 
               {/* ---------------- DESCUENTOS ESPECIALES ---------------- */}
               <div className="space-y-2 pt-2 border-t border-border/60">

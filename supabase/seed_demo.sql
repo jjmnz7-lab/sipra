@@ -1,8 +1,8 @@
 -- ============================================================================
 -- SIPRA · SEED DE DATOS DE PRUEBA (DESTRUCTIVO)
 -- ----------------------------------------------------------------------------
--- Nombres reales del esquema: academia, grupo, persona, persona_grupo,
--- alumno_planes, cargo, movimiento, aplicacion_movimiento, evento_timeline.
+-- Nombres reales del esquema: academia, grupo, persona,
+-- cargo, movimiento, aplicacion_movimiento, evento_timeline.
 -- saldo_acumulado lo calcula el trigger trg_cargo_sync_saldo (no se setea a mano).
 -- Owners de prueba (login):  owner1@sipra.dev / owner2@sipra.dev  ·  pass: Sipra2025!
 -- ============================================================================
@@ -20,8 +20,6 @@ TRUNCATE TABLE
   public.cargo,
   public.evento_timeline,
   public.envio_sugerido,
-  public.alumno_planes,
-  public.persona_grupo,
   public.persona,
   public.planes_cobro,
   public.grupo,
@@ -72,11 +70,11 @@ INSERT INTO auth.identities (provider_id, user_id, identity_data, provider, last
 -- ----------------------------------------------------------------------------
 -- 2b. ACADEMIAS (2 escenarios de control)
 -- ----------------------------------------------------------------------------
-INSERT INTO public.academia (id, nombre, estado_tenant, timezone, config_cobro, multi_plan_enabled, allow_partial_payments, created_at) VALUES
+INSERT INTO public.academia (id, nombre, estado_tenant, timezone, config_cobro, allow_partial_payments, created_at) VALUES
 ('11111111-1111-4111-8111-111111111111', 'Club Deportivo Mazatlán', 'activa', 'America/Mazatlan',
-  '{"regimen_alta":"completo","modo_prorrateo":"completo","cobra_inscripcion":false}'::jsonb, false, false, now() - interval '120 days'),
+  '{"regimen_alta":"completo","modo_prorrateo":"completo","cobra_inscripcion":false}'::jsonb, false, now() - interval '120 days'),
 ('22222222-2222-4222-8222-222222222222', 'Studio de Danza UpDance', 'activa', 'America/Mexico_City',
-  '{"regimen_alta":"proporcional","modo_prorrateo":"proporcional","proporcional_redondeo":"10","cobra_inscripcion":false}'::jsonb, true, true, now() - interval '120 days');
+  '{"regimen_alta":"proporcional","modo_prorrateo":"proporcional","proporcional_redondeo":"10","cobra_inscripcion":false}'::jsonb, true, now() - interval '120 days');
 
 -- Usuario owner por academia
 INSERT INTO public.usuario (id, academia_id, nombre, apellido, email_snapshot, rol, estado, created_at) VALUES
@@ -106,15 +104,15 @@ INSERT INTO public.planes_cobro (id, academia_id, nombre, monto, frecuencia, act
 -- ----------------------------------------------------------------------------
 -- 4. CATÁLOGO DE GRUPOS (con plan sugerido)
 -- ----------------------------------------------------------------------------
-INSERT INTO public.grupo (id, academia_id, nombre, descripcion, color, emoji, estado, orden_visual, plan_sugerido_id, created_at) VALUES
+INSERT INTO public.grupo (id, academia_id, nombre, descripcion, color, emoji, estado, orden_visual, created_at) VALUES
 -- Academia 1
-('c0000001-0000-4000-8000-000000000001', '11111111-1111-4111-8111-111111111111', 'Sub 9',  'Categoría infantil', 'azul',     '⚽', 'activo', 1, 'b0000001-0000-4000-8000-000000000001', now() - interval '110 days'),
-('c0000002-0000-4000-8000-000000000002', '11111111-1111-4111-8111-111111111111', 'Sub 13', 'Categoría juvenil',  'verde',    '🥅', 'activo', 2, 'b0000001-0000-4000-8000-000000000001', now() - interval '110 days'),
+('c0000001-0000-4000-8000-000000000001', '11111111-1111-4111-8111-111111111111', 'Sub 9',  'Categoría infantil', 'azul',     '⚽', 'activo', 1, now() - interval '110 days'),
+('c0000002-0000-4000-8000-000000000002', '11111111-1111-4111-8111-111111111111', 'Sub 13', 'Categoría juvenil',  'verde',    '🥅', 'activo', 2, now() - interval '110 days'),
 -- Academia 2
-('c0000003-0000-4000-8000-000000000003', '22222222-2222-4222-8222-222222222222', 'Grupo Rosa (4-6 años)', 'Iniciación', 'rosa',   '🩰', 'activo', 1, NULL, now() - interval '110 days'),
-('c0000004-0000-4000-8000-000000000004', '22222222-2222-4222-8222-222222222222', 'Jazz Avanzado',          'Nivel alto', 'morado', '💃', 'activo', 2, NULL, now() - interval '110 days'),
-('c0000005-0000-4000-8000-000000000005', '22222222-2222-4222-8222-222222222222', 'Sabatino Intensivo',     'Solo sábados', 'naranja', '📅', 'activo', 3, 'b0000004-0000-4000-8000-000000000004', now() - interval '110 days'),
-('c0000006-0000-4000-8000-000000000006', '22222222-2222-4222-8222-222222222222', 'Zumba Histórico',        'Grupo descontinuado', 'gris', '🎶', 'archivado', 4, NULL, now() - interval '100 days');
+('c0000003-0000-4000-8000-000000000003', '22222222-2222-4222-8222-222222222222', 'Grupo Rosa (4-6 años)', 'Iniciación', 'rosa',   '🩰', 'activo', 1, now() - interval '110 days'),
+('c0000004-0000-4000-8000-000000000004', '22222222-2222-4222-8222-222222222222', 'Jazz Avanzado',          'Nivel alto', 'morado', '💃', 'activo', 2, now() - interval '110 days'),
+('c0000005-0000-4000-8000-000000000005', '22222222-2222-4222-8222-222222222222', 'Sabatino Intensivo',     'Solo sábados', 'naranja', '📅', 'activo', 3, now() - interval '110 days'),
+('c0000006-0000-4000-8000-000000000006', '22222222-2222-4222-8222-222222222222', 'Zumba Histórico',        'Grupo descontinuado', 'gris', '🎶', 'archivado', 4, now() - interval '100 days');
 
 -- ----------------------------------------------------------------------------
 -- 5. UNIVERSO DE ALUMNOS (10) — relaciones asimétricas
@@ -133,36 +131,20 @@ INSERT INTO public.persona (id, academia_id, nombre, apellido, telefono_whatsapp
 ('d0000009-0000-4000-8000-000000000009', '22222222-2222-4222-8222-222222222222', 'Camila',    'SinAsignar','5551000009','alumno','activo',  'al_corriente', now() - interval '40 days'),
 ('d000000a-0000-4000-8000-00000000000a', '22222222-2222-4222-8222-222222222222', 'Lucía',     'Sabatina','5551000010','alumno', 'activo',   'vencido',      now() - interval '60 days');
 
--- 5b. Tabla puente alumno↔grupo (persona_grupo)
-INSERT INTO public.persona_grupo (academia_id, persona_id, grupo_id, estado, fecha_inscripcion) VALUES
-('11111111-1111-4111-8111-111111111111', 'd0000001-0000-4000-8000-000000000001', 'c0000001-0000-4000-8000-000000000001', 'activo', now() - interval '90 days'),
-('11111111-1111-4111-8111-111111111111', 'd0000002-0000-4000-8000-000000000002', 'c0000002-0000-4000-8000-000000000002', 'activo', now() - interval '88 days'),
-('11111111-1111-4111-8111-111111111111', 'd0000003-0000-4000-8000-000000000003', 'c0000001-0000-4000-8000-000000000001', 'activo', now() - interval '85 days'),
-('11111111-1111-4111-8111-111111111111', 'd0000004-0000-4000-8000-000000000004', 'c0000002-0000-4000-8000-000000000002', 'activo', now() - interval '80 days'),
--- Valentina: multigrupo (Grupo Rosa + Sabatino Intensivo)
-('22222222-2222-4222-8222-222222222222', 'd0000005-0000-4000-8000-000000000005', 'c0000003-0000-4000-8000-000000000003', 'activo', now() - interval '78 days'),
-('22222222-2222-4222-8222-222222222222', 'd0000005-0000-4000-8000-000000000005', 'c0000005-0000-4000-8000-000000000005', 'activo', now() - interval '78 days'),
-('22222222-2222-4222-8222-222222222222', 'd0000006-0000-4000-8000-000000000006', 'c0000004-0000-4000-8000-000000000004', 'activo', now() - interval '76 days'),
-('22222222-2222-4222-8222-222222222222', 'd0000007-0000-4000-8000-000000000007', 'c0000004-0000-4000-8000-000000000004', 'activo', now() - interval '70 days'),
-('22222222-2222-4222-8222-222222222222', 'd0000008-0000-4000-8000-000000000008', 'c0000004-0000-4000-8000-000000000004', 'activo', now() - interval '95 days'),
-('22222222-2222-4222-8222-222222222222', 'd000000a-0000-4000-8000-00000000000a', 'c0000005-0000-4000-8000-000000000005', 'activo', now() - interval '60 days');
--- (Camila NO tiene grupo → huérfana de grupo)
-
--- 5c. Tabla puente alumno↔plan (alumno_planes)
-INSERT INTO public.alumno_planes (academia_id, alumno_id, plan_cobro_id, created_at) VALUES
-('11111111-1111-4111-8111-111111111111', 'd0000001-0000-4000-8000-000000000001', 'b0000001-0000-4000-8000-000000000001', now() - interval '90 days'),
-('11111111-1111-4111-8111-111111111111', 'd0000002-0000-4000-8000-000000000002', 'b0000001-0000-4000-8000-000000000001', now() - interval '88 days'),
-('11111111-1111-4111-8111-111111111111', 'd0000003-0000-4000-8000-000000000003', 'b0000001-0000-4000-8000-000000000001', now() - interval '85 days'),
-('11111111-1111-4111-8111-111111111111', 'd0000004-0000-4000-8000-000000000004', 'b0000001-0000-4000-8000-000000000001', now() - interval '80 days'),
--- Valentina: multiplan (Plan 2 días + Mensualidad Sabatina)
-('22222222-2222-4222-8222-222222222222', 'd0000005-0000-4000-8000-000000000005', 'b0000002-0000-4000-8000-000000000002', now() - interval '78 days'),
-('22222222-2222-4222-8222-222222222222', 'd0000005-0000-4000-8000-000000000005', 'b0000004-0000-4000-8000-000000000004', now() - interval '78 days'),
-('22222222-2222-4222-8222-222222222222', 'd0000006-0000-4000-8000-000000000006', 'b0000003-0000-4000-8000-000000000003', now() - interval '76 days'),
-('22222222-2222-4222-8222-222222222222', 'd0000007-0000-4000-8000-000000000007', 'b0000005-0000-4000-8000-000000000005', now() - interval '70 days'),
--- Regina: SOLO plan archivado (Workshop) → huérfana financiera (cron la ignora)
-('22222222-2222-4222-8222-222222222222', 'd0000008-0000-4000-8000-000000000008', 'b0000006-0000-4000-8000-000000000006', now() - interval '95 days'),
-('22222222-2222-4222-8222-222222222222', 'd000000a-0000-4000-8000-00000000000a', 'b0000004-0000-4000-8000-000000000004', now() - interval '60 days');
--- (Camila NO tiene plan → huérfana de plan)
+-- 5b. Asignar grupo y plan directo en persona (columnas 1:N post-migración)
+-- Academia 1
+UPDATE public.persona SET grupo_id = 'c0000001-0000-4000-8000-000000000001', plan_cobro_id = 'b0000001-0000-4000-8000-000000000001' WHERE id = 'd0000001-0000-4000-8000-000000000001';
+UPDATE public.persona SET grupo_id = 'c0000002-0000-4000-8000-000000000002', plan_cobro_id = 'b0000001-0000-4000-8000-000000000001' WHERE id = 'd0000002-0000-4000-8000-000000000002';
+UPDATE public.persona SET grupo_id = 'c0000001-0000-4000-8000-000000000001', plan_cobro_id = 'b0000001-0000-4000-8000-000000000001' WHERE id = 'd0000003-0000-4000-8000-000000000003';
+UPDATE public.persona SET grupo_id = 'c0000002-0000-4000-8000-000000000002', plan_cobro_id = 'b0000001-0000-4000-8000-000000000001' WHERE id = 'd0000004-0000-4000-8000-000000000004';
+-- Academia 2
+-- Valentina: ahora 1:1, se queda con Grupo Rosa + Plan 2 días
+UPDATE public.persona SET grupo_id = 'c0000003-0000-4000-8000-000000000003', plan_cobro_id = 'b0000002-0000-4000-8000-000000000002' WHERE id = 'd0000005-0000-4000-8000-000000000005';
+UPDATE public.persona SET grupo_id = 'c0000004-0000-4000-8000-000000000004', plan_cobro_id = 'b0000003-0000-4000-8000-000000000003' WHERE id = 'd0000006-0000-4000-8000-000000000006';
+UPDATE public.persona SET grupo_id = 'c0000004-0000-4000-8000-000000000004', plan_cobro_id = 'b0000005-0000-4000-8000-000000000005' WHERE id = 'd0000007-0000-4000-8000-000000000007';
+UPDATE public.persona SET grupo_id = 'c0000004-0000-4000-8000-000000000004', plan_cobro_id = 'b0000006-0000-4000-8000-000000000006' WHERE id = 'd0000008-0000-4000-8000-000000000008';
+-- Camila NO tiene grupo ni plan → huérfana
+UPDATE public.persona SET grupo_id = 'c0000005-0000-4000-8000-000000000005', plan_cobro_id = 'b0000004-0000-4000-8000-000000000004' WHERE id = 'd000000a-0000-4000-8000-00000000000a';
 
 -- ----------------------------------------------------------------------------
 -- 6. LEDGER CRONOLÓGICO (cargos, abonos, anulaciones)

@@ -12,11 +12,10 @@ export default async function GruposPage() {
   // Config de cobranza para el preview de prorrateo del drawer de inscripción
   const { data: academia } = await supabase
     .from('academia')
-    .select('config_cobro, multi_plan_enabled, monto_inscripcion_default, cobrar_inscripcion_default')
+    .select('config_cobro, monto_inscripcion_default, cobrar_inscripcion_default')
     .eq('id', academiaId)
     .single() as any
   const modoProrrateo = (academia?.config_cobro?.modo_prorrateo as 'proporcional' | 'completo') || 'proporcional'
-  const multiPlanEnabled = !!academia?.multi_plan_enabled
   const montoInscripcionDefault = Number(academia?.monto_inscripcion_default ?? 0)
   const cobrarInscripcionDefault = !!academia?.cobrar_inscripcion_default
 
@@ -24,26 +23,31 @@ export default async function GruposPage() {
 
   // Fetch grupos regulares (las actividades viven en su propia pantalla)
   // con el estado de sus miembros (tanto activos como archivados)
-  const { data: grupos } = await supabase
+  const { data: gruposRaw } = await supabase
     .from('grupo')
     .select(`
-      id, nombre, descripcion, estado, color, emoji, plan_sugerido_id, dias_semana, hora_inicio, hora_fin, cupo_maximo,
-      persona_grupo (
-        estado,
-        persona (
-          estado_global,
-          estado_registro,
-          cargo (
-            concepto,
-            estado_financiero,
-            fecha_vencimiento,
-            saldo_pendiente
-          )
+      id, nombre, descripcion, estado, color, emoji, dias_semana, hora_inicio, hora_fin, cupo_maximo,
+      persona (
+        estado_global,
+        estado_registro,
+        cargo (
+          concepto,
+          estado_financiero,
+          fecha_vencimiento,
+          saldo_pendiente
         )
       )
     `)
     .eq('es_temporal', false)
     .order('nombre', { ascending: true }) as any
+
+  const grupos = (gruposRaw ?? []).map((g: any) => ({
+    ...g,
+    persona_grupo: (g.persona ?? []).map((pe: any) => ({
+      estado: pe.estado_registro,
+      persona: pe,
+    }))
+  }))
 
   // Planes de cobro de la academia (catálogo para el selector de inscripción)
   const { data: planes } = await supabase
@@ -58,7 +62,6 @@ export default async function GruposPage() {
       grupos={grupos || []}
       planes={planes || []}
       modoProrrateo={modoProrrateo}
-      multiPlanEnabled={multiPlanEnabled}
       montoInscripcionDefault={montoInscripcionDefault}
       cobrarInscripcionDefault={cobrarInscripcionDefault}
       timezone={timezone}

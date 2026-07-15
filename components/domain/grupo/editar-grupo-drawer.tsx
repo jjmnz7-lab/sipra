@@ -49,7 +49,7 @@ type Props = {
     nombre: string
     color: string | null
     emoji: string | null
-    plan_sugerido_id?: string | null
+
     dias_semana?: number[] | null
     hora_inicio?: string | null
     hora_fin?: string | null
@@ -68,7 +68,6 @@ export function EditarGrupoDrawer({ grupo, planes = [], open, onOpenChange }: Pr
   const [colorSlug, setColorSlug] = useState<string>(grupo.color ?? COLORES_GRUPO[0].slug)
   const [emoji, setEmoji] = useState<string>(grupo.emoji || EMOJIS_GRUPO[0])
   const [nombre, setNombre] = useState<string>(grupo.nombre)
-  const [planSugerido, setPlanSugerido] = useState<string>(grupo.plan_sugerido_id ?? NONE)
   const [dias, setDias] = useState<number[]>(grupo.dias_semana ?? [])
   const [horaInicio, setHoraInicio] = useState<string>((grupo.hora_inicio ?? '').slice(0, 5))
   const [horaFin, setHoraFin] = useState<string>((grupo.hora_fin ?? '').slice(0, 5))
@@ -84,7 +83,6 @@ export function EditarGrupoDrawer({ grupo, planes = [], open, onOpenChange }: Pr
         setColorSlug(grupo.color ?? COLORES_GRUPO[0].slug)
         setEmoji(grupo.emoji || EMOJIS_GRUPO[0])
         setNombre(grupo.nombre)
-        setPlanSugerido(grupo.plan_sugerido_id ?? NONE)
         setDias(grupo.dias_semana ?? [])
         setHoraInicio((grupo.hora_inicio ?? '').slice(0, 5))
         setHoraFin((grupo.hora_fin ?? '').slice(0, 5))
@@ -128,7 +126,6 @@ export function EditarGrupoDrawer({ grupo, planes = [], open, onOpenChange }: Pr
             <input type="hidden" name="grupo_id" value={grupo.id} />
             <input type="hidden" name="color" value={colorSlug} />
             <input type="hidden" name="emoji" value={emoji} />
-            <input type="hidden" name="plan_sugerido_id" value={planSugerido === NONE ? '' : planSugerido} />
 
             <div className="p-4 pb-0 space-y-5">
               {/* 1. Nombre */}
@@ -144,25 +141,6 @@ export function EditarGrupoDrawer({ grupo, planes = [], open, onOpenChange }: Pr
                 />
                 {state?.errors?.nombre && <p className="text-sm text-red-600">{state.errors.nombre[0]}</p>}
               </div>
-
-              {/* 2. Plan */}
-              {planes.length > 0 && (
-                <div className="space-y-2">
-                  <Label>Plan sugerido (opcional)</Label>
-                  <Select value={planSugerido} onValueChange={setPlanSugerido}>
-                    <SelectTrigger className="h-11"><SelectValue placeholder="Sin plan sugerido" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NONE}>Sin plan sugerido</SelectItem>
-                      {planes.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.nombre} — {formatCurrencyCompact(p.monto)} {FRECUENCIA_SUFIJO[p.frecuencia] ?? ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[11px] text-muted-foreground">Se autoselecciona al inscribir alumnos a este grupo (editable).</p>
-                </div>
-              )}
 
               {/* 3. Cupo máximo */}
               <div className="space-y-2">

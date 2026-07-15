@@ -56,7 +56,7 @@ export function GrupoClientView({
   cobrosFrecuentes?: { id: string; concepto: string; monto: number }[]
   planes?: PlanLite[]
   modoProrrateo?: 'proporcional' | 'completo'
-  multiPlanEnabled?: boolean
+
   montoInscripcionDefault?: number
   cobrarInscripcionDefault?: boolean
   gruposDestino?: { id: string; nombre: string }[]
@@ -352,7 +352,7 @@ export function GrupoClientView({
         grupoId={grupo.id}
         grupoNombre={grupo.nombre}
         alumnos={alumnosDisponibles}
-        planSugerido={grupo.plan_sugerido_id ? planes.find((p) => p.id === grupo.plan_sugerido_id) ?? null : null}
+        planSugerido={null}
         cobrarInscripcionDefault={cobrarInscripcionDefault}
         montoInscripcionDefault={montoInscripcionDefault}
         open={isAsignarOpen}
@@ -383,7 +383,6 @@ export function GrupoClientView({
           nombre: grupo.nombre,
           color: grupo.color ?? null,
           emoji: grupo.emoji ?? null,
-          plan_sugerido_id: grupo.plan_sugerido_id ?? null,
           dias_semana: grupo.dias_semana ?? null,
           hora_inicio: grupo.hora_inicio ?? null,
           hora_fin: grupo.hora_fin ?? null,

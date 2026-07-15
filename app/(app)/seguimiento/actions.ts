@@ -382,10 +382,23 @@ export async function editarAlumnoAction(prevState: FormState, formData: FormDat
     }
   }
 
+  const grupoId = (formData.get('grupo_id') as string) || null
+  const planId = (formData.get('plan_id') as string) || null
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   const academiaId = user?.app_metadata?.academia_id
   if (!academiaId) return { message: 'Academia no encontrada', success: false }
+
+  // Obtener estado anterior
+  const { data: personaActual } = await supabase
+    .from('persona')
+    .select('grupo_id, plan_cobro_id')
+    .eq('id', validated.data.persona_id)
+    .eq('academia_id', academiaId)
+    .single() as any
+  const currentGrupoId = personaActual?.grupo_id ?? null
+  const currentPlanId = personaActual?.plan_cobro_id ?? null
 
   const { error } = await (supabase as any)
     .from('persona')
@@ -393,150 +406,74 @@ export async function editarAlumnoAction(prevState: FormState, formData: FormDat
       nombre: validated.data.nombre,
       apellido: validated.data.apellido || null,
       telefono_whatsapp: validated.data.telefono_whatsapp || null,
-      // El email ya no se edita desde el UI: se preserva el valor existente.
-      // Descuentos especiales (mutuamente excluyentes; ya validado arriba).
       descuento_hermanos_activo: validated.data.descuento_hermanos_activo,
       descuento_hermanos_monto: validated.data.descuento_hermanos_activo ? validated.data.descuento_hermanos_monto : 0,
       beca_activa: validated.data.beca_activa,
       beca_porcentaje: validated.data.beca_activa ? validated.data.beca_porcentaje : 0,
+      grupo_id: grupoId,
+      plan_cobro_id: planId,
     })
     .eq('id', validated.data.persona_id)
     .eq('academia_id', academiaId)
 
   if (error) return { message: translateRpcError(error), success: false }
 
-  // Update M2M groups and plans
-  const grupoIds = parseIdArray(formData.get('grupo_ids'))
-  const planIds = parseIdArray(formData.get('plan_ids'))
-
-  // 1. Update groups.
-  // La sincronización solo considera grupos REGULARES: las inscripciones a
-  // actividades (es_temporal) no se tocan desde la edición del alumno.
-  const { data: activeGps } = await supabase
-    .from('persona_grupo')
-    .select('grupo_id, grupo:grupo_id (es_temporal)')
-    .eq('persona_id', validated.data.persona_id)
-    .eq('estado', 'activo') as any
-  const currentGps = (activeGps ?? [])
-    .filter((g: any) => g.grupo && g.grupo.es_temporal === false)
-    .map((g: any) => g.grupo_id)
-
-  const gpsToRemove = currentGps.filter((id: string) => !grupoIds.includes(id))
-  const gpsToAdd = grupoIds.filter((id: string) => !currentGps.includes(id))
-
-  if (gpsToRemove.length > 0) {
-    await supabase
-      .from('persona_grupo')
-      .update({ estado: 'removido', fecha_remocion: new Date().toISOString() } as any)
-      .eq('persona_id', validated.data.persona_id)
-      .in('grupo_id', gpsToRemove)
+  // 3. Eventos OPERATIVO: mutaciones de grupo y esquema de cobro.
+  const actorNombre = await obtenerActorNombre(supabase, user!.id)
+  const base = {
+    academia_id: academiaId,
+    persona_id: validated.data.persona_id,
+    categoria: 'OPERATIVO',
+    actor_id: user!.id,
+    actor_nombre: actorNombre,
   }
+  const eventos = []
 
-  for (const gId of gpsToAdd) {
-    await supabase
-      .from('persona_grupo')
-      .upsert({
-        academia_id: academiaId,
-        persona_id: validated.data.persona_id,
-        grupo_id: gId,
-        estado: 'activo',
-        fecha_inscripcion: new Date().toISOString().slice(0, 10),
-      } as any, { onConflict: 'persona_id,grupo_id' })
-  }
-
-  // 2. Update plans
-  const { data: activePls } = await supabase
-    .from('alumno_planes')
-    .select('plan_cobro_id')
-    .eq('alumno_id', validated.data.persona_id) as any
-  const currentPls = (activePls ?? []).map((p: any) => p.plan_cobro_id)
-
-  const plsToRemove = currentPls.filter((id: string) => !planIds.includes(id))
-  const plsToAdd = planIds.filter((id: string) => !currentPls.includes(id))
-
-  if (plsToRemove.length > 0) {
-    await supabase
-      .from('alumno_planes')
-      .delete()
-      .eq('alumno_id', validated.data.persona_id)
-      .in('plan_cobro_id', plsToRemove)
-  }
-
-  for (const pId of plsToAdd) {
-    await supabase
-      .from('alumno_planes')
-      .insert({
-        academia_id: academiaId,
-        alumno_id: validated.data.persona_id,
-        plan_cobro_id: pId,
-      } as any)
-  }
-
-  // 3. Eventos OPERATIVO: mutaciones de grupos y esquemas de cobro.
-  const grupoIdsAfectados = [...gpsToAdd, ...gpsToRemove]
-  const planIdsAfectados = [...plsToAdd, ...plsToRemove]
-  if (grupoIdsAfectados.length > 0 || planIdsAfectados.length > 0) {
-    const actorNombre = await obtenerActorNombre(supabase, user!.id)
-
-    const nombreGrupo: Record<string, string> = {}
-    if (grupoIdsAfectados.length > 0) {
-      const { data: gruposData } = await supabase
-        .from('grupo')
-        .select('id, nombre')
-        .in('id', grupoIdsAfectados) as any
-      for (const g of gruposData ?? []) nombreGrupo[g.id] = g.nombre
-    }
-
-    const nombrePlan: Record<string, string> = {}
-    if (planIdsAfectados.length > 0) {
-      const { data: planesData } = await supabase
-        .from('planes_cobro')
-        .select('id, nombre')
-        .in('id', planIdsAfectados) as any
-      for (const p of planesData ?? []) nombrePlan[p.id] = p.nombre
-    }
-
-    const base = {
-      academia_id: academiaId,
-      persona_id: validated.data.persona_id,
-      categoria: 'OPERATIVO',
-      actor_id: user!.id,
-      actor_nombre: actorNombre,
-    }
-    const eventos = [
-      ...gpsToAdd.map((id: string) => ({
-        ...base, tipo: 'GRUPO_MUTACION', titulo: 'Grupo asignado',
-        descripcion: nombreGrupo[id] ?? null, metadata: { grupo_id: id },
-      })),
-      ...gpsToRemove.map((id: string) => ({
+  if (grupoId !== currentGrupoId) {
+    if (currentGrupoId) {
+      const { data: oldGrupo } = await supabase.from('grupo').select('nombre').eq('id', currentGrupoId).single() as any
+      eventos.push({
         ...base, tipo: 'GRUPO_MUTACION', titulo: 'Grupo removido',
-        descripcion: nombreGrupo[id] ?? null, metadata: { grupo_id: id },
-      })),
-      ...plsToAdd.map((id: string) => ({
-        ...base, tipo: 'ESQUEMA_MUTACION', titulo: 'Esquema asignado',
-        descripcion: nombrePlan[id] ?? null, metadata: { plan_id: id },
-      })),
-      ...plsToRemove.map((id: string) => ({
-        ...base, tipo: 'ESQUEMA_MUTACION', titulo: 'Esquema removido',
-        descripcion: nombrePlan[id] ?? null, metadata: { plan_id: id },
-      })),
-    ]
-    if (eventos.length > 0) {
-      await (supabase as any).from('evento_timeline').insert(eventos)
+        descripcion: oldGrupo?.nombre ?? null, metadata: { grupo_id: currentGrupoId }
+      })
+    }
+    if (grupoId) {
+      const { data: newGrupo } = await supabase.from('grupo').select('nombre').eq('id', grupoId).single() as any
+      eventos.push({
+        ...base, tipo: 'GRUPO_MUTACION', titulo: 'Grupo asignado',
+        descripcion: newGrupo?.nombre ?? null, metadata: { grupo_id: grupoId }
+      })
     }
   }
 
-  // 4. Mensualidad del mes en curso para esquemas recién asignados: el cron solo
-  //    materializa mensualidades el día 1, así que quien recibe su esquema después
-  //    quedaría sin cargo hasta el próximo mes. La RPC decide monto según las
-  //    reglas de la academia y deduplica por persona+periodo (no genera nada si
-  //    el mes ya está cubierto, es mes sin cobro, el plan no es mensual, etc.).
+  if (planId !== currentPlanId) {
+    if (currentPlanId) {
+      const { data: oldPlan } = await supabase.from('planes_cobro').select('nombre').eq('id', currentPlanId).single() as any
+      eventos.push({
+        ...base, tipo: 'ESQUEMA_MUTACION', titulo: 'Esquema removido',
+        descripcion: oldPlan?.nombre ?? null, metadata: { plan_id: currentPlanId }
+      })
+    }
+    if (planId) {
+      const { data: newPlan } = await supabase.from('planes_cobro').select('nombre').eq('id', planId).single() as any
+      eventos.push({
+        ...base, tipo: 'ESQUEMA_MUTACION', titulo: 'Esquema asignado',
+        descripcion: newPlan?.nombre ?? null, metadata: { plan_id: planId }
+      })
+    }
+  }
+
+  if (eventos.length > 0) {
+    await (supabase as any).from('evento_timeline').insert(eventos)
+  }
+
+  // 4. Mensualidad del mes en curso para esquema recién asignado.
   const avisosCargo: string[] = []
-  for (const pId of plsToAdd) {
+  if (planId && planId !== currentPlanId) {
     const { data: gen } = await (supabase as any).rpc('generar_mensualidad_esquema_v1', {
       p_academia_id: academiaId,
       p_persona_id: validated.data.persona_id,
-      p_plan_cobro_id: pId,
+      p_plan_cobro_id: planId,
     })
     if (gen?.generado) {
       avisosCargo.push(`Se generó ${gen.concepto} por $${Math.round(Number(gen.monto))}.`)
@@ -647,7 +584,6 @@ export async function eliminarAlumnoAction(prevState: FormState, formData: FormD
   // Borrar dependencias en orden seguro.
   await (supabase as any).from('evento_timeline').delete().eq('persona_id', persona_id).eq('academia_id', academiaId)
   await (supabase as any).from('cargo').delete().eq('persona_id', persona_id).eq('academia_id', academiaId)
-  await (supabase as any).from('persona_grupo').delete().eq('persona_id', persona_id).eq('academia_id', academiaId)
 
   const { error } = await (supabase as any)
     .from('persona')

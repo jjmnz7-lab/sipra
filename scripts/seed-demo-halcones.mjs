@@ -296,7 +296,7 @@ async function main() {
   const gruposRegulares = Object.entries(GRUPOS).map(([key, g], i) => ({
     id: g.id, academia_id: ACADEMIA_ID, nombre: g.nombre, descripcion: null, color: g.color, emoji: g.emoji,
     estado: 'activo', orden_visual: i + 1, es_temporal: false, dias_semana: g.dias,
-    hora_inicio: g.hi, hora_fin: g.hf, cupo_maximo: g.cupo, plan_sugerido_id: PLANES[g.plan].id,
+    hora_inicio: g.hi, hora_fin: g.hf, cupo_maximo: g.cupo,
     created_by: OWNER_ID, created_at: at('2025-08-16'), updated_at: at('2025-08-16'),
   }))
   const actividades = Object.entries(ACTIVIDADES).map(([key, a]) => ({

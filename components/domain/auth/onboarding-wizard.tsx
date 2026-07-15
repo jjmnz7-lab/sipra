@@ -44,9 +44,13 @@ const MESES = [
   { num: 12, label: 'Dic' },
 ]
 
-export function OnboardingWizard() {
+export function OnboardingWizard({ token }: { token?: string }) {
   const router = useRouter()
   const [state, formAction, isPending] = useActionState(registroAction, initialState)
+
+  const [isValidating, setIsValidating] = useState(true)
+  const [tokenError, setTokenError] = useState<string | null>(null)
+  const [tokenData, setTokenData] = useState<any>(null)
 
   const [step, setStep] = useState(0) // 0 to 4
   const [dir, setDir] = useState<'fwd' | 'back'>('fwd')
@@ -83,14 +87,58 @@ export function OnboardingWizard() {
   const [localErrors, setLocalErrors] = useState<Record<string, string>>({})
 
   // Estado de finalización
-  const [finalizing, setFinalizing] = useState(false)
   const navigatedRef = useRef(false)
+
+  // Validar token de invitación al cargar
+  useEffect(() => {
+    if (!token) {
+      setTokenError('Este enlace de invitación no es válido o ya expiró. Contacta a soporte para solicitar uno nuevo.')
+      setIsValidating(false)
+      return
+    }
+
+    const validate = async () => {
+      try {
+        const supabase = createClient()
+        const { data, error } = await supabase.rpc('validar_invitacion_academia_v1', {
+          p_token: token,
+          p_ip: undefined,
+          p_device: typeof navigator !== 'undefined' ? navigator.userAgent : undefined
+        })
+
+        const res = data as unknown as {
+          success: boolean
+          academia_id?: string
+          nombre?: string
+          telefono?: string
+          plan_codigo?: string
+          message?: string
+          error_code?: string
+        }
+
+        if (error) {
+          setTokenError('Error al validar la invitación: ' + error.message)
+        } else if (res && res.success) {
+          setTokenData(res)
+          setNombreAcademia(res.nombre || '')
+          setTelefono(res.telefono || '')
+        } else {
+          setTokenError(res?.message || 'Este enlace de invitación no es válido o ya expiró. Contacta a soporte para solicitar uno nuevo.')
+        }
+      } catch (err) {
+        setTokenError('Ocurrió un error inesperado al validar la invitación.')
+      } finally {
+        setIsValidating(false)
+      }
+    }
+
+    void validate()
+  }, [token])
 
   // Al confirmar el alta: subir logo opcional y navegar.
   useEffect(() => {
     if (!state.success || navigatedRef.current) return
     navigatedRef.current = true
-    setFinalizing(true)
 
     const run = async () => {
       const academiaId = state.academiaId
@@ -100,8 +148,8 @@ export function OnboardingWizard() {
           const supabase = createClient()
           const path = `${academiaId}/logo.webp`
           const { error } = await supabase.storage
-            .from('logos')
-            .upload(path, resized, { contentType: 'image/webp', upsert: true })
+             .from('logos')
+             .upload(path, resized, { contentType: 'image/webp', upsert: true })
           if (!error) {
             const { data: urlData } = supabase.storage.from('logos').getPublicUrl(path)
             await guardarLogoAction(`${urlData.publicUrl}?v=${Date.now()}`)
@@ -123,6 +171,7 @@ export function OnboardingWizard() {
       if (password.length < 6) errs.password = 'Mínimo 6 caracteres.'
     } else if (step === 1) {
       if (nombreAcademia.trim().length < 3) errs.nombreAcademia = 'Mínimo 3 caracteres.'
+      if (!telefono || telefono.trim().length < 10) errs.telefono = 'El teléfono es obligatorio y debe tener al menos 10 dígitos.'
     } else if (step === 2) {
       if (!planMonto || Number(planMonto) < 0) errs.planMonto = 'Ingresa un monto válido.'
     } else if (step === 3) {
@@ -162,11 +211,17 @@ export function OnboardingWizard() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
+    if (step < 4) {
+      goNext()
+      return
+    }
+
     // Validar paso final
     const errs: Record<string, string> = {}
     setLocalErrors(errs)
 
     const fd = new FormData()
+    fd.set('token', token || '')
     fd.set('nombreOwner', nombreOwner)
     fd.set('apellidoOwner', apellidoOwner)
     fd.set('email', email)
@@ -192,12 +247,43 @@ export function OnboardingWizard() {
     startTransition(() => formAction(fd))
   }
 
+  const busy = isPending
+
+  if (isValidating) {
+    return (
+      <Card className="w-full max-w-md mx-auto shadow-lg border border-border">
+        <CardContent className="flex flex-col items-center justify-center py-12 space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-[#22887c]" />
+          <p className="text-sm text-muted-foreground">Validando tu invitación...</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (tokenError) {
+    return (
+      <Card className="w-full max-w-md mx-auto shadow-lg border border-border">
+        <CardHeader className="text-center pt-6">
+          <CardTitle className="text-xl font-bold text-red-600">Invitación Inválida</CardTitle>
+        </CardHeader>
+        <CardContent className="text-center px-6 pb-6 space-y-6">
+          <p className="text-sm text-slate-600 leading-relaxed">{tokenError}</p>
+          <Button
+            type="button"
+            className="w-full bg-[#15435a] hover:bg-[#15435a]/90 h-11 font-semibold"
+            onClick={() => router.push('/login')}
+          >
+            Volver al Inicio de Sesión
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
   const panelAnim =
     dir === 'fwd'
       ? 'animate-in fade-in slide-in-from-right-6 duration-300'
       : 'animate-in fade-in slide-in-from-left-6 duration-300'
-
-  const busy = isPending || finalizing
 
   // Validaciones del botón continuar para habilitación rápida/deshabilitación táctil
   const isContinueDisabled = () => {
@@ -205,7 +291,7 @@ export function OnboardingWizard() {
       return nombreOwner.trim().length < 2 || !EMAIL_RE.test(email) || password.length < 6
     }
     if (step === 1) {
-      return nombreAcademia.trim().length < 3
+      return nombreAcademia.trim().length < 3 || !telefono || telefono.trim().length < 10
     }
     if (step === 2) {
       return planMonto === '' || Number(planMonto) < 0
@@ -348,7 +434,10 @@ export function OnboardingWizard() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="nombreAcademia">Nombre de la academia</Label>
+                  <div className="flex justify-between items-baseline">
+                    <Label htmlFor="nombreAcademia">Nombre de la academia</Label>
+                    <span className="text-[10px] text-[#22887c] font-semibold">Verifica los datos de tu academia</span>
+                  </div>
                   <Input
                     id="nombreAcademia"
                     value={nombreAcademia}
@@ -361,7 +450,7 @@ export function OnboardingWizard() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="telefono">Teléfono de contacto (opcional)</Label>
+                  <Label htmlFor="telefono">Teléfono de contacto (obligatorio)</Label>
                   <Input
                     id="telefono"
                     type="tel"
@@ -370,6 +459,7 @@ export function OnboardingWizard() {
                     placeholder="10 dígitos"
                     className="h-11"
                   />
+                  {localErrors.telefono && <p className="text-xs text-red-600">{localErrors.telefono}</p>}
                 </div>
               </div>
             )}

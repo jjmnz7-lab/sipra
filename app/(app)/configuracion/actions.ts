@@ -348,46 +348,7 @@ export async function eliminarPlanCobroAction(planId: string): Promise<FormState
   return archivarPlanCobroAction(planId, null)
 }
 
-/** Activa el modo multi-plan (no requiere migración). */
-export async function activarMultiPlanAction(): Promise<FormState> {
-  const { supabase, academiaId } = await getAcademiaId()
-  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
 
-  const { error } = await supabase
-    .from('academia')
-    .update({ multi_plan_enabled: true } as any)
-    .eq('id', academiaId)
-
-  if (error) return { message: translateRpcError(error), success: false }
-
-  revalidatePath('/configuracion')
-  revalidatePath('/grupos')
-  revalidatePath('/alumnos')
-  return { success: true, message: 'Modo multi-plan activado.' }
-}
-
-/**
- * Convierte la academia de multi-plan a plan único: mueve a todos los alumnos
- * activos al plan fallback y archiva el resto de planes.
- */
-export async function convertirAPlanUnicoAction(planIdFallback: string): Promise<FormState> {
-  if (!planIdFallback) return { message: 'Selecciona el plan que se quedará.', success: false }
-
-  const { supabase, academiaId } = await getAcademiaId()
-  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
-
-  const { error } = await (supabase as any).rpc('convertir_a_plan_unico_v1', {
-    p_academia_id: academiaId,
-    p_plan_id_fallback: planIdFallback,
-  })
-
-  if (error) return { message: translateRpcError(error), success: false }
-
-  revalidatePath('/configuracion')
-  revalidatePath('/grupos')
-  revalidatePath('/alumnos')
-  return { success: true, message: 'Academia convertida a plan único.' }
-}
 
 /**
  * Crea o edita un plan de cobro mensual (concepto + monto). Los planes que se
@@ -447,8 +408,8 @@ export async function eliminarPlanDefinitivoAction(planId: string): Promise<Form
   if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
 
   const { count, error: countError } = await supabase
-    .from('alumno_planes')
-    .select('plan_cobro_id', { count: 'exact', head: true })
+    .from('persona')
+    .select('id', { count: 'exact', head: true })
     .eq('academia_id', academiaId)
     .eq('plan_cobro_id', planId)
   if (countError) return { message: translateRpcError(countError), success: false }

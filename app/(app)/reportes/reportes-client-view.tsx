@@ -255,11 +255,11 @@ export function ReportesClientView({
           </Card>
         </section>
 
-        {/* Control de cargos grupales */}
+        {/* Control de cargos colectivos */}
         <section className="space-y-3">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Control de cargos grupales/masivos</CardTitle>
+              <CardTitle className="text-lg">Control de cargos colectivos</CardTitle>
               <CardAction>
                 <button
                   type="button"

@@ -80,6 +80,7 @@ export async function POST(req: NextRequest) {
         telefono_whatsapp: data.alumno_nuevo.telefono_whatsapp ?? null,
         etiqueta: 'alumno',
         estado_registro: 'activo',
+        plan_cobro_id: data.alumno_nuevo.plan_cobro_id ?? null,
       })
       .select('id')
       .single()
@@ -91,23 +92,6 @@ export async function POST(req: NextRequest) {
       )
     }
     alumnoId = persona.id
-
-    // Vincular plan 'por_visita' si lo indicaron (no obligatorio).
-    if (data.alumno_nuevo.plan_cobro_id) {
-      const { error: errPlan } = await (supabase as any)
-        .from('alumno_planes')
-        .insert({
-          academia_id: academiaId,
-          alumno_id: alumnoId,
-          plan_cobro_id: data.alumno_nuevo.plan_cobro_id,
-        })
-      if (errPlan) {
-        return NextResponse.json(
-          { error: translateRpcError(errPlan), alumno_id: alumnoId },
-          { status: 400 }
-        )
-      }
-    }
   }
 
   if (!alumnoId) {

@@ -21,7 +21,6 @@ type Props = {
   grupos: GrupoFiltro[]
   planes: PlanCobroItem[]
   modoProrrateo: 'proporcional' | 'completo'
-  multiPlanEnabled: boolean
   montoInscripcionDefault?: number
   cobrarInscripcionDefault?: boolean
 }
@@ -41,7 +40,7 @@ function normalizar(s: string | null | undefined) {
     .toLowerCase()
 }
 
-export function AlumnosClientView({ alumnos, grupos, planes, modoProrrateo, multiPlanEnabled, montoInscripcionDefault = 0, cobrarInscripcionDefault = false }: Props) {
+export function AlumnosClientView({ alumnos, grupos, planes, modoProrrateo, montoInscripcionDefault = 0, cobrarInscripcionDefault = false }: Props) {
   // Search
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -362,7 +361,7 @@ export function AlumnosClientView({ alumnos, grupos, planes, modoProrrateo, mult
         open={filtrosOpen}
         onOpenChange={setFiltrosOpen}
         grupos={grupos}
-        planes={multiPlanEnabled ? planes.map((p) => ({ id: p.id, nombre: p.nombre })) : undefined}
+        planes={planes.map((p) => ({ id: p.id, nombre: p.nombre }))}
         currentEstado={filtroEstado}
         currentGrupos={filtroGrupos}
         currentPlanes={filtroPlanes}
@@ -379,7 +378,7 @@ export function AlumnosClientView({ alumnos, grupos, planes, modoProrrateo, mult
 
       {/* Lista de alumnos */}
       <div className="p-4 space-y-2.5">
-        {dentroFiltro.map(a => <AlumnoCard key={a.id} a={a} multiPlanEnabled={multiPlanEnabled} />)}
+        {dentroFiltro.map(a => <AlumnoCard key={a.id} a={a} />)}
 
         {hayBusqueda && fueraFiltro.length > 0 && (
           <>
@@ -390,7 +389,7 @@ export function AlumnosClientView({ alumnos, grupos, planes, modoProrrateo, mult
               </span>
               <div className="flex-1 h-[1px] bg-slate-100 dark:bg-slate-900/30" />
             </div>
-            {fueraFiltro.map(a => <AlumnoCard key={a.id} a={a} multiPlanEnabled={multiPlanEnabled} />)}
+            {fueraFiltro.map(a => <AlumnoCard key={a.id} a={a} />)}
           </>
         )}
 
@@ -412,18 +411,16 @@ export function AlumnosClientView({ alumnos, grupos, planes, modoProrrateo, mult
         grupos={grupos as any}
         planes={planes as any}
         modoProrrateo={modoProrrateo}
-        multiPlanEnabled={multiPlanEnabled}
       />
     </div>
   )
 }
 
-function AlumnoCard({ a, multiPlanEnabled }: { a: AlumnoListItem; multiPlanEnabled: boolean }) {
+function AlumnoCard({ a }: { a: AlumnoListItem }) {
   const estado = colorEstado(a.estadoFinanciero)
   const grupoColor = a.grupo ? colorPorSlug(a.grupo.color) : null
   const suspendido = a.estado_registro !== 'activo'
   const planPrincipal = a.planes[0]
-  const planesExtra = a.planes.length - 1
   const descuento = descuentoEspecialBadge(a.descuentoHermanosActivo, a.becaActiva, a.becaPorcentaje)
 
   return (
@@ -451,28 +448,7 @@ function AlumnoCard({ a, multiPlanEnabled }: { a: AlumnoListItem; multiPlanEnabl
         </div>
         <div className="flex items-center justify-start sm:justify-end gap-1.5 flex-shrink-0 w-full sm:w-auto">
           {/* Badge de grupo */}
-          {a.grupos && a.grupos.length > 1 ? (
-             <span
-               className="inline-flex items-center gap-1.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full border bg-white border-gray-200 dark:bg-card dark:border-border dark:text-foreground flex-shrink-0 whitespace-nowrap"
-               style={{ color: '#333a4a' }}
-               title={a.grupos.map((g) => g.nombre).join(', ')}
-             >
-               <div className="flex items-center -space-x-0.5">
-                 {a.grupos.slice(0, 3).map((g, idx) => {
-                   const gColor = colorPorSlug(g.color)
-                   return (
-                     <div
-                       key={g.id}
-                       className="w-2 h-2 rounded-full border border-white dark:border-card"
-                       style={{ backgroundColor: gColor.border, zIndex: 10 - idx }}
-                     />
-                   )
-                 })}
-               </div>
-               <span>{a.grupos[0].nombre}</span>
-               <span className="flex-shrink-0">, +{a.grupos.length - 1}</span>
-             </span>
-          ) : a.grupo && grupoColor ? (
+          {a.grupo && grupoColor ? (
             <span
               className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full border whitespace-nowrap"
               style={{ borderColor: grupoColor.border, color: grupoColor.textLight, backgroundColor: grupoColor.bg }}
@@ -496,14 +472,13 @@ function AlumnoCard({ a, multiPlanEnabled }: { a: AlumnoListItem; multiPlanEnabl
                </span>
                Sin plan de pago
              </span>
-          ) : multiPlanEnabled && planPrincipal ? (
+          ) : planPrincipal ? (
              <span
                className="inline-flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-muted/80 text-muted-foreground flex-shrink-0 whitespace-nowrap"
-               title={a.planes.map((p) => p.nombre).join(', ')}
+               title={planPrincipal.nombre}
              >
                <PlanIcon />
                <span>{planPrincipal.nombre}</span>
-               {planesExtra > 0 && <span className="flex-shrink-0">, +{planesExtra}</span>}
              </span>
           ) : null}
 

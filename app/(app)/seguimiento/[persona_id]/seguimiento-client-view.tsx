@@ -57,7 +57,6 @@ export function SeguimientoClientView({
   grupos = [],
   planes = [],
   cobrosFrecuentes = [],
-  multiPlanEnabled = false,
   currentGrupoId = null,
   currentPlanIds = [],
 }: {
@@ -74,7 +73,6 @@ export function SeguimientoClientView({
   grupos?: any[]
   planes?: any[]
   cobrosFrecuentes?: { id: string; concepto: string; monto: number }[]
-  multiPlanEnabled?: boolean
   currentGrupoId?: string | null
   currentPlanIds?: string[]
 }) {
@@ -108,8 +106,7 @@ export function SeguimientoClientView({
     }
   }, [searchParams])
 
-  const [groupsExpanded, setGroupsExpanded] = useState(false)
-  const [plansExpanded, setPlansExpanded] = useState(false)
+
   const [isPhoneOptionsOpen, setIsPhoneOptionsOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
@@ -191,7 +188,7 @@ export function SeguimientoClientView({
             <ListonBadge className="bg-amber-500/10 text-amber-700 dark:text-amber-500 border-amber-500/30">
               ⚠️ sin grupo
             </ListonBadge>
-          ) : gruposAlumno.length === 1 ? (() => {
+          ) : (() => {
             const g = gruposAlumno[0]!
             const gColor = colorPorSlug(g.color)
             return (
@@ -219,50 +216,16 @@ export function SeguimientoClientView({
                 {g.nombre}
               </Link>
             )
-          })() : (
-            <ListonBadge
-              icon={<Users className="h-3 w-3" />}
-              onClick={() => setGroupsExpanded(!groupsExpanded)}
-              className={cn(groupsExpanded && "border-[#22887c]/30 bg-[#22887c]/15 text-[#22887c]")}
-            >
-              {groupsExpanded ? (
-                gruposAlumno.map((g) => g.nombre).join(', ')
-              ) : (
-                <>
-                  <span>{gruposAlumno[0]!.nombre}</span>
-                  <span className="inline-flex items-center justify-center bg-[#22887c]/15 text-[#22887c] rounded-full px-1.5 py-[1px] text-[9px] font-bold ml-1">
-                    +{gruposAlumno.length - 1}
-                  </span>
-                </>
-              )}
-            </ListonBadge>
-          )}
+          })()}
 
           {/* Badge de esquemas de cobro */}
           {planesAlumno.length === 0 ? (
             <ListonBadge className="bg-amber-500/10 text-amber-700 dark:text-amber-500 border-amber-500/30">
               ⚠️ Sin plan de pago
             </ListonBadge>
-          ) : planesAlumno.length === 1 ? (
+          ) : (
             <ListonBadge icon={<PlanIcon />}>
               {planesAlumno[0]!.nombre}
-            </ListonBadge>
-          ) : (
-            <ListonBadge
-              icon={<PlanIcon />}
-              onClick={() => setPlansExpanded(!plansExpanded)}
-              className={cn(plansExpanded && "border-[#22887c]/30 bg-[#22887c]/15 text-[#22887c]")}
-            >
-              {plansExpanded ? (
-                planesAlumno.map((p) => p.nombre).join(', ')
-              ) : (
-                <>
-                  <span>{planesAlumno[0]!.nombre}</span>
-                  <span className="inline-flex items-center justify-center bg-[#22887c]/15 text-[#22887c] rounded-full px-1.5 py-[1px] text-[9px] font-bold ml-1">
-                    +{planesAlumno.length - 1}
-                  </span>
-                </>
-              )}
             </ListonBadge>
           )}
 
@@ -405,7 +368,6 @@ export function SeguimientoClientView({
           }}
           grupos={grupos}
           planes={planes}
-          multiPlanEnabled={multiPlanEnabled}
           currentGrupoId={currentGrupoId}
           currentPlanIds={currentPlanIds}
           open={isEditarOpen}

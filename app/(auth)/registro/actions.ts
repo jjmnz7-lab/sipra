@@ -1,9 +1,11 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { headers } from 'next/headers'
 import { z } from 'zod'
 
 const onboardingSchema = z.object({
+  token: z.string().min(1, { message: 'El token de invitación es requerido' }),
   // Cuenta
   nombreOwner: z.string().min(2, { message: 'El nombre debe tener al menos 2 caracteres' }),
   apellidoOwner: z.string().optional(),
@@ -11,7 +13,7 @@ const onboardingSchema = z.object({
   password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres' }),
   // Paso 0 — academia
   nombreAcademia: z.string().min(3, { message: 'El nombre de la academia debe tener al menos 3 caracteres' }),
-  telefono: z.string().optional(),
+  telefono: z.string().min(10, { message: 'El teléfono debe tener al menos 10 dígitos' }),
   // Paso 1 — plan
   planNombre: z.string().default('Mensualidad Regular'),
   planMonto: z.coerce.number().nonnegative({ message: 'El monto no puede ser negativo' }).default(300),
@@ -27,6 +29,7 @@ const onboardingSchema = z.object({
 
 export type RegistroState = {
   errors?: {
+    token?: string[]
     nombreOwner?: string[]
     apellidoOwner?: string[]
     nombreAcademia?: string[]
@@ -50,6 +53,7 @@ export type RegistroState = {
 
 export async function registroAction(prevState: RegistroState, formData: FormData): Promise<RegistroState> {
   const payload = {
+    token: (formData.get('token') as string) || '',
     nombreOwner: (formData.get('nombreOwner') as string) || '',
     apellidoOwner: (formData.get('apellidoOwner') as string) || '',
     email: (formData.get('email') as string) || '',
@@ -92,11 +96,18 @@ export async function registroAction(prevState: RegistroState, formData: FormDat
     return { errors: { general: 'No se pudo crear el usuario.' }, success: false }
   }
 
-  // 2. RPC transaccional registrar_owner_v3
-  const { data: rpcData, error: rpcError } = await (supabase as any).rpc('registrar_owner_v3', {
-    p_nombre_academia: data.nombreAcademia,
+  // 2. Obtener metadatos de request (IP y User Agent)
+  const reqHeaders = await headers()
+  const ip = reqHeaders.get('x-forwarded-for') || '127.0.0.1'
+  const userAgent = reqHeaders.get('user-agent') || 'unknown'
+
+  // 3. RPC transaccional completar_invitacion_academia_v1
+  const { data: rpcData, error: rpcError } = await (supabase as any).rpc('completar_invitacion_academia_v1', {
+    p_token: data.token,
+    p_user_id: authData.user.id,
     p_nombre_owner: data.nombreOwner,
     p_apellido_owner: data.apellidoOwner || null,
+    p_nombre_academia: data.nombreAcademia,
     p_telefono: data.telefono || null,
     p_plan_nombre: data.planNombre || 'Mensualidad Regular',
     p_plan_monto: data.planMonto,
@@ -106,16 +117,18 @@ export async function registroAction(prevState: RegistroState, formData: FormDat
     p_regimen_alta: data.regimenAlta,
     p_allow_partial: data.allowPartial,
     p_allow_overpayment: data.allowOverpayment,
+    p_opened_ip: ip,
+    p_opened_device: userAgent,
   })
 
   if (rpcError) {
     return { errors: { general: `Error al configurar la academia: ${rpcError.message}` }, success: false }
   }
 
-  // 3. Refrescar sesión para que el JWT obtenga los claims (academia_id, rol).
+  // 4. Refrescar sesión para que el JWT obtenga los claims (academia_id, rol).
   await supabase.auth.refreshSession()
 
-  // 4. Devolver éxito
+  // 5. Devolver éxito
   return {
     success: true,
     academiaId: rpcData?.academia_id as string | undefined,

@@ -32,10 +32,12 @@ export async function updateSession(request: NextRequest) {
 
   const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
 
-  // Enlace público de historial: accesible sin sesión (token en la URL).
+  // Enlace público de historial y registro: accesible sin sesión (token en la URL).
   // Ojo: el historial autenticado vive en /seguimiento/[id]/historial, así que
   // este prefijo sólo matchea la vista pública por token.
-  const isPublicRoute = request.nextUrl.pathname.startsWith('/historial')
+  const isPublicRoute =
+    request.nextUrl.pathname.startsWith('/historial') ||
+    request.nextUrl.pathname.startsWith('/registro')
 
   if (!user && !isAuthRoute && !isPublicRoute && request.nextUrl.pathname !== '/') {
     // Si no hay usuario y no es login/ruta pública, mandar a login

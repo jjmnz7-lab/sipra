@@ -50,11 +50,10 @@ export default async function AlumnosPage() {
   // Config de cobranza para el preview de prorrateo del CrearPersonaDrawer (FAB)
   const { data: academia } = await supabase
     .from('academia')
-    .select('config_cobro, multi_plan_enabled, monto_inscripcion_default, cobrar_inscripcion_default, timezone')
+    .select('config_cobro, monto_inscripcion_default, cobrar_inscripcion_default, timezone')
     .eq('id', academiaId)
     .single() as any
   const modoProrrateo = (academia?.config_cobro?.modo_prorrateo as 'proporcional' | 'completo') || 'proporcional'
-  const multiPlanEnabled = !!academia?.multi_plan_enabled
   const montoInscripcionDefault = Number(academia?.monto_inscripcion_default ?? 0)
   const cobrarInscripcionDefault = !!academia?.cobrar_inscripcion_default
   const now = ahoraAcademia(academia?.timezone || 'America/Mexico_City')
@@ -63,8 +62,8 @@ export default async function AlumnosPage() {
   const { data: grupos } = await supabase
     .from('grupo')
     .select(`
-      id, nombre, color, emoji, plan_sugerido_id, cupo_maximo,
-      persona_grupo (estado)
+      id, nombre, color, emoji, cupo_maximo,
+      persona ( id, estado_registro )
     `)
     .eq('estado', 'activo')
     .eq('es_temporal', false)
@@ -84,13 +83,8 @@ export default async function AlumnosPage() {
     .select(`
       id, nombre, apellido, telefono_whatsapp, estado_registro, created_at,
       descuento_hermanos_activo, beca_activa, beca_porcentaje,
-      persona_grupo (
-        estado,
-        grupo ( id, nombre, color, emoji, es_temporal )
-      ),
-      alumno_planes (
-        planes_cobro ( id, nombre, activo, frecuencia )
-      ),
+      grupo:grupo_id ( id, nombre, color, emoji, es_temporal ),
+      planes_cobro:plan_cobro_id ( id, nombre, activo, frecuencia ),
       cargo (
         concepto, estado_financiero, fecha_vencimiento, saldo_pendiente
       )
@@ -99,19 +93,13 @@ export default async function AlumnosPage() {
     .order('nombre', { ascending: true }) as any
 
   const alumnos: AlumnoListItem[] = (personas ?? []).map((p: any) => {
-    const pgActivos = (p.persona_grupo ?? []).filter((pg: any) => pg.estado === 'activo')
-    // El badge y los filtros de esta pantalla trabajan con grupos REGULARES;
-    // las actividades del alumno viven en su propia pantalla.
-    const grupos = pgActivos
-      .filter((pg: any) => pg.grupo && !pg.grupo.es_temporal)
-      .map((pg: any) => ({
-        id: pg.grupo.id,
-        nombre: pg.grupo.nombre,
-        color: pg.grupo.color ?? null,
-        emoji: pg.grupo.emoji ?? null
-      }))
-    const grupo = grupos.length > 0 ? grupos[0] : null
-    const tieneActividad = pgActivos.some((pg: any) => pg.grupo?.es_temporal)
+    const grupo = p.grupo ? {
+      id: p.grupo.id,
+      nombre: p.grupo.nombre,
+      color: p.grupo.color ?? null,
+      emoji: p.grupo.emoji ?? null
+    } : null
+    const tieneActividad = p.grupo?.es_temporal ?? false
 
     const cargosPendientes = (p.cargo ?? []).filter((c: any) =>
       ['pendiente', 'parcial', 'vencido'].includes(c.estado_financiero),
@@ -122,21 +110,12 @@ export default async function AlumnosPage() {
     )
     const estadoFinanciero = clasificarAlumno(cargosPendientes, now)
 
-    // Solo planes ACTIVOS cuentan: un alumno con únicamente planes archivados
-    // se considera huérfano de plan (el cron tampoco le genera cargos).
-    const planesActivos = (p.alumno_planes ?? [])
-      .map((ap: any) => ap.planes_cobro)
-      .filter((pc: any) => pc && pc.activo)
-    const planes = planesActivos.map((pc: any) => ({ id: pc.id, nombre: pc.nombre }))
-    // Plan recurrente = mensual/semanal: solo este tipo dispara la alerta "sin grupo".
-    const tieneRecurrente = planesActivos.some(
-      (pc: any) => pc.frecuencia === 'mensual' || pc.frecuencia === 'semanal',
-    )
+    const plan = p.planes_cobro && p.planes_cobro.activo ? { id: p.planes_cobro.id, nombre: p.planes_cobro.nombre } : null
+    const planesList = plan ? [plan] : []
+    const tieneRecurrente = p.planes_cobro?.activo && (p.planes_cobro.frecuencia === 'mensual' || p.planes_cobro.frecuencia === 'semanal')
 
     const sinGrupo = !grupo
-    // Quien solo participa en actividades no requiere plan: las actividades
-    // cobran por cargo único, no por esquema (misma regla que las alertas).
-    const sinPlan = planes.length === 0 && !(tieneActividad && sinGrupo)
+    const sinPlan = !plan && !(tieneActividad && sinGrupo)
 
     return {
       id: p.id,
@@ -146,8 +125,8 @@ export default async function AlumnosPage() {
       estado_registro: p.estado_registro,
       created_at: p.created_at,
       grupo,
-      grupos,
-      planes,
+      grupos: grupo ? [grupo] : [],
+      planes: planesList,
       sinGrupo,
       sinPlan,
       // Regla estricta: un alumno solo 'por_visita' sin grupo NO es huérfano.
@@ -168,13 +147,12 @@ export default async function AlumnosPage() {
         nombre: g.nombre,
         color: g.color ?? null,
         emoji: g.emoji ?? null,
-        plan_sugerido_id: g.plan_sugerido_id ?? null,
+        plan_sugerido_id: null,
         cupo_maximo: g.cupo_maximo ?? null,
-        persona_grupo: g.persona_grupo || [],
+        persona_grupo: (g.persona ?? []).map((pe: any) => ({ estado: pe.estado_registro })),
       }))}
       planes={(planes ?? []) as PlanCobroItem[]}
       modoProrrateo={modoProrrateo}
-      multiPlanEnabled={multiPlanEnabled}
       montoInscripcionDefault={montoInscripcionDefault}
       cobrarInscripcionDefault={cobrarInscripcionDefault}
     />

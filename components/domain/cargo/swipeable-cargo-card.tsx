@@ -18,7 +18,7 @@ type GrupoEditar = {
   nombre: string
   color?: string | null
   emoji?: string | null
-  plan_sugerido_id?: string | null
+
 }
 type PlanEditar = { id: string; nombre: string; monto: number; frecuencia: string }
 
@@ -28,7 +28,6 @@ interface SwipeableCargoCardProps {
   allowOverpayment?: boolean
   grupos?: GrupoEditar[]
   planes?: PlanEditar[]
-  multiPlanEnabled?: boolean
 }
 
 function getIniciales(nombre: string | null | undefined, apellido: string | null | undefined) {
@@ -43,7 +42,6 @@ export function SwipeableCargoCard({
   allowOverpayment = true,
   grupos = [],
   planes = [],
-  multiPlanEnabled = false,
 }: SwipeableCargoCardProps) {
   const [offsetX, setOffsetX] = useState(0)
   const [isSwiping, setIsSwiping] = useState(false)
@@ -289,7 +287,6 @@ export function SwipeableCargoCard({
         }}
         grupos={grupos}
         planes={planes}
-        multiPlanEnabled={multiPlanEnabled}
         currentGrupoId={alumno.persona?.grupo?.id ?? null}
         currentPlanIds={alumno.planIds ?? []}
         initialFocus={editFocus}

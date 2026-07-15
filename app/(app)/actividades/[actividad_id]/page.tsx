@@ -41,14 +41,18 @@ export default async function ActividadDetallePage({ params, searchParams }: { p
     .order('concepto', { ascending: true }) as any
 
   // Fetch alumnos inscritos
-  const { data: inscripciones } = await supabase
-    .from('persona_grupo')
-    .select(`
-      id, estado, fecha_inscripcion,
-      persona (id, nombre, apellido, telefono_whatsapp, estado_registro, beca_activa, beca_porcentaje)
-    `)
+  const { data: personas } = await supabase
+    .from('persona')
+    .select('id, created_at, nombre, apellido, telefono_whatsapp, estado_registro, beca_activa, beca_porcentaje')
     .eq('grupo_id', actividad_id)
-    .eq('estado', 'activo') as any
+    .eq('estado_registro', 'activo') as any
+
+  const inscripciones = (personas ?? []).map((p: any) => ({
+    id: p.id,
+    estado: 'activo',
+    fecha_inscripcion: p.created_at,
+    persona: p,
+  }))
 
   // Orden A–Z por nombre completo (case-insensitive)
   const inscripcionesOrdenadas = [...(inscripciones ?? [])].sort((a: any, b: any) => {

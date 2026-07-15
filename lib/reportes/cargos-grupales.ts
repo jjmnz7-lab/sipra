@@ -317,18 +317,18 @@ export function agruparLotesCargos(
             .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
         : []
 
-    // Contexto: para grupal multi-grupo, "N grupos"; mensualidad multi-esquema,
-    // "N esquemas"; con uno solo, su nombre.
+    // Contexto: si tiene >1 grupo (masivo), "N grupos"; si no, para mensualidad
+    // multi-esquema, "N esquemas"; con uno solo, su nombre.
     const contexto =
-      acc.familia === 'grupal'
-        ? gruposLote.length > 1
-          ? `${gruposLote.length} grupos`
-          : (gruposLote[0]?.nombre ?? acc.contexto)
-        : acc.familia === 'mensualidad'
-          ? esquemasLote.length > 1
-            ? `${esquemasLote.length} esquemas`
-            : (esquemasLote[0]?.nombre ?? acc.contexto)
-          : acc.contexto
+      gruposLote.length > 1
+        ? `${gruposLote.length} grupos`
+        : acc.familia === 'grupal'
+          ? (gruposLote[0]?.nombre ?? acc.contexto)
+          : acc.familia === 'mensualidad'
+            ? esquemasLote.length > 1
+              ? `${esquemasLote.length} esquemas`
+              : (esquemasLote[0]?.nombre ?? acc.contexto)
+            : acc.contexto
 
     resultado.push({
       clave,
@@ -358,7 +358,7 @@ export async function fetchLotesCargos(
   supabase: SupabaseClient<any>,
   academiaId: string,
 ): Promise<LoteCargos[]> {
-  const [cargosRes, gruposRes, planesRes, personaGruposRes] = await Promise.all([
+  const [cargosRes, gruposRes, planesRes, personasRes] = await Promise.all([
     supabase
       .from('cargo')
       .select(
@@ -372,10 +372,11 @@ export async function fetchLotesCargos(
     // Membresía ACTUAL de grupo por alumno (solo grupos regulares, no actividades),
     // usada para etiquetar por grupo los lotes de mensualidad.
     supabase
-      .from('persona_grupo')
-      .select('persona_id, grupo:grupo_id (id, nombre, color, emoji, es_temporal)')
+      .from('persona')
+      .select('id, grupo:grupo_id (id, nombre, color, emoji, es_temporal)')
       .eq('academia_id', academiaId)
-      .eq('estado', 'activo'),
+      .eq('etiqueta', 'alumno')
+      .eq('estado_registro', 'activo'),
   ])
 
   const cargos = (cargosRes.data ?? []) as unknown as CargoRow[]
@@ -383,12 +384,10 @@ export async function fetchLotesCargos(
   const planes = (planesRes.data ?? []) as GrupoLite[]
 
   const personaGruposActuales = new Map<string, GrupoMeta[]>()
-  for (const row of (personaGruposRes.data ?? []) as unknown as PersonaGrupoRow[]) {
+  for (const row of (personasRes.data ?? []) as any) {
     const g = row.grupo
     if (!g || g.es_temporal) continue // solo grupos regulares (mismo criterio que el resto de la app)
-    const arr = personaGruposActuales.get(row.persona_id) ?? []
-    arr.push({ id: g.id, nombre: g.nombre, color: g.color, emoji: g.emoji })
-    personaGruposActuales.set(row.persona_id, arr)
+    personaGruposActuales.set(row.id, [{ id: g.id, nombre: g.nombre, color: g.color, emoji: g.emoji }])
   }
 
   return agruparLotesCargos(cargos, grupos, planes, personaGruposActuales)
