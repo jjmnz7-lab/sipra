@@ -30,7 +30,7 @@ export async function updateSession(request: NextRequest) {
   // refrescar session si ha caducado
   const { data: { user } } = await supabase.auth.getUser()
 
-  const isAuthRoute = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/registro')
+  const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
 
   // Enlace público de historial: accesible sin sesión (token en la URL).
   // Ojo: el historial autenticado vive en /seguimiento/[id]/historial, así que
@@ -38,7 +38,7 @@ export async function updateSession(request: NextRequest) {
   const isPublicRoute = request.nextUrl.pathname.startsWith('/historial')
 
   if (!user && !isAuthRoute && !isPublicRoute && request.nextUrl.pathname !== '/') {
-    // Si no hay usuario y no es login/registro/ruta pública, mandar a login
+    // Si no hay usuario y no es login/ruta pública, mandar a login
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
