@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useSearchParams } from 'next/navigation'
@@ -22,6 +23,11 @@ export function DesktopSidebar() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const supabase = createClient()
+  const [impersonating, setImpersonating] = useState(false)
+
+  useEffect(() => {
+    setImpersonating(document.cookie.includes('sipra_impersonation='))
+  }, [])
 
   // En la ficha de un alumno se resalta el origen (?from=inicio|grupos|actividades, default alumnos).
   const enSeguimiento = pathname.startsWith('/seguimiento')
@@ -37,7 +43,10 @@ export function DesktopSidebar() {
   }
 
   return (
-    <aside className="hidden lg:flex flex-col w-64 h-screen bg-card text-muted-foreground fixed left-0 top-0 border-r border-border">
+    <aside className={cn(
+      "hidden lg:flex flex-col w-64 bg-card text-muted-foreground fixed left-0 border-r border-border",
+      impersonating ? "top-[40px] h-[calc(100vh-40px)]" : "top-0 h-screen"
+    )}>
       <div className="p-6 flex items-center space-x-3 text-foreground">
         <div className="h-10 w-10 rounded-lg bg-primary/10 border border-primary/15 flex items-center justify-center">
           <Image
