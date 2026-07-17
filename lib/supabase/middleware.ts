@@ -37,7 +37,8 @@ export async function updateSession(request: NextRequest) {
   // este prefijo sólo matchea la vista pública por token.
   const isPublicRoute =
     request.nextUrl.pathname.startsWith('/historial') ||
-    request.nextUrl.pathname.startsWith('/registro')
+    request.nextUrl.pathname.startsWith('/registro') ||
+    request.nextUrl.pathname.startsWith('/auth/')
 
   if (!user && !isAuthRoute && !isPublicRoute && request.nextUrl.pathname !== '/') {
     // Si no hay usuario y no es login/ruta pública, mandar a login
