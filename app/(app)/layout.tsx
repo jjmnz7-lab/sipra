@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
+import { SuspendedLock } from '@/components/auth/SuspendedLock'
 
 export async function generateMetadata(): Promise<Metadata> {
   const supabase = await createClient()
@@ -53,10 +54,12 @@ export default async function AppLayout({
 
   let academiaNombre = 'Mi Academia'
   let academiaLogoUrl: string | null = null
+  let estadoTenant: string | null = null
+
   if (academiaId) {
     const { data: academia } = await supabase
       .from('academia')
-      .select('nombre, metadata')
+      .select('nombre, metadata, estado_tenant')
       .eq('id', academiaId)
       .single() as any
     if (academia?.nombre) {
@@ -65,12 +68,20 @@ export default async function AppLayout({
     if (academia?.metadata?.logo_url) {
       academiaLogoUrl = academia.metadata.logo_url
     }
+    if (academia?.estado_tenant) {
+      estadoTenant = academia.estado_tenant
+    }
   }
 
   const alertas = await computeAlertasOperativas(supabase, academiaId)
 
   const cookieStore = await cookies()
   const impersonating = cookieStore.has('sipra_impersonation')
+
+  // Si la academia está suspendida y no estamos en modo impersonación por HQ, bloquear accesos
+  if (estadoTenant === 'suspendida' && !impersonating) {
+    return <SuspendedLock academiaNombre={academiaNombre} />
+  }
 
   return (
     <AcademiaProvider academiaNombre={academiaNombre} academiaLogoUrl={academiaLogoUrl}>
