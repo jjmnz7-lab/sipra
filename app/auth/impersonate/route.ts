@@ -59,9 +59,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${request.nextUrl.origin}/login?error=Error al generar enlace de inicio de sesión.`)
     }
 
-    // Extraer token_hash de action_link
+    // Extraer token_hash y tipo de verificación de las propiedades del enlace
     const actionUrl = new URL(linkData.properties.action_link)
-    const token_hash = actionUrl.searchParams.get('token_hash')
+    const token_hash = linkData.properties.hashed_token || 
+                       actionUrl.searchParams.get('token') || 
+                       actionUrl.searchParams.get('token_hash')
+
+    const verificationType = linkData.properties.verification_type || 'magiclink'
 
     if (!token_hash) {
       console.error('Impersonate error (token_hash not found in action_link)')
@@ -71,7 +75,7 @@ export async function GET(request: NextRequest) {
     // 4. Redimir link del lado del servidor (inicia sesión en supabaseServer client)
     const { error: verifyErr } = await supabaseServer.auth.verifyOtp({
       token_hash,
-      type: 'magiclink',
+      type: verificationType as any,
     })
 
     if (verifyErr) {
