@@ -9,6 +9,7 @@ import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import { SuspendedLock } from '@/components/auth/SuspendedLock'
+import MaintenanceLock from '@/components/auth/MaintenanceLock'
 
 export async function generateMetadata(): Promise<Metadata> {
   const supabase = await createClient()
@@ -77,6 +78,18 @@ export default async function AppLayout({
 
   const cookieStore = await cookies()
   const impersonating = cookieStore.has('sipra_impersonation')
+
+  // Verificar Mantenimiento Global de HQ
+  const { data: configMantenimiento } = await (supabase as any)
+    .from('hq_configuracion_global')
+    .select('valor')
+    .eq('clave', 'mantenimiento')
+    .single() as any
+
+  const mantInfo = configMantenimiento?.valor
+  if (mantInfo?.activo && !impersonating) {
+    return <MaintenanceLock mensaje={mantInfo.mensaje || 'SIPRA se encuentra en mantenimiento programado. Volveremos en breve.'} />
+  }
 
   // Si la academia está suspendida y no estamos en modo impersonación por HQ, bloquear accesos
   if (estadoTenant === 'suspendida' && !impersonating) {
