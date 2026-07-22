@@ -148,12 +148,13 @@ async function handlePago() {
 
 ### 4.4 Estados Visuales de Cargo
 
-| Estado | Color Tailwind | Condición |
+| Estado | Color Tailwind (Hex) | Condición |
 |---|---|---|
-| `liquidado` | `text-emerald-600` | `estado_financiero = 'liquidado'` |
-| `pendiente` | `text-amber-500` | No vencido, saldo > 0 |
-| `parcial` | `text-amber-500` | `estado_financiero = 'parcial'` |
-| `vencido` | `text-red-600` | `estado_financiero = 'vencido'` |
+| `liquidado` | `text-st-aldia` (#5C8F78) | `estado_financiero = 'liquidado'` |
+| `pendiente` | `text-st-pendiente` (#D2A45C) | No vencido, saldo > 0 |
+| `parcial` | `text-st-pendiente` (#D2A45C) | `estado_financiero = 'parcial'` |
+| `vencido` | `text-st-atrasado` (#B85C50) | `estado_financiero = 'vencido'` |
+| `urgente` | `text-st-urgente` (#7A2F38) | Estado crítico / urgente |
 | `anulado` | `text-gray-400 line-through` | `estado_financiero = 'anulado'` |
 
 ### 4.5 Pantallas y Rutas

@@ -120,7 +120,7 @@ export function buildWhatsAppShareUrl(
 
 /** URL absoluta del historial público por token: {origin}/historial/{token}. */
 export function buildShareLink(token: string, origin?: string): string {
-  const base = (origin ?? '').replace(/\/$/, '')
+  const base = (origin || process.env.NEXT_PUBLIC_SITE_URL || 'https://sipracontrol.com').replace(/\/$/, '')
   return `${base}/historial/${token}`
 }
 

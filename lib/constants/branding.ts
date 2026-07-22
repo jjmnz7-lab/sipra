@@ -13,4 +13,4 @@ export const SIPRA_TAGLINE = 'Sistema de Pagos y Recordatorios para Academias'
  * TODO: repuntar a la landing definitiva cuando esté publicada.
  */
 export const LANDING_URL =
-  process.env.NEXT_PUBLIC_LANDING_URL || 'https://sipra-three.vercel.app'
+  process.env.NEXT_PUBLIC_LANDING_URL || 'https://sipracontrol.com'

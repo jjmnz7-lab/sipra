@@ -29,6 +29,12 @@
   --color-popover-foreground: #0a0a0a;
   --color-accent: #f1f5f9;
   --color-accent-foreground: #0f172a;
+
+  /* Colores de estatus financiero */
+  --color-st-aldia: #5C8F78;
+  --color-st-pendiente: #D2A45C;
+  --color-st-atrasado: #B85C50;
+  --color-st-urgente: #7A2F38;
 }
 
 /* Ocultar scrollbar nativo en carruseles horizontales */
