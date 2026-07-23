@@ -17,7 +17,10 @@ import {
   Award,
   DollarSign,
   Check,
-  LogIn
+  LogIn,
+  Download,
+  BarChart3,
+  CheckCircle2
 } from 'lucide-react'
 
 // Número centralizado de WhatsApp (con fallback configurable)
@@ -384,15 +387,22 @@ export function LandingView() {
                 <li className="relative pl-5 text-sm md:text-base font-medium text-[#16232E] before:content-[''] before:absolute before:left-0 before:top-2.5 before:w-2 before:h-2 before:rounded-full before:bg-[#22887c]">
                   Tú decides cuándo compartirlo, alumno por alumno.
                 </li>
+                <li className="relative pl-5 text-sm md:text-base font-medium text-[#16232E] before:content-[''] before:absolute before:left-0 before:top-2.5 before:w-2 before:h-2 before:rounded-full before:bg-[#22887c]">
+                  Si quieres, le mandas la confirmación por WhatsApp en cuanto registras su pago.
+                </li>
               </ul>
             </div>
 
             {/* PHONE PREVIEW */}
             <div className="max-w-[340px] mx-auto w-full">
               <div className="text-center pb-4">
-                <div className="w-13 h-13 rounded-2xl bg-[#15435a] text-white font-extrabold text-base flex items-center justify-center mx-auto mb-2.5">
-                  AA
-                </div>
+                <Image
+                  src="/logos/academia-aurora-logo.png"
+                  alt="Academia Aurora"
+                  width={56}
+                  height={56}
+                  className="w-14 h-14 rounded-2xl object-cover shadow-sm ring-1 ring-[#E3E7EC] mx-auto mb-2.5"
+                />
                 <p className="font-extrabold text-[#16232E] text-base">Academia Aurora</p>
               </div>
 
@@ -473,6 +483,44 @@ export function LandingView() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* TARJETA DESTACADA: CARGOS EXTRAORDINARIOS CON MINI-DEMO */}
+              <div className="col-span-1 sm:col-span-2 lg:col-span-3 bg-white border border-[#E3E7EC] rounded-2xl p-5 md:p-6 hover:shadow-lg hover:shadow-[#15435a]/5 transition-all">
+                <div className="flex flex-col lg:flex-row lg:items-center gap-6 justify-between">
+                  <div className="max-w-[54ch]">
+                    <div className="w-9 h-9 rounded-lg bg-[#E7F2F0] text-[#1a6b61] flex items-center justify-center mb-3.5">
+                      <FileText className="w-4.5 h-4.5" />
+                    </div>
+                    <h3 className="text-base font-bold text-[#16232E] mb-1.5">Cargos extraordinarios</h3>
+                    <p className="text-sm text-[#5B6B7A] leading-relaxed">
+                      Cobra uniformes, materiales o inscripciones a un alumno, un grupo, o varios grupos a la vez — excluye a quien no aplique en un par de clics, y dale seguimiento al avance de cobro. Cuando quieras, mándale a todo el grupo un resumen del avance por WhatsApp.
+                    </p>
+                  </div>
+
+                  {/* Mini-demo visual */}
+                  <div className="w-full lg:w-[380px] bg-[#F6F7F9] border border-[#E3E7EC] rounded-xl p-4 shrink-0">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <h4 className="font-extrabold text-sm text-[#16232E]">Uniformes temporada 2026</h4>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#E7F2F0] text-[#1a6b61]">
+                        Grupal
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#5B6B7A] mb-3">
+                      Fútbol Sub-12 · 23 de 25 alumnos (2 excluidos)
+                    </p>
+                    
+                    {/* Barra de progreso al 78% */}
+                    <div className="w-full bg-[#E3E7EC] h-2.5 rounded-full overflow-hidden mb-2">
+                      <div className="bg-[#22887c] h-full rounded-full" style={{ width: '78%' }} />
+                    </div>
+
+                    <div className="flex justify-between items-center text-xs font-bold text-[#16232E]">
+                      <span>18 de 23 pagado</span>
+                      <span>$2,700 de $3,450</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="bg-white border border-[#E3E7EC] rounded-2xl p-5 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#15435a]/5 transition-all">
                 <div className="w-9 h-9 rounded-lg bg-[#E7F2F0] text-[#1a6b61] flex items-center justify-center mb-3.5">
                   <FileText className="w-4.5 h-4.5" />
@@ -510,6 +558,36 @@ export function LandingView() {
                 <h3 className="text-base font-bold text-[#16232E] mb-1.5">Historial digital por alumno</h3>
                 <p className="text-sm text-[#5B6B7A] leading-relaxed">
                   Cada alumno o papá recibe un enlace propio para ver su saldo y pagos, sin contraseña ni apps que instalar.
+                </p>
+              </div>
+
+              <div className="bg-white border border-[#E3E7EC] rounded-2xl p-5 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#15435a]/5 transition-all">
+                <div className="w-9 h-9 rounded-lg bg-[#E7F2F0] text-[#1a6b61] flex items-center justify-center mb-3.5">
+                  <CheckCircle2 className="w-4.5 h-4.5" />
+                </div>
+                <h3 className="text-base font-bold text-[#16232E] mb-1.5">Confirmación de pago automática</h3>
+                <p className="text-sm text-[#5B6B7A] leading-relaxed">
+                  Cuando registras un pago, le puedes mandar al alumno o al papá una confirmación por WhatsApp con el enlace a su historial — así ambos tienen certeza de que quedó registrado, sin lugar a discusiones.
+                </p>
+              </div>
+
+              <div className="bg-white border border-[#E3E7EC] rounded-2xl p-5 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#15435a]/5 transition-all">
+                <div className="w-9 h-9 rounded-lg bg-[#E7F2F0] text-[#1a6b61] flex items-center justify-center mb-3.5">
+                  <BarChart3 className="w-4.5 h-4.5" />
+                </div>
+                <h3 className="text-base font-bold text-[#16232E] mb-1.5">Reportes de ingresos</h3>
+                <p className="text-sm text-[#5B6B7A] leading-relaxed">
+                  Ve cuánto llevas cobrado hoy y en el mes, desglosado por efectivo y transferencia, además el historial de meses anteriores.
+                </p>
+              </div>
+
+              <div className="bg-white border border-[#E3E7EC] rounded-2xl p-5 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#15435a]/5 transition-all">
+                <div className="w-9 h-9 rounded-lg bg-[#E7F2F0] text-[#1a6b61] flex items-center justify-center mb-3.5">
+                  <Download className="w-4.5 h-4.5" />
+                </div>
+                <h3 className="text-base font-bold text-[#16232E] mb-1.5">Exportación de tus datos</h3>
+                <p className="text-sm text-[#5B6B7A] leading-relaxed">
+                  Descarga tu información en CSV cuando quieras — alumnos, grupos, pagos y cargos. Es tu información.
                 </p>
               </div>
 
@@ -618,6 +696,45 @@ export function LandingView() {
           </div>
         </section>
 
+        {/* ============ PRICING ============ */}
+        <section className="py-14 md:py-24 bg-white border-y border-[#E3E7EC]">
+          <div className="max-w-[1120px] mx-auto px-5 text-center">
+            <span className="font-mono text-xs tracking-wider uppercase text-[#1a6b61] mb-2 block font-semibold">
+              Precio
+            </span>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#15435a]">
+              Un precio, sin letra chiquita.
+            </h2>
+
+            <div className="mt-6 mb-6">
+              <span className="text-4xl sm:text-5xl md:text-6xl font-black text-[#15435a]">
+                $299 MXN
+              </span>
+              <span className="text-base sm:text-xl font-medium text-[#5B6B7A] ml-2">
+                /mes
+              </span>
+            </div>
+
+            <div className="max-w-[620px] mx-auto p-4 sm:p-5 rounded-2xl bg-[#E7F2F0] border border-[#22887c]/20 mb-8">
+              <p className="text-sm sm:text-base font-semibold text-[#1a6b61] leading-relaxed">
+                "Si te ayuda a recuperar una sola mensualidad que se te hubiera pasado, el sistema ya se pagó solo ese mes."
+              </p>
+            </div>
+
+            <div className="flex justify-center">
+              <a
+                href={WA_LINK}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2.5 font-bold text-base px-6 py-3.5 rounded-lg bg-[#22887c] text-white hover:bg-[#1a6b61] transition-all shadow-md hover:-translate-y-0.5 active:translate-y-0"
+              >
+                <Send className="w-5 h-5" />
+                Escríbenos por WhatsApp
+              </a>
+            </div>
+          </div>
+        </section>
+
         {/* ============ FAQ ============ */}
         <section className="py-14 md:py-24" id="preguntas">
           <div className="max-w-[1120px] mx-auto px-5">
@@ -640,6 +757,18 @@ export function LandingView() {
                 </summary>
                 <p className="mt-3 text-sm md:text-base text-[#5B6B7A] max-w-[68ch] leading-relaxed">
                   Nosotros activamos cada academia directamente, para asegurarnos de que arranque bien configurada. Escríbenos por WhatsApp y en minutos tienes acceso, con período de prueba incluido.
+                </p>
+              </details>
+
+              <details className="py-4.5 group">
+                <summary className="cursor-pointer font-bold text-base md:text-lg text-[#16232E] flex justify-between items-center gap-4 list-none">
+                  <span>¿Cuánto cuesta?</span>
+                  <span className="text-xl font-bold text-[#22887c] group-open:rotate-45 transition-transform">
+                    +
+                  </span>
+                </summary>
+                <p className="mt-3 text-sm md:text-base text-[#5B6B7A] max-w-[68ch] leading-relaxed">
+                  $299 MXN al mes, un solo plan, sin funciones escondidas. Si te ayuda a recuperar aunque sea una mensualidad que se te hubiera pasado, ya se pagó solo.
                 </p>
               </details>
 

@@ -56,8 +56,8 @@ function SipraFooter() {
 /** Página neutral para enlaces inválidos, suspendidos o bloqueados. */
 export function EnlaceNoDisponible() {
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+    <div className="min-h-screen bg-muted/30 flex flex-col justify-between items-center py-6 px-4">
+      <div className="w-full max-w-md my-auto flex flex-col items-center justify-center p-6 bg-card border border-border rounded-2xl sm:rounded-3xl shadow-sm text-center">
         <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center mb-4">
           <Lock className="h-6 w-6 text-muted-foreground" />
         </div>
@@ -94,110 +94,111 @@ export function HistorialPublicoView({
   const visibles = expanded ? movimientos : movimientos.slice(0, PREVIEW)
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Encabezado institucional: logo + nombre de la academia */}
-      <header className="bg-card border-b border-border">
-        <div className="max-w-md mx-auto px-5 py-5 flex flex-col items-center text-center gap-2.5">
-          {academia.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={academia.logoUrl}
-              alt={academia.nombre}
-              className="h-16 w-16 rounded-2xl object-cover shadow-sm ring-1 ring-border"
-            />
-          ) : (
-            <div className="h-16 w-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center text-xl font-black shadow-sm ring-1 ring-border">
-              {iniciales(academia.nombre)}
-            </div>
-          )}
-          <h1 className="text-lg font-bold text-foreground leading-tight">{academia.nombre}</h1>
-        </div>
-      </header>
+    <div className="min-h-screen bg-muted/30 flex flex-col justify-between py-4 sm:py-6 px-3 sm:px-4">
+      <div className="w-full max-w-md mx-auto space-y-4">
+        {/* Contenedor principal encerrado con bordes redondeados y sombra */}
+        <div className="bg-card border border-border rounded-2xl sm:rounded-3xl shadow-sm p-4 sm:p-5 space-y-4">
+          {/* Encabezado institucional: logo + nombre de la academia */}
+          <header className="pb-4 border-b border-border flex flex-col items-center text-center gap-2.5">
+            {academia.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={academia.logoUrl}
+                alt={academia.nombre}
+                className="h-16 w-16 rounded-2xl object-cover shadow-sm ring-1 ring-border"
+              />
+            ) : (
+              <div className="h-16 w-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center text-xl font-black shadow-sm ring-1 ring-border">
+                {iniciales(academia.nombre)}
+              </div>
+            )}
+            <h1 className="text-lg font-bold text-foreground leading-tight">{academia.nombre}</h1>
+          </header>
 
-      <main className="flex-1 w-full max-w-md mx-auto px-4 py-5 space-y-4">
-        {/* Estado de cuenta: alumno + semáforo + saldo (dos líneas) */}
-        <section className="bg-card rounded-2xl border border-border p-5 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Estado de cuenta
-              </p>
-              <h2 className="text-xl font-black text-foreground mt-1 leading-tight break-words">
-                {alumnoNombre || 'Alumno'}
-              </h2>
-            </div>
-            <span
-              className="flex-shrink-0 text-[11px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full border"
-              style={{
-                color: estadoDef.hex,
-                backgroundColor: `${estadoDef.hex}1A`,
-                borderColor: `${estadoDef.hex}33`,
-              }}
-            >
-              {estadoDef.label}
-            </span>
-          </div>
-
-          <div className="mt-4 pt-4 border-t border-border">
-            <p className="text-xs text-muted-foreground font-medium">Saldo</p>
-            <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-3xl font-black leading-none" style={{ color: estadoDef.hex }}>
-                {formatCurrency(deuda)}
+          {/* Estado de cuenta: alumno + semáforo + saldo */}
+          <section className="bg-muted/40 rounded-xl sm:rounded-2xl border border-border/80 p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Estado de cuenta
+                </p>
+                <h2 className="text-xl font-black text-foreground mt-1 leading-tight break-words">
+                  {alumnoNombre || 'Alumno'}
+                </h2>
+              </div>
+              <span
+                className="flex-shrink-0 text-[11px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full border"
+                style={{
+                  color: estadoDef.hex,
+                  backgroundColor: `${estadoDef.hex}1A`,
+                  borderColor: `${estadoDef.hex}33`,
+                }}
+              >
+                {estadoDef.label}
               </span>
             </div>
-            {saldoAFavor > 0 && (
-              <p className="mt-2 text-xs font-semibold text-[#15435a] flex items-center gap-1.5">
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#15435a]" aria-hidden="true" />
-                Saldo a favor: {formatCurrency(saldoAFavor)}
-              </p>
-            )}
-            <p className="mt-3 text-[10px] text-muted-foreground/70 flex items-center gap-1">
-              <ShieldCheck className="h-3 w-3" /> Información actualizada en tiempo real
-            </p>
-          </div>
-        </section>
 
-        {/* Historial financiero (sólo movimientos financieros) */}
-        <section className="bg-card rounded-2xl border border-border p-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center">
-            <Receipt className="h-4 w-4 mr-2 text-muted-foreground" /> Historial de pagos
-          </h3>
-
-          {movimientos.length === 0 ? (
-            <div className="text-center py-8 px-4">
-              <Receipt className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Aún no hay movimientos financieros registrados.
-              </p>
-            </div>
-          ) : (
-            <div>
-              {visibles.map((m, i) => {
-                const esUltimo = i === visibles.length - 1 && (expanded || !hayMas)
-                return <EventoRow key={m.id} evento={m as unknown as EventoTimeline} isLast={esUltimo} />
-              })}
-
-              {hayMas && (
-                <button
-                  type="button"
-                  onClick={() => setExpanded((v) => !v)}
-                  className="mt-3 w-full flex items-center justify-center gap-1.5 h-11 rounded-xl border border-border bg-muted/40 text-sm font-semibold text-foreground/80 hover:bg-muted transition-colors active:scale-[0.99]"
-                >
-                  {expanded ? (
-                    <>
-                      Ver menos <ChevronUp className="h-4 w-4" />
-                    </>
-                  ) : (
-                    <>
-                      Ver movimientos anteriores <ChevronDown className="h-4 w-4" />
-                    </>
-                  )}
-                </button>
+            <div className="mt-4 pt-4 border-t border-border">
+              <p className="text-xs text-muted-foreground font-medium">Saldo</p>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-3xl font-black leading-none" style={{ color: estadoDef.hex }}>
+                  {formatCurrency(deuda)}
+                </span>
+              </div>
+              {saldoAFavor > 0 && (
+                <p className="mt-2 text-xs font-semibold text-[#15435a] flex items-center gap-1.5">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#15435a]" aria-hidden="true" />
+                  Saldo a favor: {formatCurrency(saldoAFavor)}
+                </p>
               )}
+              <p className="mt-3 text-[10px] text-muted-foreground/70 flex items-center gap-1">
+                <ShieldCheck className="h-3 w-3" /> Información actualizada en tiempo real
+              </p>
             </div>
-          )}
-        </section>
-      </main>
+          </section>
+
+          {/* Historial financiero */}
+          <section className="bg-muted/40 rounded-xl sm:rounded-2xl border border-border/80 p-4 sm:p-5">
+            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center">
+              <Receipt className="h-4 w-4 mr-2 text-muted-foreground" /> Historial de pagos
+            </h3>
+
+            {movimientos.length === 0 ? (
+              <div className="text-center py-8 px-4">
+                <Receipt className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Aún no hay movimientos financieros registrados.
+                </p>
+              </div>
+            ) : (
+              <div>
+                {visibles.map((m, i) => {
+                  const esUltimo = i === visibles.length - 1 && (expanded || !hayMas)
+                  return <EventoRow key={m.id} evento={m as unknown as EventoTimeline} isLast={esUltimo} />
+                })}
+
+                {hayMas && (
+                  <button
+                    type="button"
+                    onClick={() => setExpanded((v) => !v)}
+                    className="mt-3 w-full flex items-center justify-center gap-1.5 h-11 rounded-xl border border-border bg-background text-sm font-semibold text-foreground/80 hover:bg-muted transition-colors active:scale-[0.99]"
+                  >
+                    {expanded ? (
+                      <>
+                        Ver menos <ChevronUp className="h-4 w-4" />
+                      </>
+                    ) : (
+                      <>
+                        Ver movimientos anteriores <ChevronDown className="h-4 w-4" />
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            )}
+          </section>
+        </div>
+      </div>
 
       <SipraFooter />
     </div>
