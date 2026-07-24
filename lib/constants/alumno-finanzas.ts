@@ -46,50 +46,93 @@ export function descuentoEspecialBadge(
   return null
 }
 
-type CargoLite = {
+export type ConfigEstadosPago = {
+  dia_atrasado?: number | null
+  dia_urgente?: number | null
+}
+
+export type CargoLite = {
   concepto: string | null
   estado_financiero?: string | null
-  fecha_vencimiento: string | null | undefined
+  fecha_vencimiento?: string | null
+  fecha_creacion?: string | null
+  created_at?: string | null
+  origen?: string | null
 }
 
 /**
- * Clasifica el estado financiero del alumno dado el conjunto de cargos
- * con saldo pendiente. Implementa la regla:
- *  - Sin cargos pendientes → al_dia
- *  - >=2 mensualidades vencidas O >=1 cargo no-mensualidad con
- *    fecha_vencimiento < hoy - 1 mes → urgente
- *  - >=1 cargo con estado_financiero === 'vencido' → atrasado
- *  - Resto (cargos pendiente/parcial sin vencer) → pendiente
- *
- * `hoy` debe venir de ahoraAcademia(timezone) con el timezone real de la
- * academia (columna academia.timezone) — no todas las academias están en el
- * mismo huso horario.
+ * Clasifica un cargo individual evaluando su antigüedad en meses de calendario.
  */
-export function clasificarAlumno(cargos: CargoLite[], hoy: Date): EstadoFinancieroAlumno {
+export function clasificarCargoIndividual(
+  cargo: CargoLite,
+  hoy: Date,
+  diaAtrasado: number,
+  diaUrgente: number
+): EstadoFinancieroAlumno {
+  const fechaStr = cargo.fecha_vencimiento ?? cargo.fecha_creacion ?? cargo.created_at
+  if (!fechaStr) return 'pendiente'
+
+  const [yStr, mStr] = fechaStr.split('T')[0].split('-')
+  const vencYear = Number(yStr)
+  const vencMonth = Number(mStr) - 1 // 0-indexed
+
+  const hoyYear = hoy.getUTCFullYear()
+  const hoyMonth = hoy.getUTCMonth() // 0-indexed
+  const hoyDay = hoy.getUTCDate()
+
+  // Diferencia exacta en meses de calendario
+  const mesesDiferencia = (hoyYear - vencYear) * 12 + (hoyMonth - vencMonth)
+
+  // 1. Cargo de 2 o más meses de calendario atrás -> Urgente
+  if (mesesDiferencia >= 2) {
+    return 'urgente'
+  }
+
+  // 2. Cargo de exactamente 1 mes de calendario atrás (ej: cargo de julio estando en agosto)
+  if (mesesDiferencia === 1) {
+    // Permanece en Atrasado durante los primeros días del nuevo mes;
+    // escala a Urgente sólo al alcanzar el dia_urgente del mes actual (ej: día 20)
+    if (hoyDay >= diaUrgente) return 'urgente'
+    return 'atrasado'
+  }
+
+  // 3. Cargo del mes de calendario actual (mesesDiferencia === 0)
+  if (mesesDiferencia === 0) {
+    if (hoyDay >= diaUrgente) return 'urgente'
+    if (hoyDay >= diaAtrasado) return 'atrasado'
+    return 'pendiente'
+  }
+
+  // 4. Cargo de meses futuros (mesesDiferencia < 0)
+  return 'pendiente'
+}
+
+/**
+ * Clasifica el estado financiero del alumno dado el conjunto de cargos con saldo pendiente.
+ * `hoy` debe venir de ahoraAcademia(timezone) con el timezone real de la academia.
+ */
+export function clasificarAlumno(
+  cargos: CargoLite[],
+  hoy: Date,
+  config?: ConfigEstadosPago | null
+): EstadoFinancieroAlumno {
   if (!cargos || cargos.length === 0) return 'al_dia'
 
-  // hoy viene "falso-UTC" (ver zonedAcademia): siempre getUTC*(), nunca
-  // accesores locales, para no depender del huso del proceso que ejecuta esto.
-  const oneMonthAgo = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() - 1, hoy.getUTCDate()))
+  const diaAtrasado = Number(config?.dia_atrasado) || 6
+  const diaUrgente = Number(config?.dia_urgente) || 20
 
-  const isMensualidad = (c: CargoLite) =>
-    String(c.concepto ?? '').toLowerCase().includes('mensualidad')
+  const esMensualidad = (c: CargoLite) =>
+    c.origen === 'recurrente' || /mensualidad|colegiatura|cuota/i.test(c.concepto ?? '')
 
-  const mensualidadesVencidas = cargos.filter(
-    c => c.estado_financiero === 'vencido' && isMensualidad(c),
-  ).length
+  const mensualidadesAdeudadas = cargos.filter(esMensualidad).length
 
-  const otrosAntiguosVencidos = cargos.filter(c => {
-    if (isMensualidad(c)) return false
-    if (!c.fecha_vencimiento) return false
-    const venc = new Date(c.fecha_vencimiento)
-    return venc < oneMonthAgo
-  }).length
+  // Acumulación de 2 o más mensualidades no pagadas de cualquier mes -> Urgente
+  if (mensualidadesAdeudadas >= 2) return 'urgente'
 
-  if (mensualidadesVencidas >= 2 || otrosAntiguosVencidos >= 1) return 'urgente'
+  // Evaluar severidad individual de cada cargo
+  const estados = cargos.map(c => clasificarCargoIndividual(c, hoy, diaAtrasado, diaUrgente))
 
-  const hayVencido = cargos.some(c => c.estado_financiero === 'vencido')
-  if (hayVencido) return 'atrasado'
-
+  if (estados.includes('urgente')) return 'urgente'
+  if (estados.includes('atrasado')) return 'atrasado'
   return 'pendiente'
 }

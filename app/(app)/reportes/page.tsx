@@ -211,11 +211,18 @@ export default async function ReportesPage() {
   const timezone = await obtenerTimezoneAcademia(supabase, academiaId)
   const now = ahoraAcademia(timezone)
 
+  const { data: academiaData } = await supabase
+    .from('academia')
+    .select('config_recargos')
+    .eq('id', academiaId)
+    .single() as any
+  const configRecargos = academiaData?.config_recargos || {}
+
   const [alumnosRes, lotes, cobradoMes] = await Promise.all([
     // Alumnos activos y sus cargos pendientes para la deuda y estados
     supabase
       .from('persona')
-      .select('id, cargo (persona_id, saldo_pendiente, concepto, estado_financiero, fecha_vencimiento)')
+      .select('id, cargo (persona_id, saldo_pendiente, concepto, estado_financiero, fecha_vencimiento, fecha_creacion, created_at, origen)')
       .eq('academia_id', academiaId)
       .eq('etiqueta', 'alumno')
       .eq('estado_registro', 'activo'),
@@ -239,6 +246,9 @@ export default async function ReportesPage() {
       concepto: string
       estado_financiero: string
       fecha_vencimiento: string
+      fecha_creacion?: string
+      created_at?: string
+      origen?: string
     }[]
   }
 
@@ -249,7 +259,7 @@ export default async function ReportesPage() {
     const cargosPendientes = (p.cargo ?? []).filter((c) =>
       ['pendiente', 'parcial', 'vencido'].includes(c.estado_financiero)
     )
-    const estado = clasificarAlumno(cargosPendientes, now)
+    const estado = clasificarAlumno(cargosPendientes, now, configRecargos)
     countEstados[estado]++
   }
 

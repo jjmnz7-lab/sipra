@@ -27,7 +27,7 @@ export default async function ActividadDetallePage({ params, searchParams }: { p
 
   const { data: academia } = await supabase
     .from('academia')
-    .select('timezone')
+    .select('timezone, config_recargos')
     .eq('id', actividad.academia_id)
     .single() as any
   const timezone = academia?.timezone || 'America/Mexico_City'
@@ -40,10 +40,10 @@ export default async function ActividadDetallePage({ params, searchParams }: { p
     .eq('activo', true)
     .order('concepto', { ascending: true }) as any
 
-  // Fetch alumnos inscritos
+  // Fetch miembros de la actividad
   const { data: personas } = await supabase
     .from('persona')
-    .select('id, created_at, nombre, apellido, telefono_whatsapp, estado_registro, beca_activa, beca_porcentaje')
+    .select('id, created_at, nombre, apellido, telefono_whatsapp, estado_registro, beca_activa, beca_porcentaje, plan_cobro_id')
     .eq('grupo_id', actividad_id)
     .eq('estado_registro', 'activo') as any
 
@@ -68,7 +68,7 @@ export default async function ActividadDetallePage({ params, searchParams }: { p
   // Fetch cargos activos (con fecha_vencimiento para clasificación del semáforo)
   const { data: cargos } = await supabase
     .from('cargo')
-    .select('persona_id, concepto, saldo_pendiente, estado_financiero, fecha_vencimiento')
+    .select('persona_id, concepto, saldo_pendiente, estado_financiero, fecha_vencimiento, fecha_creacion, created_at, origen')
     .in('persona_id', personaIds.length ? personaIds : ['00000000-0000-0000-0000-000000000000'])
     .in('estado_financiero', ['vencido', 'pendiente', 'parcial']) as any
 
@@ -84,7 +84,7 @@ export default async function ActividadDetallePage({ params, searchParams }: { p
   for (const ins of inscripcionesOrdenadas) {
     const p = ins.persona
     if (!p?.id) continue
-    mapEstadoMiembro[p.id] = clasificarAlumno(cargosPorPersona[p.id] ?? [], now)
+    mapEstadoMiembro[p.id] = clasificarAlumno(cargosPorPersona[p.id] ?? [], now, academia?.config_recargos)
   }
 
   const totalAlumnos = inscripcionesOrdenadas.filter((ins: any) => ins.persona?.estado_registro === 'activo').length

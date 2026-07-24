@@ -35,7 +35,7 @@ export default async function GrupoDetallePage({ params, searchParams }: { param
 
   const { data: academia } = await supabase
     .from('academia')
-    .select('config_cobro, monto_inscripcion_default, cobrar_inscripcion_default, timezone')
+    .select('config_recargos, config_cobro, monto_inscripcion_default, cobrar_inscripcion_default, timezone')
     .eq('id', grupo.academia_id)
     .single() as any
   const modoProrrateo = (academia?.config_cobro?.modo_prorrateo as 'proporcional' | 'completo') || 'proporcional'
@@ -90,7 +90,7 @@ export default async function GrupoDetallePage({ params, searchParams }: { param
   // Fetch cargos activos (con fecha_vencimiento para clasificación crítico)
   const { data: cargos } = await supabase
     .from('cargo')
-    .select('persona_id, concepto, saldo_pendiente, estado_financiero, fecha_vencimiento')
+    .select('persona_id, concepto, saldo_pendiente, estado_financiero, fecha_vencimiento, fecha_creacion, created_at, origen')
     .in('persona_id', personaIds.length ? personaIds : ['00000000-0000-0000-0000-000000000000'])
     .in('estado_financiero', ['vencido', 'pendiente', 'parcial']) as any
 
@@ -113,7 +113,7 @@ export default async function GrupoDetallePage({ params, searchParams }: { param
     const p = ins.persona
     if (!p?.id) continue
     const cargosP = cargosPorPersona[p.id] ?? []
-    const estado = clasificarAlumno(cargosP, now)
+    const estado = clasificarAlumno(cargosP, now, academia?.config_recargos)
     mapEstadoMiembro[p.id] = estado
     if (p.estado_registro === 'activo') {
       if (estado === 'al_dia') alDia++

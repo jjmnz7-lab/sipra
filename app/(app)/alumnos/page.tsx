@@ -50,7 +50,7 @@ export default async function AlumnosPage() {
   // Config de cobranza para el preview de prorrateo del CrearPersonaDrawer (FAB)
   const { data: academia } = await supabase
     .from('academia')
-    .select('config_cobro, monto_inscripcion_default, cobrar_inscripcion_default, timezone')
+    .select('config_recargos, config_cobro, monto_inscripcion_default, cobrar_inscripcion_default, timezone')
     .eq('id', academiaId)
     .single() as any
   const modoProrrateo = (academia?.config_cobro?.modo_prorrateo as 'proporcional' | 'completo') || 'proporcional'
@@ -86,7 +86,7 @@ export default async function AlumnosPage() {
       grupo:grupo_id ( id, nombre, color, emoji, es_temporal ),
       planes_cobro:plan_cobro_id ( id, nombre, activo, frecuencia ),
       cargo (
-        concepto, estado_financiero, fecha_vencimiento, saldo_pendiente
+        concepto, estado_financiero, fecha_vencimiento, fecha_creacion, created_at, origen, saldo_pendiente
       )
     `)
     .eq('etiqueta', 'alumno')
@@ -108,7 +108,7 @@ export default async function AlumnosPage() {
       (acc: number, c: any) => acc + Number(c.saldo_pendiente ?? 0),
       0,
     )
-    const estadoFinanciero = clasificarAlumno(cargosPendientes, now)
+    const estadoFinanciero = clasificarAlumno(cargosPendientes, now, academia?.config_recargos)
 
     const plan = p.planes_cobro && p.planes_cobro.activo ? { id: p.planes_cobro.id, nombre: p.planes_cobro.nombre } : null
     const planesList = plan ? [plan] : []

@@ -46,6 +46,9 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
         saldo_pendiente,
         estado_financiero,
         fecha_vencimiento,
+        fecha_creacion,
+        created_at,
+        origen,
         aplicacion_movimiento (
           id,
           monto_aplicado,
@@ -66,7 +69,7 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
   // 1a. Bandera de abonos parciales de la academia y multi_plan
   const { data: academia } = await supabase
     .from('academia')
-    .select('allow_partial_payments, allow_overpayment, timezone')
+    .select('allow_partial_payments, allow_overpayment, timezone, config_recargos')
     .eq('id', persona.academia_id)
     .single() as any
   const allowPartial = academia?.allow_partial_payments ?? true
@@ -128,7 +131,7 @@ export default async function SeguimientoPersonaPage({ params }: { params: Promi
     ['pendiente', 'parcial', 'vencido'].includes(c.estado_financiero)
   ) || []
   const deudaTotal = cargosActivos.reduce((acc: number, c: any) => acc + Number(c.saldo_pendiente), 0)
-  const estadoFinanciero = clasificarAlumno(cargosActivos, ahoraAcademia(timezone))
+  const estadoFinanciero = clasificarAlumno(cargosActivos, ahoraAcademia(timezone), academia?.config_recargos)
 
   // Saldo a favor: crédito disponible
   const { data: movsCredito } = await supabase

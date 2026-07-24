@@ -56,8 +56,11 @@ export default async function HistorialPublicoPage({
 
   // Página pública: el RPC no expone el timezone de la academia (no es
   // sensible, pero tampoco vale la pena ampliar su contrato solo para esto).
-  // Cae al mismo fallback que el resto de la app cuando no hay timezone real.
-  const estado: EstadoFinancieroAlumno = clasificarAlumno(payload.cargos_activos ?? [], ahoraAcademia(ACADEMIA_TZ_FALLBACK))
+  const estado: EstadoFinancieroAlumno = clasificarAlumno(
+    payload.cargos_activos ?? [],
+    ahoraAcademia(ACADEMIA_TZ_FALLBACK),
+    (payload.academia as any)?.config_recargos
+  )
 
   return (
     <HistorialPublicoView

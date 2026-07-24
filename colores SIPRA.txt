@@ -1,0 +1,26 @@
+"Al día"
+#5C8F78
+todo pagado al corriente.
+
+"Pendiente"
+#D2A45C
+pendiente pagar la mensualidad en curso, pero está dentro del rango de días (1 - 6 o 7 según configuración) permitido por el dueño.
+
+"Atrasado" 
+#B85C50
+debe mensualidad y está fuera del rango de días permitido por el dueño.
+
+"Urgente" 
+#7A2F38
+debe más de 1 mensualidad, o tiene algún cargo con más de 1 mes de antigüedad, o alguna otra regla definida de peso para ser considerado crítico.
+
+- - - - - - 
+
+COLORES LOGO 
+para identidad en app
+
+azul principal
+#15435a
+
+verde secundario
+#22887c
