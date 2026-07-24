@@ -67,12 +67,22 @@ const reglaRecargoSchema = z.object({
   valor: z.number().min(0).max(100000),
 })
 
+const estadosPagoSchema = z
+  .object({
+    dia_atrasado: z.number().int().min(1).max(28),
+    dia_urgente: z.number().int().min(5).max(31),
+  })
+  .superRefine((data, ctx) => {
+    if (data.dia_urgente - data.dia_atrasado < 4) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'El día de Urgente debe ser al menos 4 días mayor al día de Atrasado.',
+      })
+    }
+  })
+
 const recargosConfigSchema = z
   .object({
-    marcar_critico: z.object({
-      activo: z.boolean(),
-      dia_umbral: z.number().int().min(6).max(25),
-    }),
     aplicar_recargos: z.boolean(),
     reglas: z.array(reglaRecargoSchema).max(2),
   })
@@ -191,34 +201,31 @@ export async function guardarCobranzaAction(
 }
 
 /* -------------------------------------------------------------------------- */
-/* 3. Pagos atrasados — guarda config_recargos                                */
+/* 3. Estados de pago — guarda dia_atrasado y dia_urgente                    */
 /* -------------------------------------------------------------------------- */
 
-export async function guardarPagosAtrasadosAction(
+export async function guardarEstadosPagoAction(
   _prevState: FormState,
   formData: FormData
 ): Promise<FormState> {
-  const raw = (formData.get('config_recargos_json') as string) || ''
-  if (!raw) return { message: 'La configuración de pagos atrasados es inválida.', success: false }
+  const raw = (formData.get('config_estados_pago_json') as string) || ''
+  if (!raw) return { message: 'La configuración de estados de pago es inválida.', success: false }
 
-  let parsed: z.infer<typeof recargosConfigSchema>
+  let parsed: z.infer<typeof estadosPagoSchema>
   try {
     const obj = JSON.parse(raw)
-    const result = recargosConfigSchema.safeParse(obj)
+    const result = estadosPagoSchema.safeParse(obj)
     if (!result.success) {
-      return { message: 'La configuración de pagos atrasados es inválida.', success: false }
+      return { message: 'La configuración de estados de pago es inválida.', success: false }
     }
     parsed = result.data
   } catch {
-    return { message: 'La configuración de pagos atrasados no se pudo leer.', success: false }
+    return { message: 'La configuración de estados de pago no se pudo leer.', success: false }
   }
 
   const { supabase, academiaId } = await getAcademiaId()
   if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
 
-  // Mantener compatibilidad con claves legacy (`activo`, `escalones`):
-  // ya no las escribimos, pero las preservamos por si quedan en la BD para
-  // alguna academia migrada parcialmente.
   const { data: academiaData } = await supabase
     .from('academia')
     .select('config_recargos')
@@ -228,7 +235,61 @@ export async function guardarPagosAtrasadosAction(
   const currentConfig = academiaData?.config_recargos || {}
   const updatedConfig = {
     ...currentConfig,
-    marcar_critico: parsed.marcar_critico,
+    dia_atrasado: parsed.dia_atrasado,
+    dia_urgente: parsed.dia_urgente,
+    // Preservar clave legacy `marcar_critico` para compatibilidad
+    marcar_critico: {
+      activo: true,
+      dia_umbral: parsed.dia_urgente,
+    },
+  }
+
+  const { error } = await supabase
+    .from('academia')
+    .update({ config_recargos: updatedConfig } as any)
+    .eq('id', academiaId)
+
+  if (error) return { message: translateRpcError(error), success: false }
+
+  revalidatePath('/configuracion')
+  return { success: true, message: 'Estados de pago guardados.' }
+}
+
+/* -------------------------------------------------------------------------- */
+/* 4. Recargos por pago tardío — guarda config_recargos                       */
+/* -------------------------------------------------------------------------- */
+
+export async function guardarPagosAtrasadosAction(
+  _prevState: FormState,
+  formData: FormData
+): Promise<FormState> {
+  const raw = (formData.get('config_recargos_json') as string) || ''
+  if (!raw) return { message: 'La configuración de recargos es inválida.', success: false }
+
+  let parsed: z.infer<typeof recargosConfigSchema>
+  try {
+    const obj = JSON.parse(raw)
+    const result = recargosConfigSchema.safeParse(obj)
+    if (!result.success) {
+      return { message: 'La configuración de recargos es inválida.', success: false }
+    }
+    parsed = result.data
+  } catch {
+    return { message: 'La configuración de recargos no se pudo leer.', success: false }
+  }
+
+  const { supabase, academiaId } = await getAcademiaId()
+  if (!academiaId) return { message: 'No tienes una academia asociada.', success: false }
+
+  const { data: academiaData } = await supabase
+    .from('academia')
+    .select('config_recargos')
+    .eq('id', academiaId)
+    .single() as any
+
+  const currentConfig = academiaData?.config_recargos || {}
+  const updatedConfig = {
+    ...currentConfig,
     aplicar_recargos: parsed.aplicar_recargos,
     reglas: parsed.reglas,
   }
@@ -241,7 +302,7 @@ export async function guardarPagosAtrasadosAction(
   if (error) return { message: translateRpcError(error), success: false }
 
   revalidatePath('/configuracion')
-  return { success: true, message: 'Pagos atrasados guardados.' }
+  return { success: true, message: 'Recargos guardados.' }
 }
 
 /* -------------------------------------------------------------------------- */

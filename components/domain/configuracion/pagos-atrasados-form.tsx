@@ -29,18 +29,13 @@ import {
 
 type TipoRecargo = 'porcentaje' | 'monto_fijo'
 type Regla = { dia: number; tipo: TipoRecargo; valor: number }
-type MarcarCritico = { activo: boolean; dia_umbral: number }
 
-type PagosAtrasadosState = {
-  marcar_critico: MarcarCritico
+type RecargosState = {
   aplicar_recargos: boolean
   reglas: Regla[]
 }
 
-const CRITICO_HEX = '#7A2F38'
-
-const DEFAULT_STATE: PagosAtrasadosState = {
-  marcar_critico: { activo: false, dia_umbral: 15 },
+const DEFAULT_STATE: RecargosState = {
   aplicar_recargos: false,
   reglas: [],
 }
@@ -55,16 +50,8 @@ const REGLA_DEFAULT_2_FROM = (r1: Regla): Regla => ({
 const VALORES_PORCENTAJE = [5, 10, 15, 20, 25, 30]
 const VALORES_MONTO = [20, 50, 100, 150, 200, 300]
 
-function deriveInitialState(initialConfig: any): PagosAtrasadosState {
+function deriveInitialState(initialConfig: any): RecargosState {
   if (!initialConfig || typeof initialConfig !== 'object') return DEFAULT_STATE
-
-  const marcar = initialConfig.marcar_critico
-  const marcarCritico: MarcarCritico = marcar
-    ? {
-        activo: !!marcar.activo,
-        dia_umbral: Math.min(25, Math.max(6, Number(marcar.dia_umbral) || 15)),
-      }
-    : { activo: false, dia_umbral: 15 }
 
   let reglas: Regla[] = []
   if (Array.isArray(initialConfig.reglas)) {
@@ -85,11 +72,11 @@ function deriveInitialState(initialConfig: any): PagosAtrasadosState {
     ? !!initialConfig.aplicar_recargos
     : !!initialConfig.activo // legacy
 
-  return { marcar_critico: marcarCritico, aplicar_recargos: aplicar, reglas }
+  return { aplicar_recargos: aplicar, reglas }
 }
 
 /* -------------------------------------------------------------------------- */
-/* Bloque de recargos (sin Card; se monta dentro de "Recargos y Excepciones")  */
+/* Bloque de recargos                                                         */
 /* -------------------------------------------------------------------------- */
 
 const initialFormState: FormState = {}
@@ -97,16 +84,13 @@ const initialFormState: FormState = {}
 export function RecargosBlock({ initialConfig }: { initialConfig: any }) {
   const initial = useMemo(() => deriveInitialState(initialConfig), [initialConfig])
 
-  const [marcarCritico, setMarcarCritico] = useState<MarcarCritico>(initial.marcar_critico)
   const [aplicarRecargos, setAplicarRecargos] = useState<boolean>(initial.aplicar_recargos)
   const [reglas, setReglas] = useState<Regla[]>(initial.reglas)
 
-  // Bottom sheets
-  const [criticoSheetOpen, setCriticoSheetOpen] = useState(false)
+  // Bottom sheet
   const [editingReglaIdx, setEditingReglaIdx] = useState<number | null>(null)
 
-  const current: PagosAtrasadosState = {
-    marcar_critico: marcarCritico,
+  const current: RecargosState = {
     aplicar_recargos: aplicarRecargos,
     reglas,
   }
@@ -119,7 +103,6 @@ export function RecargosBlock({ initialConfig }: { initialConfig: any }) {
   }, [state.success, commitSnapshot])
 
   const onCancel = () => {
-    setMarcarCritico(snapshot.marcar_critico)
     setAplicarRecargos(snapshot.aplicar_recargos)
     setReglas(snapshot.reglas)
   }
@@ -127,11 +110,10 @@ export function RecargosBlock({ initialConfig }: { initialConfig: any }) {
   const configJson = useMemo(
     () =>
       JSON.stringify({
-        marcar_critico: marcarCritico,
         aplicar_recargos: aplicarRecargos,
         reglas,
       }),
-    [marcarCritico, aplicarRecargos, reglas]
+    [aplicarRecargos, reglas]
   )
 
   const toggleRegla2 = (checked: boolean) => {
@@ -167,57 +149,6 @@ export function RecargosBlock({ initialConfig }: { initialConfig: any }) {
       <form action={formAction} className="space-y-3">
         <input type="hidden" name="config_recargos_json" value={configJson} />
 
-        {/* Marcar como Crítico */}
-        <div className="flex items-start gap-3 py-1.5">
-          <button
-            type="button"
-            role="switch"
-            aria-checked={marcarCritico.activo}
-            aria-label='Marcar estado de alumno como "Crítico"'
-            onClick={() =>
-              setMarcarCritico((current) => ({
-                ...current,
-                activo: !current.activo,
-                dia_umbral: current.dia_umbral || 15,
-              }))
-            }
-            className={cn(
-              'relative inline-flex h-[18.4px] w-[32px] mt-0.5 shrink-0 items-center rounded-full border border-transparent transition-colors',
-              marcarCritico.activo ? 'bg-primary' : 'bg-input'
-            )}
-          >
-            <span
-              className={cn(
-                'block size-4 rounded-full bg-white transition-transform',
-                marcarCritico.activo ? 'translate-x-[calc(100%-2px)]' : 'translate-x-0'
-              )}
-            />
-          </button>
-
-          <div className="flex items-center flex-wrap gap-x-1.5 gap-y-1 text-sm leading-relaxed">
-            <span className="text-foreground">Marcar estado de alumno como</span>
-            <span className="inline-flex items-center gap-1 font-semibold text-foreground">
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CRITICO_HEX }} aria-hidden />
-              &ldquo;Crítico&rdquo;
-            </span>
-            <span className="text-foreground">cuando supere el día</span>
-            <button
-              type="button"
-              disabled={!marcarCritico.activo}
-              onClick={() => setCriticoSheetOpen(true)}
-              className={cn(
-                'inline-flex items-center justify-center h-8 min-w-[2.75rem] px-2 rounded-md border text-sm font-medium transition-colors',
-                marcarCritico.activo
-                  ? 'border-input bg-background text-foreground hover:bg-muted/40'
-                  : 'border-dashed border-input bg-muted/40 text-muted-foreground cursor-not-allowed opacity-70'
-              )}
-            >
-              {marcarCritico.activo ? marcarCritico.dia_umbral : ''}
-            </button>
-            <span className="text-foreground">sin registrarse el pago.</span>
-          </div>
-        </div>
-
         {/* Aplicar recargos */}
         <ToggleRow
           id="aplicar_recargos_toggle"
@@ -250,45 +181,6 @@ export function RecargosBlock({ initialConfig }: { initialConfig: any }) {
           errorMessage={state.success === false ? state.message : null}
         />
       </form>
-
-      {/* Bottom sheet: día límite de "Crítico" (4 columnas × 5 filas, días 6-25) */}
-      <Drawer open={criticoSheetOpen} onOpenChange={setCriticoSheetOpen}>
-        <DrawerContent>
-          <div className="mx-auto w-full max-w-sm">
-            <DrawerHeader className="text-left">
-              <DrawerTitle>Día límite</DrawerTitle>
-              <DrawerDescription>
-                A partir de este día del mes (sin registrarse el pago) el alumno se marca como Crítico.
-              </DrawerDescription>
-            </DrawerHeader>
-            <div className="p-4 pb-6">
-              <div className="grid grid-cols-4 gap-2 max-w-xs mx-auto">
-                {Array.from({ length: 25 - 6 + 1 }, (_, i) => i + 6).map((d) => {
-                  const selected = d === marcarCritico.dia_umbral
-                  return (
-                    <button
-                      key={d}
-                      type="button"
-                      onClick={() => {
-                        setMarcarCritico({ ...marcarCritico, dia_umbral: d })
-                        setCriticoSheetOpen(false)
-                      }}
-                      className={cn(
-                        'h-11 rounded-md text-sm font-medium transition-colors border',
-                        selected
-                          ? 'bg-primary text-primary-foreground border-primary font-semibold'
-                          : 'bg-background text-foreground border-input hover:bg-muted/40'
-                      )}
-                    >
-                      {d}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-        </DrawerContent>
-      </Drawer>
 
       {/* Bottom sheet: editar una regla de recargo */}
       <ReglaEditorSheet

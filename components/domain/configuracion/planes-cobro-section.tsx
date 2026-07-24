@@ -28,6 +28,7 @@ import { cn } from '@/lib/utils'
 import { parseWholeMoneyInput, preventMoneyWheel } from '@/lib/utils/money-input'
 import { useToast } from '@/components/ui/use-toast'
 import { MesesCobroSection } from '@/components/domain/configuracion/meses-cobro-section'
+import { ProrrateoBlock } from '@/components/domain/configuracion/cobranza-form-section'
 import {
   guardarPlanCobroAction,
   archivarPlanCobroAction,
@@ -58,9 +59,11 @@ const SUFIJO_POR_FRECUENCIA: Record<PlanCobro['frecuencia'], string> = {
 export function PlanesCobroSection({
   planes,
   initialMesesSinCobro,
+  initialCobro,
 }: {
   planes: PlanCobro[]
   initialMesesSinCobro: number[]
+  initialCobro?: any
 }) {
   const router = useRouter()
   const { showToast, toast } = useToast()
@@ -213,6 +216,11 @@ export function PlanesCobroSection({
         {/* Meses de cobro (subsección sin título propio) */}
         <div className="border-t border-border pt-4">
           <MesesCobroSection initialMeses={initialMesesSinCobro} />
+        </div>
+
+        {/* ¿Qué pasa si un alumno entra con el mes ya iniciado? (Prorrateo) */}
+        <div className="border-t border-border pt-4">
+          <ProrrateoBlock initialConfig={initialCobro} />
         </div>
       </CardContent>
 

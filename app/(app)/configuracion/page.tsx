@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { PlanesCobroSection, type PlanCobro } from '@/components/domain/configuracion/planes-cobro-section'
 import { CobrosFrecuentesSection, type CobroFrecuente } from '@/components/domain/configuracion/cobros-frecuentes-section'
-import { RecargosExcepcionesSection } from '@/components/domain/configuracion/recargos-excepciones-section'
+import { EstadosPagoSection } from '@/components/domain/configuracion/estados-pago-section'
+import { RecargosSection } from '@/components/domain/configuracion/recargos-excepciones-section'
 import { PoliticasCobroSection } from '@/components/domain/configuracion/politicas-cobro-section'
 import { ConfiguracionSubheader } from './configuracion-subheader'
 import { Sparkles } from 'lucide-react'
@@ -105,18 +106,23 @@ export default async function ConfiguracionPage({
           </div>
         )}
 
+        {/* 1. Planes de Cobro Mensual (incluye Meses de cobro + Prorrateo) */}
         <PlanesCobroSection
           planes={planesConConteo as PlanCobro[]}
           initialMesesSinCobro={mesesSinCobro}
-        />
-
-        <CobrosFrecuentesSection cobros={cobrosFrecuentes} />
-
-        <RecargosExcepcionesSection
-          initialRecargos={configRecargos}
           initialCobro={configCobro}
         />
 
+        {/* 2. Catálogo de Cobros Frecuentes */}
+        <CobrosFrecuentesSection cobros={cobrosFrecuentes} />
+
+        {/* 3. Estados de pago (nueva) */}
+        <EstadosPagoSection initialConfig={configRecargos} />
+
+        {/* 4. Recargos (recargos por pago tardío de mensualidad) */}
+        <RecargosSection initialConfig={configRecargos} />
+
+        {/* 5. Políticas de Cobro (sin cambios) */}
         <PoliticasCobroSection
           initialAllowPartial={allowPartial}
           initialAllowOverpayment={allowOverpayment}

@@ -6,27 +6,22 @@ import { RecargosBlock } from '@/components/domain/configuracion/pagos-atrasados
 import { ProrrateoBlock } from '@/components/domain/configuracion/cobranza-form-section'
 
 /**
- * Sección unificada: primero los recargos por pago tardío (config_recargos) y
- * luego el prorrateo / régimen de alta (config_cobro). Cada bloque conserva su
- * propio guardado independiente.
+ * Sección Recargos: recargos por pago tardío de mensualidad (config_recargos).
  */
-export function RecargosExcepcionesSection({
-  initialRecargos,
-  initialCobro,
-}: {
-  initialRecargos: any
-  initialCobro: any
-}) {
+export function RecargosSection({ initialConfig }: { initialConfig: any }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Recargos y Excepciones</CardTitle>
+        <CardTitle className="text-lg">Recargos</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <RecargosBlock initialConfig={initialRecargos} />
-        <div className="border-t border-border" />
-        <ProrrateoBlock initialConfig={initialCobro} />
+      <CardContent>
+        <RecargosBlock initialConfig={initialConfig} />
       </CardContent>
     </Card>
   )
 }
+
+/** Compat alias */
+export const RecargosExcepcionesSection = ({ initialRecargos }: { initialRecargos: any; initialCobro?: any }) => (
+  <RecargosSection initialConfig={initialRecargos} />
+)
